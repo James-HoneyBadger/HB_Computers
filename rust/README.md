@@ -46,6 +46,7 @@ What it has not carried over from the Qt window, and why:
 | `kestrel-cli` | `tools/kestrel.cpp` | done, the `kestrel` binary |
 | `kestrel-cli` | `tools/kestrel_emu.cpp` | done, the `kestrel_emu` binary |
 | `kestrel-app` | `app/main.cpp` and `model1982/window.cpp`, in egui | done, the `kestrel_computers` binary |
+| `kestrel-asm` | `tools/kestrel_asm.cpp` | done, the `kestrel_asm` binary; the same bytes out as the C++ tool for all three ROMs |
 
 ## What proves it
 
@@ -63,9 +64,15 @@ Three kinds of test, in rising order of strength:
 - **the tools** (`crates/kestrel-cli/tests/emulator.rs`). The interactive
   emulator's session commands, asked of the built binary, as the C++
   `kestrel_emu_tests` asks them.
+- **the assembler** (`crates/kestrel-asm`). The C++ suite in
+  `tests/kestrel_asm_tests.cpp` is ported, and the binary is then run over the
+  three ROM sources and its image, symbol table, listing and header compared
+  byte for byte with the ones the C++ build generated.
 
-The images are assembled by the C++ build; a Rust-only checkout has no ROMs, so
-those tests say so rather than passing quietly.
+The images the port loads are still assembled by the C++ build; a Rust-only
+checkout has no ROMs, so those tests say so rather than passing quietly.
+`crates/kestrel-asm` now assembles the same three ROMs to the same bytes, so
+which tool produces them no longer matters.
 
 ## When the two trees disagree
 

@@ -1667,6 +1667,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "kestrel-asm"
+version = "0.1.0"
+
+[[package]]
 name = "kestrel-cli"
 version = "0.1.0"
 dependencies = [

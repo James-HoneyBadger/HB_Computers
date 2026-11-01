@@ -3,7 +3,12 @@
 # also still working.
 [workspace]
 resolver = "2"
-members = ["crates/kestrel-machine", "crates/kestrel-cli", "crates/kestrel-app"]
+members = [
+    "crates/kestrel-machine",
+    "crates/kestrel-cli",
+    "crates/kestrel-app",
+    "crates/kestrel-asm",
+]
 
 [workspace.package]
 version = "0.1.0"
