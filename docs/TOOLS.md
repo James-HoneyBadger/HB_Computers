@@ -120,7 +120,21 @@ READY.
 | `--frames N` | How many frames to run before the screen is printed |
 | `--speed 1\|2\|4\|8\|turbo` | How fast the host clocks it; `turbo` by default |
 | `--type "LINE"` | Type a line at the prompt and let the machine answer; may be repeated |
+| `--rom ID` | Which ROM to put in the 1982 machine's socket: `basic`, `monitor` |
+| `--tape FILE` | Insert this cassette image; the machine gets a blank one otherwise |
 | `--no-screen` | Print nothing |
+
+The machine types at the speed it could be typed at: a key goes in only when the
+keyboard controller has room for it, and each line waits for the buffer to empty
+before the next. Pasting a whole line in at once overruns the sixteen-key buffer
+and loses characters, Return included — which welds two program lines into one.
+
+```bash
+$ ./build/kestrel --rom monitor --type "S 0900 0902" --type "L"
+```
+
+`--rom monitor` boots the machine with the monitor in the socket instead of BASIC,
+which is how the cassette is used at all: `S` and `L` live there.
 
 ---
 

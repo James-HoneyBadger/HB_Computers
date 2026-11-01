@@ -1862,6 +1862,9 @@ ERR_BAD_FILENAME:
 ERR_DOS:
         LDA #E_DISK
         JMP ERROR
+ERR_FILE_NOT_FOUND:
+        LDA #E_FILE_NOT_FOUND
+        JMP ERROR
 
 ERROR:
         STA B_ERRNUM
@@ -1877,7 +1880,7 @@ ERROR:
         JSR K_PRINT
         ; In a program, the line number is part of the report.
         LDA B_MODE
-        BEQ ERROR_DONE
+        BEQ ERROR_NEWLINE
         LDA #<TXT_IN
         STA ZP_STRPTR
         LDA #>TXT_IN
@@ -1892,7 +1895,8 @@ ERROR:
         LDA #>B_NUMBUF
         STA ZP_STRPTR+1
         JSR K_PRINT
-        LDA #CC_RETURN
+ERROR_NEWLINE:
+        LDA #CC_RETURN          ; the report ends its line either way
         JSR K_CHROUT
 ERROR_DONE:
         JMP BASIC_WARM
@@ -2001,6 +2005,8 @@ DO_CATALOG:
         RTS
 
 DOS_FAULT:
+        CMP #ERR_NOT_FOUND      ; a file the directory does not list is named as
+        BEQ ERR_FILE_NOT_FOUND  ; such; everything else is the disk's fault
         JMP ERR_DOS
 
 ; PARSEFN: the name in quotes after SAVE or LOAD goes to DOSNAME, upper case and

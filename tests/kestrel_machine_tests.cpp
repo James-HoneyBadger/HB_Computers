@@ -448,6 +448,63 @@ void test_the_disk_holds_a_program() {
     typeOut(machine, "LOAD \"DEMO\"");
     typeOut(machine, "RUN");
     TW_CHECK((answerAfter(machine, "RUN")) == "FROM DISK");
+
+    // A second file is listed too, and the sizes are decimal.
+    typeOut(machine, "20 REM A LONGER PROGRAM THAN THE FIRST ONE");
+    typeOut(machine, "SAVE \"SECOND\"");
+    typeOut(machine, "CLS");
+    typeOut(machine, "CATALOG");
+    const std::string all = screenText(machine);
+    TW_CHECK(all.find("DEMO") != std::string::npos);
+    TW_CHECK(all.find("SECOND") != std::string::npos);
+    TW_CHECK(all.find("q") == std::string::npos);   // a digit, not a letter
+
+    // A name the directory does not hold is named as such.
+    Machine missing{Model::Kestrel};
+    missing.runFrames(20);
+    typeOut(missing, "LOAD \"NOPE\"");
+    TW_CHECK(screenText(missing).find("FILE NOT FOUND") != std::string::npos);
+}
+
+/// The monitor ROM: examine, deposit, go, registers, and the cassette.
+void test_the_monitor_rom_uses_the_cassette() {
+    Machine machine{Model::Kestrel};
+    const auto* monitor = kestrel::model1982::findRom("monitor");
+    TW_CHECK(monitor != nullptr);
+    machine.mountSocketRom(*monitor->image, monitor->id);
+    machine.reset();
+    machine.runFrames(20);
+
+    // LDA #$41 : STA $0900 : RTS -- it overwrites its own first byte, which is
+    // how the test knows it ran.
+    typeOut(machine, ": 0900 A9 41 8D 00 09 60");
+    typeOut(machine, "CLS");
+    typeOut(machine, "M 0900 06");
+    TW_CHECK(screenText(machine).find("A9 41 8D 00 09 60") != std::string::npos);
+    typeOut(machine, "G 0900");
+    typeOut(machine, "CLS");
+    typeOut(machine, "M 0900 01");
+    TW_CHECK(screenText(machine).find("41") != std::string::npos);
+    typeOut(machine, "R");
+    TW_CHECK(screenText(machine).find("A=") != std::string::npos);
+
+    // Without a cassette in the deck there is nothing to save to.
+    const std::string noTape = screenText(machine);
+    typeOut(machine, "S 0900 0902");
+    TW_CHECK(screenText(machine).find("no tape") != std::string::npos);
+    TW_CHECK(noTape.find("saved") == std::string::npos);
+
+    // With one, a block goes out and comes back whole, last address included.
+    machine.tape().insert();
+    typeOut(machine, ": 0910 AA BB CC");
+    typeOut(machine, "S 0910 0912");
+    TW_CHECK(screenText(machine).find("saved") != std::string::npos);
+    typeOut(machine, ": 0910 00 00 00");
+    typeOut(machine, "L");
+    TW_CHECK(screenText(machine).find("loaded") != std::string::npos);
+    typeOut(machine, "CLS");
+    typeOut(machine, "M 0910 03");
+    TW_CHECK(screenText(machine).find("AA BB CC") != std::string::npos);
 }
 
 
@@ -798,6 +855,7 @@ int main() {
     test_delete_removes_lines();
     test_the_functions();
     test_the_disk_holds_a_program();
+    test_the_monitor_rom_uses_the_cassette();
     test_strings();
     test_strings_in_a_program();
     test_get_takes_one_key();

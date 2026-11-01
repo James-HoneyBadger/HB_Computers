@@ -185,6 +185,19 @@ a number is stored in the program, and a line without one is run at once.
 
 `HELP` prints the command list, which is where this table comes from.
 
+A definition is kept as a pointer at the expression, which stays where it was
+written, so a function has to be *defined in the program*:
+
+```basic
+10 DEF FN A(X)=X*X+1
+20 PRINT FN A(3)
+RUN
+10
+```
+
+Typed at the prompt, `DEF FN` points into the input buffer and is worthless by
+the next line — the text it named has gone. Write the definitions in the program.
+
 A `FOR` whose start is already past its limit runs its body no times, and leaves
 the variable holding that start, so `FOR J=I*I TO 100` is safe even when `I*I` has
 run past the end of the array it indexes. The machine walks forward for the
@@ -279,6 +292,22 @@ The other socket ROM. `HELP` is not in it; its own words are:
 
 It is how a machine-code program is written and run on the machine itself, and
 how the cassette is used at all: BASIC has no tape words.
+
+`S aaaa bbbb` takes the block from `aaaa` to `bbbb` *inclusive*, so
+`S 0900 0902` writes three bytes behind a four-byte header — the load address and
+the length — and `L` puts them back where they came from. Both words need a
+cassette in the deck: the window inserts one with **Tape**, and `kestrel --tape`
+takes an image, or hands the machine a blank one. With the drawer empty, `S` and
+`L` both say `no tape`.
+
+`G aaaa` jumps to the address and an `RTS` there comes back to the prompt, so a
+routine can be deposited and tried. `R` prints the registers the frame interrupt
+last saw, which is what a monitor without a `BRK` vector of its own can honestly
+report.
+
+The socket holds one ROM at a time, and which one it is changes the machine: the
+window's **ROM** menu swaps them and cold-boots, and `kestrel --rom monitor` does
+the same from the command line.
 
 ---
 

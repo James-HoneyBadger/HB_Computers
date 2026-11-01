@@ -120,6 +120,7 @@ ZP_CHR      = $12
 ZP_BLINK    = $13
 ZP_CURSOR   = $14
 ZP_INLEN    = $15
+ZP_ENTRY    = $16       ; the catalog's place in the directory
 ZP_IRQCNT   = $17
 ZP_DSKPTR   = $18       ; $18/$19, the DOS transfer pointer
 ZP_DSKSTAT  = $1A
@@ -149,6 +150,8 @@ DIRBUF      = $0300     ; both directory sectors, read and written as a unit
 DIRBUF_SIZE = 512
 VOLBUF      = $0500     ; the volume header, with the free-sector map
 CHUNKBUF    = $0600     ; one sector of file data on its way through
+PRBUF       = $0740     ; five digits, on their way out one at a time: printing a
+                        ; character uses every zero page byte the KERNAL has
 
 ; ---------------------------------------------------------------------------
 ; KERNAL entry points. The jump table at $E000 is this list in the same order:

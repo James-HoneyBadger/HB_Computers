@@ -7,10 +7,13 @@
 // run, print the screen. Everything on that screen came out of the model's ROMs.
 
 #include "kestrel/machine.hpp"
+#include "kestrel/model1982/rom.hpp"
 
 using kestrel::SpecialKey;
 
 #include <cstdio>
+#include <fstream>
+#include <iterator>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -24,6 +27,8 @@ struct Options {
     int frames = 40;
     kestrel::Machine::Speed speed = kestrel::Machine::Speed::Turbo;
     std::vector<std::string> lines;
+    std::string rom;
+    std::string tape;
     bool screen = true;
 };
 
@@ -36,6 +41,9 @@ void usage() {
         "  --frames   frames to run before the screen is printed (default 40)\n"
         "  --type     type a line at the prompt and let the machine answer; may\n"
         "             be given more than once\n"
+        "  --tape     insert this cassette image (.tap); a blank one otherwise\n"
+        "  --rom      which ROM to put in the 1982 machine's socket: basic, or\n"
+        "             monitor for machine code (default basic)\n"
         "  --no-screen  print nothing; useful only for timing\n");
 }
 
@@ -79,6 +87,10 @@ int main(int argc, char** argv) {
                 std::fprintf(stderr, "kestrel: speed must be 1, 2, 4, 8 or turbo\n");
                 return 2;
             }
+        } else if (arg == "--tape") {
+            options.tape = std::string{next()};
+        } else if (arg == "--rom") {
+            options.rom = std::string{next()};
         } else if (arg == "--type") {
             options.lines.emplace_back(next());
         } else if (arg == "--no-screen") {
@@ -95,7 +107,38 @@ int main(int argc, char** argv) {
 
     kestrel::Machine machine{options.model};
     machine.setSpeed(options.speed);
+    if (!options.rom.empty()) {
+        const auto* rom = kestrel::model1982::findRom(options.rom);
+        if (rom == nullptr) {
+            std::fprintf(stderr, "kestrel: no such ROM: %s\n", options.rom.c_str());
+            for (const auto& one : kestrel::model1982::romLibrary()) {
+                std::fprintf(stderr, "  %.*s -- %.*s\n", static_cast<int>(one.id.size()),
+                             one.id.data(), static_cast<int>(one.description.size()),
+                             one.description.data());
+            }
+            return 2;
+        }
+        if (machine.model() != kestrel::Model::Kestrel) {
+            std::fprintf(stderr, "kestrel: the 1992 machine's language ROM is a bank, not a socket\n");
+            return 2;
+        }
+        if (!machine.mountSocketRom(*rom->image, rom->id)) {
+            std::fprintf(stderr, "kestrel: %s does not fit the socket\n", options.rom.c_str());
+            return 2;
+        }
+    }
     machine.reset();
+    if (!options.tape.empty()) {
+        std::ifstream in(options.tape, std::ios::binary);
+        if (!in) {
+            std::fprintf(stderr, "kestrel: cannot read tape: %s\n", options.tape.c_str());
+            return 2;
+        }
+        const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(in),
+                                             std::istreambuf_iterator<char>()};
+        machine.tape().load(bytes);
+    }
+    machine.tape().insert();
     machine.runFrames(options.frames);
 
     // A person types at the speed of the emulated machine, not the host's: the

@@ -373,6 +373,9 @@ MON_REGISTERS:
 ; --- S: save a block to tape ----------------------------------------------
 
 MON_SAVE:
+        LDA IO_TAPESTAT
+        AND #$80                ; bit 7: a cassette is in the deck
+        BEQ MON_NOTAPE_JMP
         JSR SKIP
         JSR PARSEHEX
         BCS MON_BAD
@@ -390,6 +393,10 @@ MON_SAVE:
         LDA M_WORD+1
         SBC M_ADDR+1
         STA M_COUNT+1
+        INC M_COUNT             ; the block runs to the last address, not up to
+        BNE MON_SAVE_SPAN       ; it, so the count is one more than the gap
+        INC M_COUNT+1
+MON_SAVE_SPAN:
         LDA #2
         STA IO_TAPECONTROL      ; record
         LDA M_ADDR+1
@@ -479,6 +486,9 @@ MON_LOAD_DONE:
         STA ZP_STRPTR+1
         JSR K_PRINT
         JMP MON_WARM
+MON_NOTAPE_JMP:
+        JMP MON_LOAD_NONE
+
 MON_LOAD_NONE:
         LDA #<MON_NOTAPE
         STA ZP_STRPTR

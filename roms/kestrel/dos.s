@@ -226,9 +226,9 @@ DOSCATALOG:
         JSR READDIR
         BNE DOSCATALOG_ERR
         LDA #0
-        STA ZP_TMP
+        STA ZP_ENTRY            ; printing a line uses every other scratch byte
 DOSCATALOG_LOOP:
-        LDA ZP_TMP
+        LDA ZP_ENTRY
         CMP #DOS_MAX_FILES
         BCS DOSCATALOG_NONE
         JSR ENTRYPTR
@@ -253,7 +253,7 @@ DOSCATALOG_NAME:
         JSR PRDEC16
         JSR NEWLINE
 DOSCATALOG_NEXT:
-        INC ZP_TMP
+        INC ZP_ENTRY
         JMP DOSCATALOG_LOOP
 DOSCATALOG_NONE:
         LDA #0
@@ -724,33 +724,53 @@ FORMATNAME:
 ; Decimal output, for the directory listing
 ; ---------------------------------------------------------------------------
 
-; PRDEC16: prints the unsigned 16-bit number in ZP_PTR.
+; PRDEC16: prints the unsigned 16-bit number in ZP_PTR, in decimal. The digits
+; are collected first, because printing one character uses most of the KERNAL's
+; zero page -- including ZP_PTR, where the number is.
 PRDEC16:
         LDA #0
-        STA ZP_TMP4
-        LDA #$27
+        STA ZP_TMP4             ; no digit has been worth printing yet
+        LDX #0
+        LDA #$27                ; ten thousand
         STA ZP_TMP
         LDA #$10
         STA ZP_TMP2
         JSR PRDIGIT
-        LDA #$03
+        LDA #$03                ; a thousand
         STA ZP_TMP
         LDA #$E8
         STA ZP_TMP2
         JSR PRDIGIT
-        LDA #$64
+        LDA #$64                ; a hundred
         STA ZP_TMP
         LDA #0
         STA ZP_TMP2
         JSR PRDIGIT
-        LDA #$0A
+        LDA #$0A                ; ten
         STA ZP_TMP
         LDA #0
         STA ZP_TMP2
         JSR PRDIGIT
-        LDA ZP_PTR
+        LDA ZP_PTR              ; and the units
         ORA #$30
+        STA PRBUF,X
+        INX
+        CPX #1
+        BNE PRDEC16_OUT
+        LDA #'0'                ; the number was zero and nothing was printed
         JMP CHROUT
+PRDEC16_OUT:
+        LDA #0                  ; a zero ends the digits, and Y survives a
+        STA PRBUF,X             ; character going out while X does not
+        LDY #0
+PRDEC16_OUT_LOOP:
+        LDA PRBUF,Y
+        BEQ PRDEC16_OUT_DONE
+        JSR CHROUT
+        INY
+        JMP PRDEC16_OUT_LOOP
+PRDEC16_OUT_DONE:
+        RTS
 
 PRDIGIT:
         JSR PRDIV
@@ -763,7 +783,8 @@ PRDIGIT_SHOW:
         STA ZP_TMP4
         LDA ZP_TMP3
         ORA #$30
-        JSR CHROUT
+        STA PRBUF,X
+        INX
 PRDIGIT_DONE:
         RTS
 
