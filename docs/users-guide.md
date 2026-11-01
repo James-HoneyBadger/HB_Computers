@@ -472,8 +472,9 @@ compared with the `.expected` file beside it, so these programs run as written.
 | [02-arithmetic](../samples/kestrel16/02-arithmetic.bas) | sixteen-bit range and precedence |
 | [03-division](../samples/kestrel16/03-division.bas) | signed division |
 | [04-variables](../samples/kestrel16/04-variables.bas) | `LET` and the `A`–`Z` variables |
-| [05-table](../samples/kestrel16/05-table.bas) | a table written out, because there are no loops |
+| [05-table](../samples/kestrel16/05-table.bas) | a table, one row to a line |
 | [06-limits](../samples/kestrel16/06-limits.bas) | what the language does not do yet |
+| [07-branches-and-loops](../samples/kestrel16/07-branches-and-loops.bas) | `IF`/`THEN`, `GOSUB`/`RETURN` and `FOR`/`NEXT` in one program |
 
 Run one:
 

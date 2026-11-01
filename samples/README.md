@@ -40,8 +40,9 @@ Or type them in at the window, or from `./start.sh cli`.
 
 ## Kestrel 16 (1992), Kestrel 16 BASIC 2.0
 
-That language has no stored program yet, so its samples are the direct statements
-it takes — a set of lines rather than a program.
+Some of these are direct statements, typed one at a time; the one that needs a
+stored program numbers its lines and ends with `RUN`, so the file can be typed at
+the machine as it stands.
 
 | File | What it shows |
 | --- | --- |
@@ -49,5 +50,6 @@ it takes — a set of lines rather than a program.
 | `02-arithmetic.bas` | sixteen-bit range and operator precedence |
 | `03-division.bas` | signed division, rounding towards zero |
 | `04-variables.bas` | `LET` and the `A`–`Z` variables |
-| `05-table.bas` | a table written out, because there are no loops |
+| `05-table.bas` | a table, one row to a line |
 | `06-limits.bas` | what the language does not do yet, said plainly |
+| `07-branches-and-loops.bas` | `IF`/`THEN`, `GOSUB`/`RETURN` and `FOR`/`NEXT` |
