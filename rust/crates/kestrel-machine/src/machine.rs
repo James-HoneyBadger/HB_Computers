@@ -300,6 +300,29 @@ fn profile_of(model: Model) -> &'static crate::profile::Profile {
     }
 }
 
+/// Where the C++ build leaves the assembled images. `chosen` wins; then
+/// `KESTREL_ROMS`; then `build/generated` under the current directory or under
+/// the repository this crate lives in. A checkout that has never been built has
+/// none, and saying so is more use than a missing-file error.
+pub fn shipped_roms_directory(chosen: Option<&Path>) -> Result<std::path::PathBuf, String> {
+    if let Some(path) = chosen {
+        return Ok(path.to_path_buf());
+    }
+    if let Some(path) = std::env::var_os("KESTREL_ROMS") {
+        return Ok(std::path::PathBuf::from(path));
+    }
+    let candidates = [
+        std::path::PathBuf::from("build/generated"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../build/generated"),
+    ];
+    for candidate in candidates {
+        if candidate.join("kestrel").join("kernal.bin").is_file() {
+            return Ok(candidate);
+        }
+    }
+    Err("no assembled ROMs: run ./start.sh build, or say where they are with --roms".to_string())
+}
+
 fn read_image(path: &Path) -> Result<Vec<u8>, RomError> {
     std::fs::read(path).map_err(|error| RomError::Unreadable(format!("{}: {error}", path.display())))
 }

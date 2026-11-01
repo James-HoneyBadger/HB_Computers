@@ -10,10 +10,10 @@
 //   kestrel [--model kestrel|kestrel16] [--frames N] [--type "LINE"]...
 //           [--file PATH] [--roms DIR] [--no-screen]
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use kestrel_machine::machine::Machine;
+use kestrel_machine::machine::{shipped_roms_directory, Machine};
 use kestrel_machine::profile::Model;
 
 struct Options {
@@ -93,30 +93,8 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
     Ok(options)
 }
 
-/// Where the assembled images are. The C++ build puts them in
-/// `build/generated`; a checkout that has never been built has none, which is
-/// worth saying plainly rather than failing with a missing file.
-fn roms_directory(chosen: Option<&PathBuf>) -> Result<PathBuf, String> {
-    if let Some(path) = chosen {
-        return Ok(path.clone());
-    }
-    if let Some(path) = std::env::var_os("KESTREL_ROMS") {
-        return Ok(PathBuf::from(path));
-    }
-    let candidates = [
-        PathBuf::from("build/generated"),
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../build/generated"),
-    ];
-    for candidate in candidates {
-        if candidate.join("kestrel").join("kernal.bin").is_file() {
-            return Ok(candidate);
-        }
-    }
-    Err("no assembled ROMs: run ./start.sh build, or say where they are with --roms".to_string())
-}
-
 fn run(options: &Options) -> Result<(), String> {
-    let images = roms_directory(options.roms.as_ref())?;
+    let images = shipped_roms_directory(options.roms.as_deref())?;
     let mut machine = Machine::new(options.model);
     machine
         .mount_shipped_roms(&images)

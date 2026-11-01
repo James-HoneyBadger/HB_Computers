@@ -10,9 +10,9 @@ The port is far enough along to boot both machines and answer BASIC:
 ./start.sh build                              # assembles the ROMs the port loads
 
 cd rust
-cargo run --offline -p kestrel-cli -- --type 'PRINT 2+2*3'
-cargo run --offline -p kestrel-cli -- --model kestrel16 --type 'PRINT 1000*20'
-cargo run --offline -p kestrel-cli -- --file ../samples/kestrel/03-fibonacci.bas --type RUN
+cargo run --offline --bin kestrel -- --type 'PRINT 2+2*3'
+cargo run --offline --bin kestrel -- --model kestrel16 --type 'PRINT 1000*20'
+cargo run --offline --bin kestrel -- --file ../samples/kestrel/03-fibonacci.bas --type RUN
 cargo test --offline
 ```
 
@@ -22,9 +22,9 @@ cargo test --offline
 | `kestrel-machine` | `model1982/cpu6502.cpp` | done, `cpu6502.rs` |
 | `kestrel-machine` | `model1992/cpu65816.cpp` | done, `cpu65816.rs` |
 | `kestrel-machine` | `src/kestrel/machine.cpp` | done, `machine.rs` |
-| `kestrel-cli` | `tools/kestrel.cpp` | done, `kestrel-cli` |
-| `kestrel-cli` | `tools/kestrel_emu.cpp` — the interactive one | next |
-| `kestrel-app` | `app/main.cpp` and `window.cpp`, in egui | last |
+| `kestrel-cli` | `tools/kestrel.cpp` | done, the `kestrel` binary |
+| `kestrel-cli` | `tools/kestrel_emu.cpp` | done, the `kestrel_emu` binary |
+| `kestrel-app` | `app/main.cpp` and `window.cpp`, in egui | next |
 
 ## What proves it
 
@@ -38,7 +38,10 @@ Three kinds of test, in rising order of strength:
 - **the samples** (`crates/kestrel-cli/tests/samples.rs`). All twenty-four sample
   programs in `samples/` are typed at the Rust machine and checked against the
   same `.expected` files the C++ suite uses. That is the whole machine — bus,
-  processor, KERNAL and language ROM — agreeing screenful by screenful.
+  processor, KERNAL and language ROM — agreeing screenful by screenful;
+- **the tools** (`crates/kestrel-cli/tests/emulator.rs`). The interactive
+  emulator's session commands, asked of the built binary, as the C++
+  `kestrel_emu_tests` asks them.
 
 The images are assembled by the C++ build; a Rust-only checkout has no ROMs, so
 those tests say so rather than passing quietly.

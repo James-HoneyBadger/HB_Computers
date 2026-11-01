@@ -7,3 +7,11 @@ description = "The Rust port's command line: boot a Kestrel, type at it, print t
 
 [dependencies]
 kestrel-machine = { path = "../kestrel-machine" }
+
+[[bin]]
+name = "kestrel"
+path = "src/main.rs"
+
+[[bin]]
+name = "kestrel_emu"
+path = "src/bin/kestrel-emu.rs"
