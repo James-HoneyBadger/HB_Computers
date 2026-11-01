@@ -4,8 +4,10 @@
 
 #include <QAction>
 #include <QFile>
+#include <QFileInfo>
 #include <QFont>
 #include <QKeySequence>
+#include <QLineEdit>
 #include <QLabel>
 #include <QMenuBar>
 #include <QPushButton>
@@ -13,6 +15,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "timewarp/ui/app_paths.hpp"
 #include "timewarp/ui/hb2_window.hpp"
 #include "timewarp/ui/retro_computer.hpp"
 
@@ -95,6 +98,7 @@ void MachineLauncher::buildActions() {
 
 timewarp::ui::RetroComputerWindow* MachineLauncher::openHb1() {
     if (hb1_ == nullptr) {
+        installDemoDisk();
         auto* window = new timewarp::ui::RetroComputerWindow{this};
         window->setAttribute(Qt::WA_DeleteOnClose);
         hb1_ = window;
@@ -103,21 +107,55 @@ timewarp::ui::RetroComputerWindow* MachineLauncher::openHb1() {
     hb1_->show();
     hb1_->raise();
     hb1_->activateWindow();
+    // The ROM selector is first in the tab order, so a new window would otherwise
+    // leave the keyboard there and the first keystroke would go to a combo box.
+    hb1_->promptInput()->setFocus(Qt::OtherFocusReason);
     statusBar()->showMessage(QStringLiteral("HB-1 powered on."));
     return hb1_;
 }
 
-timewarp::ui::Hb2Window* MachineLauncher::openHb2() {
+void MachineLauncher::installDemoDisk() {
+    const QString directory = timewarp::ui::dataDirFor(QStringLiteral("disks"));
+    if (directory.isEmpty()) {
+        return;
+    }
+    const QString target = directory + QStringLiteral("/HBWARP.dsk");
+    if (QFileInfo::exists(target)) {
+        return;
+    }
+    const QString examples = timewarp::ui::examplesDir();
+    if (examples.isEmpty()) {
+        return;
+    }
+    const QString source = examples + QStringLiteral("/hb1/HBWARP.dsk");
+    if (!QFileInfo::exists(source)) {
+        return;
+    }
+    if (QFile::copy(source, target)) {
+        statusBar()->showMessage(tr("HB DOS volume installed: %1").arg(target));
+    }
+}
+
+timewarp::ui::Hb2Window* MachineLauncher::openHb2() { return showHb2(true); }
+
+timewarp::ui::Hb2Window* MachineLauncher::showHb2(bool boot) {
+    QString boot_error;
     if (hb2_ == nullptr) {
         auto* window = new timewarp::ui::Hb2Window{this};
         window->setAttribute(Qt::WA_DeleteOnClose);
         hb2_ = window;
         connect(window, &QObject::destroyed, this, [this] { hb2_ = nullptr; });
+        if (boot) {
+            window->bootDesktop(&boot_error);
+        }
     }
     hb2_->show();
     hb2_->raise();
     hb2_->activateWindow();
-    statusBar()->showMessage(QStringLiteral("HB-2 powered on."));
+    hb2_->promptEntry()->setFocus(Qt::OtherFocusReason);
+    statusBar()->showMessage(boot_error.isEmpty()
+                                 ? QStringLiteral("HB-2 powered on.")
+                                 : tr("HB-2 powered on without HB-OS: %1").arg(boot_error));
     return hb2_;
 }
 
@@ -141,7 +179,7 @@ bool MachineLauncher::openHb2Listing(const QString& path, QString* error) {
         }
         return false;
     }
-    openHb2()->setListing(QString::fromUtf8(file.readAll()));
+    showHb2(false)->setListing(QString::fromUtf8(file.readAll()));
     return true;
 }
 

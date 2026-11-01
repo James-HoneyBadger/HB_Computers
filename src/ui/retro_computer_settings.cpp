@@ -8,6 +8,7 @@
 #include <optional>
 
 #include <QCloseEvent>
+#include <QCoreApplication>
 #include <QComboBox>
 #include <QFileInfo>
 #include <QFont>
@@ -227,6 +228,31 @@ bool RetroComputerWindow::eventFilter(QObject* watched, QEvent* event) {
     if (watched == lamp_label_ && event->type() == QEvent::MouseButtonRelease) {
         togglePower();
         return true;
+    }
+    // The glass and the drawing beside it are the machine's face; a click on
+    // either puts the keyboard back on the prompt line, and a keystroke typed
+    // there is delivered to it. Without this a person who clicks the screen and
+    // types gets nothing, which is not what the machine they are looking at did.
+    const bool face = watched == tube_ || watched == canvas_;
+    if (face && event->type() == QEvent::MouseButtonPress) {
+        if (input_ != nullptr && input_->isEnabled()) {
+            input_->setFocus(Qt::MouseFocusReason);
+        }
+        return false;
+    }
+    if (face && event->type() == QEvent::KeyPress) {
+        auto* key = static_cast<QKeyEvent*>(event);
+        const int pressed = key->key();
+        const bool typing = !key->text().isEmpty() || pressed == Qt::Key_Backspace ||
+                            pressed == Qt::Key_Return || pressed == Qt::Key_Enter ||
+                            pressed == Qt::Key_Up || pressed == Qt::Key_Down ||
+                            pressed == Qt::Key_Left || pressed == Qt::Key_Right ||
+                            pressed == Qt::Key_Home || pressed == Qt::Key_End;
+        if (typing && input_ != nullptr && input_->isEnabled()) {
+            input_->setFocus(Qt::OtherFocusReason);
+            QCoreApplication::sendEvent(input_, key);
+            return true;
+        }
     }
     if (watched == input_ && event->type() == QEvent::KeyPress) {
         auto* key = static_cast<QKeyEvent*>(event);

@@ -31,7 +31,7 @@ machine is real software — everything in this book happens when you type it.
 | Display | One CRT, three modes: TEXT, SPLIT (the default), GRAPHICS |
 | Text side | PROGRAM (a real code editor) and SCREEN (the tube, painted from memory) |
 | Graphics side | The turtle canvas: the drawing surface a program draws on |
-| Keyboard | The prompt line, with history; function keys below |
+| Keyboard | The prompt line, with history; the tube and the canvas take typing too |
 | Disk | HB DOS 1.0: one volume, 512 sectors of 256 bytes, 30-character names |
 | Monitor | Green, amber, white or ice phosphor; scanlines, vignette, curvature, flicker, glow |
 | Power | The lamp in the header. Plugging in is not modelled |
@@ -194,6 +194,10 @@ that prefix and transliterates the typographic punctuation in the banner. What i
 left is ASCII, which is what the machine's character set is.
 
 ### Keys
+
+Typing works at the prompt line and at the machine's face: click the tube or the
+drawing beside it and the keystrokes are delivered to the prompt, the way they
+would be on a machine whose keyboard was the computer.
 
 | Key | Action |
 | --- | --- |
@@ -418,14 +422,16 @@ To run one on the machine:
 `SAVE "TUBE"` puts it on the disk when you want it there tomorrow, and
 [HB DOS](hb-dos.md) has the rest of that conversation.
 
-**The demo volume.** The same three programs are already saved on a 5.25" volume:
+**The demo volume.** All nine programs are already saved on a 5.25" volume:
 [`Examples/hb1/HBWARP.dsk`](../../Examples/hb1/HBWARP.dsk) is a disk image in
-[the documented format](hb-dos.md#the-image), so nothing has to be typed. Copy it
-to `~/.time_warp/disks/HBWARP.dsk` (or `$TIME_WARP_DATA_DIR/disks/`) and boot the
-machine: `CATALOG` lists all three, and `RUN "FRAME CLOCK"` runs one. The machine
-has exactly one volume, so **copy your own image aside first** — this one replaces
-it. `retro_computer_tests` opens the shipped image and checks the three files and
-their ROM, so the disk cannot rot without a test failing.
+[the documented format](hb-dos.md#the-image), so nothing has to be typed. The first
+time a machine is opened from the launcher, the shipped image is installed as
+`~/.time_warp/disks/HBWARP.dsk` (or `$TIME_WARP_DATA_DIR/disks/`) if there is no
+disk there yet; after that the disk is yours and is never replaced. `CATALOG` lists
+the nine, `LOAD "FRAME CLOCK"` puts one in memory, and `RUN` runs it. The machine
+has exactly one volume, so keep a copy of anything you save. `retro_computer_tests`
+opens the shipped image, checks that the programs load, and checks that a first boot
+from the launcher installs it, so the disk cannot rot without a test failing.
 
 ---
 

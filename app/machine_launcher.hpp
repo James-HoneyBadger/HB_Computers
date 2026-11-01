@@ -31,7 +31,7 @@ public:
     /// The HB-1, booted into its stored ROM.
     timewarp::ui::RetroComputerWindow* openHb1();
 
-    /// The HB-2, with the desktop listing loaded.
+    /// The HB-2, booted into HB-OS.
     timewarp::ui::Hb2Window* openHb2();
 
     /// The HB-1, restored from a machine image. `error` receives why it could
@@ -43,6 +43,12 @@ public:
 
 private:
     void buildActions();
+    /// Shows the HB-2, booting HB-OS into it when `boot` is true. A machine that
+    /// was given a listing to load boots without the demo processes.
+    timewarp::ui::Hb2Window* showHb2(bool boot);
+    /// Installs the shipped HB DOS volume the first time an HB-1 is opened, so a
+    /// machine that has never saved anything still has a disk with programs on it.
+    void installDemoDisk();
 
     QAction* hb1_action_ = nullptr;
     QAction* hb2_action_ = nullptr;

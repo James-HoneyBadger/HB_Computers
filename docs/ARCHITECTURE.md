@@ -140,7 +140,7 @@ the framebuffer, and fails a program that ran and drew nothing.
 | What | Where |
 | --- | --- |
 | Preferences (both machines) | `QSettings` under `~/.config/HoneyBadger/HB Computers.conf` |
-| HB DOS 1.0 volumes | `~/.time_warp/disks/` |
+| HB DOS 1.0 volumes | `~/.time_warp/disks/`, seeded once from [`Examples/hb1/HBWARP.dsk`](../Examples/hb1/HBWARP.dsk) |
 | Machine images | `~/.time_warp/` (`.hb1`) |
 | HB-2 drives, tape and module bay | `~/.time_warp/hb2/` |
 | Example programs | `Examples/`, found beside the build tree |

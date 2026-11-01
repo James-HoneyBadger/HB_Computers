@@ -48,12 +48,16 @@ QString examplesDir() {
         return QFileInfo{from_environment}.absoluteFilePath();
     }
     const QString app_dir = QApplication::applicationDirPath();
-    // `bin/time_warp_ide` -> `share/time-warp-studio/examples`, which is the
-    // destination CMakeLists.txt installs them to.
-    const QString installed =
-        app_dir + QStringLiteral("/../share/time-warp-studio/examples");
-    if (QFileInfo{installed}.isDir()) {
-        return QFileInfo{installed}.absoluteFilePath();
+    // `bin/hb_computers` -> `share/hb-computers/examples`, which is the
+    // destination CMakeLists.txt installs them to. The Studio's own share
+    // directory is searched too, so a build that shares an install still finds
+    // the programs it shipped with.
+    for (const QString& installed :
+         {app_dir + QStringLiteral("/../share/hb-computers/examples"),
+          app_dir + QStringLiteral("/../share/time-warp-studio/examples")}) {
+        if (QFileInfo{installed}.isDir()) {
+            return QFileInfo{installed}.absoluteFilePath();
+        }
     }
     // A build tree: the binary is `native/build/time_warp_ide` and the programs
     // are beside `native/`. The second path covers a binary in `native/build/bin`.

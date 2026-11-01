@@ -60,6 +60,15 @@ RetroComputerWindow::RetroComputerWindow(QWidget* parent) : QMainWindow(parent) 
     setMinimumSize(720, 520);
     resize(1040, 760);
     buildUi();
+    // Typing at the glass is what a 1982 machine taught, so the tube and the
+    // canvas take the keyboard and hand it to the prompt line rather than
+    // swallowing it. `eventFilter` is where that is done.
+    if (tube_ != nullptr) {
+        tube_->installEventFilter(this);
+    }
+    if (canvas_ != nullptr) {
+        canvas_->installEventFilter(this);
+    }
     restoreSettings();
     prepared_ = true;
     // The settings are only known after restoreSettings, so the look is applied
@@ -453,7 +462,16 @@ void RetroComputerWindow::appendBootBanner() {
         appendConsole(QStringLiteral("%1  \u00b7  %2")
                           .arg(QString::fromUtf8(kBootCopyright),
                                QString::fromUtf8(rom.note)));
-        appendConsole(QStringLiteral("HB DOS 1.0  \u00b7  VOLUME %1").arg(dos_.volumeName()));
+        QString volume = dos_.volumeName();
+        if (!dos_.files().isEmpty()) {
+            volume += QStringLiteral("  \u00b7  %1 FILES").arg(dos_.files().size());
+        }
+        appendConsole(QStringLiteral("HB DOS 1.0  \u00b7  VOLUME %1").arg(volume));
+        if (!dos_.files().isEmpty()) {
+            // The disk is the one thing a 1982 machine cannot explain by itself,
+            // and a full one that is never listed looks exactly like an empty one.
+            appendConsole(QStringLiteral("TYPE CATALOG TO LIST THEM"));
+        }
         appendConsole(QStringLiteral("SYSTEM READY"));
     }
     appendConsole(QStringLiteral("READY."));

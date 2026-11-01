@@ -151,9 +151,11 @@ bool RetroComputerWindow::runSelfTest() {
         return false;
     }
     appendConsole(QStringLiteral("ROM CHECK OK (%1 ROMS, %2)").arg(roms).arg(rom_sum));
-    appendConsole(QStringLiteral("HB DOS 1.0  %1").arg(dos_.imagePath().isEmpty()
-                                                            ? QStringLiteral("NO DISK")
-                                                            : dos_.volumeName()));
+    QString disk = dos_.imagePath().isEmpty() ? QStringLiteral("NO DISK") : dos_.volumeName();
+    if (!dos_.files().isEmpty()) {
+        disk += QStringLiteral("  \u00b7  %1 FILES").arg(dos_.files().size());
+    }
+    appendConsole(QStringLiteral("HB DOS 1.0  %1").arg(disk));
     return true;
 }
 

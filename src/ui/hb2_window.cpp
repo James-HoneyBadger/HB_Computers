@@ -542,6 +542,73 @@ bool Hb2Window::running() const noexcept { return timer_ != nullptr && timer_->i
 
 void Hb2Window::setListing(const QString& text) { listing_->setPlainText(text); }
 
+bool Hb2Window::bootDesktop(QString* error) {
+    const auto read = [](const QString& path) {
+        QFile file{path};
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return QString{};
+        }
+        return QString::fromUtf8(file.readAll());
+    };
+
+    const QString examples = timewarp::ui::examplesDir();
+    if (examples.isEmpty()) {
+        if (error != nullptr) {
+            *error = tr("no Examples folder beside the binary");
+        }
+        return false;
+    }
+    const QString first = read(examples + QStringLiteral("/hb2/task_a.s"));
+    const QString second = read(examples + QStringLiteral("/hb2/task_b.s"));
+    if (first.isEmpty() || second.isEmpty()) {
+        if (error != nullptr) {
+            *error = tr("%1 has no hb2/task_a.s and hb2/task_b.s").arg(examples);
+        }
+        return false;
+    }
+
+    // A machine that has just been switched on has nothing in its RAM, so the
+    // processor would run forty kilobytes of zeroes and fault by the second
+    // frame. HB-OS is the machine's own answer to that: two processes, each with
+    // a window, taking turns on the frame tick.
+    machine_.reset(0x001000);
+    const int task_a = machine_.spawn("TASK A", first.toStdString());
+    const int task_b = task_a == 0 ? 0 : machine_.spawn("TASK B", second.toStdString());
+    if (task_a == 0 || task_b == 0) {
+        if (error != nullptr) {
+            *error = QString::fromStdString(std::string{"the demo processes: "} +
+                                            machine_.scheduler().lastError());
+        }
+        return false;
+    }
+    // Side by side rather than one over the other: the point of the desktop is
+    // that both processes are visible at once, and a window hidden behind its
+    // neighbour demonstrates the opposite.
+    machine_.desktop().move(task_a, 8, 4);
+    machine_.desktop().resize(task_a, 240, 82);
+    machine_.desktop().move(task_b, 66, 88);
+    machine_.desktop().resize(task_b, 240, 82);
+
+    // The Program page holds a real listing rather than an empty page: the desktop
+    // the two processes are drawn on, which `RUN` assembles by itself.
+    const QString desktop = read(examples + QStringLiteral("/hb2/desktop.s"));
+    if (!desktop.isEmpty()) {
+        setListing(desktop);
+    }
+
+    transcript_->appendPlainText(
+        tr("HB-OS 2.0  \u00b7  HB-16 at 60 Hz  \u00b7  1 MiB  \u00b7  %1 processes")
+            .arg(machine_.scheduler().size()));
+    transcript_->appendPlainText(
+        tr("Each process prints into its own window. Type HELP for the words, "
+           "TASKS for the scheduler."));
+    timer_->start();
+    refreshMonitor();
+    refreshStatus();
+    screen_->refresh();
+    return true;
+}
+
 void Hb2Window::runCommand(const QString& line) {
     // The machine's listing is whatever the Program page holds: `RUN` and `SAVE` mean
     // the thing on screen, so the prompt does not have an older copy of it.

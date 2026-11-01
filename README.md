@@ -46,14 +46,17 @@ ctest --test-dir build --output-on-failure
 ./build/hb_computers --listing prog.s --hb2 # load a listing into the HB-2
 ```
 
-The HB-1 boots into BASIC with a `READY.` prompt. Type a numbered line to build a
-program, `RUN` to run it, or `CATALOG` at the prompt to see the disk. The ROM
-selector in the header exchanges BASIC for any of the other ten languages; each
-keeps its own program when you switch away.
+The HB-1 boots into BASIC with a `READY.` prompt and a disk with the machine's
+nine programs already on it — `CATALOG` lists them, `LOAD "TUBE WRITER"` puts one
+in memory, `RUN` sets it going. Typing works where you would type on the machine:
+click the tube (or the drawing beside it) and the keystrokes go to the prompt line
+under it. The ROM selector in the header exchanges BASIC for any of the other ten
+languages; each keeps its own program when you switch away.
 
-The HB-2 needs a listing: open the **Program** page, write or paste a program, and
-press **Run**. The programs it ships with are in
-[`Examples/hb2/`](Examples/hb2/).
+The HB-2 powers on into **HB-OS**: two processes on a desktop, each with a window,
+taking turns on the machine's own 60 Hz clock. The **Program** page holds the
+listing that drew that desktop, and **Run** assembles and runs whatever is there.
+The programs it ships with are in [`Examples/hb2/`](Examples/hb2/).
 
 The HB-2 alone runs on a shell, which is how the manual's examples are checked:
 

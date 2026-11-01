@@ -68,7 +68,13 @@ int main(int argc, char** argv) {
     parser.process(app);
 
     hb::MachineLauncher launcher;
-    launcher.show();
+    const bool machine_named = parser.isSet(hb1_option) || parser.isSet(hb2_option) ||
+                               parser.isSet(machine_option) || parser.isSet(listing_option);
+    // A machine was asked for by name, so the front door stays shut: the window
+    // that closes is then the machine's, and closing it ends the program.
+    if (!machine_named || parser.isSet(screenshot_option)) {
+        launcher.show();
+    }
 
     if (parser.isSet(hb1_option) || parser.isSet(machine_option)) {
         launcher.openHb1();

@@ -300,6 +300,9 @@ if(HB_BUILD_GUI AND HB_QT_FOUND)
     hb_enable_warnings(hb_computers)
 
     install(TARGETS hb_computers RUNTIME DESTINATION bin)
+    # The machines boot from the programs beside them: HB DOS's volume and
+    # HB-OS's two processes are found through `examplesDir()`.
+    install(DIRECTORY Examples/ DESTINATION share/hb-computers/examples)
 else()
     message(STATUS "Qt 6 Widgets not found: building the engines only")
 endif()
@@ -363,6 +366,7 @@ if(HB_BUILD_TESTS)
             tests/retro/paper_tests.cpp
             tests/retro/bbs_tests.cpp
             tests/retro_boot_tests.cpp
+            tests/retro/launcher_tests.cpp
             tests/retro_config_tests.cpp
             tests/retro_dos_tests.cpp
             tests/retro_hardware_tests.cpp

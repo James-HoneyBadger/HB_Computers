@@ -91,8 +91,15 @@ public:
 
     /// Writes the listing into the machine's editor page.
     void setListing(const QString& text);
+    /// The prompt's entry line, so the window's owner can put the keyboard in it.
+    [[nodiscard]] QLineEdit* promptEntry() const noexcept { return entry_; }
     /// Runs one prompt line and shows the answer.
     void runCommand(const QString& line);
+    /// Power-on, 1992 style: the shipped demo processes are started on the
+    /// desktop and their source is put in the Program page, so a machine that is
+    /// switched on has something on it. False, with the reason in `error`, when
+    /// the checkout has no `Examples/hb2` to boot from.
+    bool bootDesktop(QString* error = nullptr);
     /// Whether the frame timer is ticking the machine.
     [[nodiscard]] bool running() const noexcept;
     void start();
