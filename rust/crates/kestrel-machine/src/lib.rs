@@ -10,9 +10,11 @@
 // The port follows the original file by file, so a reader can put the two side by
 // side: `profile.rs` is `makeProfile`, `devices.rs` is `devices.cpp`.
 
+pub mod bus;
 pub mod devices;
 pub mod profile;
 
+pub use bus::{Bus, Register};
 pub use devices::{Devices, Disk, Keyboard, SpecialKey, Tape, TapeMode, Video};
 pub use profile::{profile_of, Model, Profile, KESTREL, KESTREL16};
 
@@ -40,6 +42,45 @@ mod tests {
         assert_eq!(kestrel16.disk_sectors * kestrel16.disk_sector_size, 2_097_152);
         assert_eq!(kestrel16.basic_base, 0x010000);
         assert_eq!(kestrel16.keyboard_capacity, 32);
+    }
+
+    #[test]
+    fn the_bus_answers_in_the_documented_order() {
+        use bus::Bus;
+        let mut kestrel = Bus::new(&KESTREL);
+        // RAM first: $0000 is memory.
+        kestrel.write(0x0010, 0x42);
+        assert_eq!(kestrel.read(0x0010), 0x42);
+        // The tube at $8000, its attributes at $8400.
+        kestrel.write(0x8000, b'A');
+        assert_eq!(kestrel.read(0x8000), b'A');
+        kestrel.write(0x8400, 0x1E);
+        assert_eq!(kestrel.read(0x8400), 0x1E);
+        // The padding between them reads as a space.
+        assert_eq!(kestrel.read(0x83E8), b' ');
+        // The I/O page: ink, paper, the sound latch and its count.
+        kestrel.write(0x8805, 0x03);
+        assert_eq!(kestrel.read(0x8805), 0x03);
+        kestrel.write(0x8808, 60);
+        assert_eq!(kestrel.notes_played, 1);
+        // A key goes in and comes out of the same register.
+        kestrel.keyboard.push(b'Z');
+        assert_eq!(kestrel.read(0x8801), 0xFF);
+        assert_eq!(kestrel.read(0x8800), b'Z');
+        assert_eq!(kestrel.read(0x8801), 0x00);
+    }
+
+    #[test]
+    fn the_1992_bus_puts_the_kernal_over_its_ram() {
+        use bus::Bus;
+        let mut kestrel16 = Bus::new(&KESTREL16);
+        kestrel16.kernal[0] = 0x99;
+        assert_eq!(kestrel16.read(0x00E000), 0x99, "the KERNAL wins in bank zero");
+        kestrel16.write(0x00E000, 0x11);
+        assert_eq!(kestrel16.read(0x00E000), 0x99, "and writes to ROM are lost");
+        // Bank one is the language.
+        kestrel16.basic[0] = 0x5A;
+        assert_eq!(kestrel16.read(0x010000), 0x5A);
     }
 
     #[test]
