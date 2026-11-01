@@ -6,9 +6,9 @@
 
 #include "check.hpp"
 
-#include "timewarp/machine.hpp"
-#include "timewarp/kestrel/map.hpp"
-#include "timewarp/kestrel/rom.hpp"
+#include "kestrel/machine.hpp"
+#include "kestrel/model1982/map.hpp"
+#include "kestrel/model1982/rom.hpp"
 
 #include <cstdio>
 #include <string>
@@ -16,13 +16,13 @@
 
 namespace {
 
-using timewarp::Disk;
-using timewarp::Machine;
-using timewarp::Model;
-using timewarp::kestrel::RomInfo;
-using timewarp::kestrel::findRom;
-using timewarp::kestrel::map::kAttributeBase;
-using timewarp::kestrel::map::kScreenBase;
+using kestrel::Disk;
+using kestrel::Machine;
+using kestrel::Model;
+using kestrel::model1982::RomInfo;
+using kestrel::model1982::findRom;
+using kestrel::model1982::map::kAttributeBase;
+using kestrel::model1982::map::kScreenBase;
 
 /// Types a line the way a person does: one key at a time, letting the machine
 /// run in between, because the keyboard controller holds sixteen keys and a

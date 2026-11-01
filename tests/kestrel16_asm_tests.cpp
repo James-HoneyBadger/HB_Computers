@@ -206,7 +206,7 @@ void test_dialect(const fs::path& tool) {
 }  // namespace
 
 int main() {
-    const fs::path tool{HB2ASM_PATH};
+    const fs::path tool{KESTREL16_ASM_PATH};
     test_encodings(tool);
     test_labels_and_branches(tool);
     test_dialect(tool);

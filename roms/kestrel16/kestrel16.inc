@@ -1,7 +1,7 @@
 ; SPDX-License-Identifier: MIT
 ;
 ; kestrel16.inc -- the Kestrel 16's machine constants, the same map the emulator decodes in
-; include/timewarp/kestrel16/map.hpp. When one changes the other changes with it.
+; include/kestrel/model1992/map.hpp. When one changes the other changes with it.
 
 ; The ROM banks.
 KERNAL          = $00E000

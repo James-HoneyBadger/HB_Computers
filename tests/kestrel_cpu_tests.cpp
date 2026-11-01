@@ -5,7 +5,7 @@
 
 #include "check.hpp"
 
-#include "timewarp/kestrel/cpu6502.hpp"
+#include "kestrel/model1982/cpu6502.hpp"
 
 #include <array>
 #include <cstdint>
@@ -13,8 +13,8 @@
 
 namespace {
 
-using timewarp::kestrel::Bus;
-using timewarp::kestrel::Cpu6502;
+using kestrel::model1982::Bus;
+using kestrel::model1982::Cpu6502;
 
 /// 64K of plain memory: enough to run a program and read back what it did.
 class RamBus final : public Bus {

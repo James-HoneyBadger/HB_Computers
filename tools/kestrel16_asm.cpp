@@ -1818,7 +1818,7 @@ std::string headerText(const std::string& name, std::uint32_t origin,
     out << "#pragma once\n\n";
     out << "#include <array>\n";
     out << "#include <cstdint>\n\n";
-    out << "namespace timewarp::kestrel16::rom {\n\n";
+    out << "namespace kestrel::model1992::rom {\n\n";
     out << "inline constexpr std::uint32_t k" << upper << "Origin = 0x"
         << std::hex << std::uppercase << origin << std::dec << ";\n";
     out << "inline constexpr std::array<std::uint8_t, " << image.size()
@@ -1832,7 +1832,7 @@ std::string headerText(const std::string& name, std::uint32_t origin,
             << std::setfill(' ') << ",";
     }
     out << "\n};\n\n";
-    out << "}  // namespace timewarp::kestrel16::rom\n";
+    out << "}  // namespace kestrel::model1992::rom\n";
     return out.str();
 }
 

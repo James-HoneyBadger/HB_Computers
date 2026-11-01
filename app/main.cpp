@@ -1,95 +1,82 @@
 // SPDX-License-Identifier: MIT
 //
-// Kestrel Computers: the front door to the Kestrel and the Kestrel 16.
+// kestrel_computers -- the machines' window.
 //
-//   kestrel_computers              open the launcher
-//   kestrel_computers --hb1        power on the Kestrel at once
-//   kestrel_computers --machine IMG --hb1
-//                             restore the Kestrel from a machine image
-//   kestrel_computers --hb1 --screenshot hb1.png
-//                             photograph the machine and exit, for CI
+// One executable, two machines, because they are one emulator: `--model kestrel`
+// powers on the 1982 machine, `--model kestrel16` the 1992 one. With no
+// argument the 1982 machine comes up, which is the one with a ROM socket to fill.
+//
+//   kestrel_computers                    the Kestrel
+//   kestrel_computers --model kestrel16   the Kestrel 16
+//   kestrel_computers --shot tube.png     photograph the machine and exit
 
 #include <QApplication>
-#include <QCommandLineOption>
-#include <QCommandLineParser>
-#include <QTimer>
-#include <QWidget>
+#include <QPixmap>
 
 #include <cstdio>
+#include <cstring>
+#include <string_view>
 
-#include "machine_launcher.hpp"
-#include "timewarp/ui/retro_computer.hpp"
+#include "kestrel/model1982/window.hpp"
 
 namespace {
 
-constexpr const char* kVersion = HB_VERSION;
+void usage() {
+    std::printf(
+        "usage: kestrel_computers [--model kestrel|kestrel16] [--shot FILE]\n"
+        "\n"
+        "  --model   which machine to power on (default kestrel)\n"
+        "  --shot    save a PNG of the machine and exit, for CI\n");
+}
 
 }  // namespace
 
 int main(int argc, char** argv) {
-    QApplication app{argc, argv};
-    QCoreApplication::setOrganizationName(QStringLiteral("HoneyBadger"));
-    QCoreApplication::setApplicationName(QStringLiteral("Kestrel Computers"));
-    QCoreApplication::setApplicationVersion(QString::fromLatin1(kVersion));
-    QApplication::setApplicationDisplayName(QStringLiteral("Kestrel Computers"));
+    kestrel::Model model = kestrel::Model::Kestrel;
+    const char* shotPath = nullptr;
 
-    QCommandLineParser parser;
-    parser.setApplicationDescription(QStringLiteral(
-        "The Kestrel and the Kestrel 16: two complete home computers from a 1982 that "
-        "never happened, and its 1992 successor."));
-    parser.addHelpOption();
-    parser.addVersionOption();
-
-    const QCommandLineOption hb1_option{
-        QStringLiteral("hb1"), QStringLiteral("Power on the Kestrel at once.")};
-    const QCommandLineOption machine_option{
-        QStringLiteral("machine"),
-        QStringLiteral("Restore the Kestrel from a machine image."),
-        QStringLiteral("image")};
-    const QCommandLineOption screenshot_option{
-        QStringLiteral("screenshot"),
-        QStringLiteral("Save a PNG of the machine and exit."),
-        QStringLiteral("file")};
-    parser.addOption(hb1_option);
-    parser.addOption(machine_option);
-    parser.addOption(screenshot_option);
-    parser.process(app);
-
-    hb::MachineLauncher launcher;
-    const bool machine_named =
-        parser.isSet(hb1_option) || parser.isSet(machine_option);
-    // A machine was asked for by name, so the front door stays shut: the window
-    // that closes is then the machine's, and closing it ends the program.
-    if (!machine_named || parser.isSet(screenshot_option)) {
-        launcher.show();
-    }
-
-    if (parser.isSet(hb1_option) || parser.isSet(machine_option)) {
-        launcher.openKestrel();
-    }
-
-    QString error;
-    if (parser.isSet(machine_option) &&
-        !launcher.openMachineImage(parser.value(machine_option), &error)) {
-        std::fprintf(stderr, "kestrel_computers: %s\n", qPrintable(error));
-        return 2;
-    }
-
-    if (const QString path = parser.value(screenshot_option); !path.isEmpty()) {
-        QWidget* target = &launcher;
-        if (auto* hb1 = launcher.findChild<timewarp::ui::RetroComputerWindow*>()) {
-            target = hb1;
-        }
-        // One turn of the event loop so the machine has painted its first frame.
-        QTimer::singleShot(1200, target, [target, path] {
-            if (!target->grab().save(path)) {
-                std::fprintf(stderr, "kestrel_computers: cannot write %s\n", qPrintable(path));
-                QCoreApplication::exit(3);
-                return;
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view arg = argv[i];
+        if (arg == "--model" && i + 1 < argc) {
+            const std::string_view name = argv[++i];
+            if (name == "kestrel") {
+                model = kestrel::Model::Kestrel;
+            } else if (name == "kestrel16" || name == "kestrel-16") {
+                model = kestrel::Model::Kestrel16;
+            } else {
+                std::fprintf(stderr, "kestrel_computers: no such model: %s\n",
+                             argv[i]);
+                return 2;
             }
-            QCoreApplication::quit();
-        });
+        } else if (arg == "--shot" && i + 1 < argc) {
+            shotPath = argv[++i];
+        } else if (arg == "--help" || arg == "-h") {
+            usage();
+            return 0;
+        } else {
+            std::fprintf(stderr, "kestrel_computers: unknown option: %s\n", argv[i]);
+            usage();
+            return 2;
+        }
     }
 
+    QApplication application(argc, argv);
+    QCoreApplication::setOrganizationName(QStringLiteral("HoneyBadger Systems"));
+    QCoreApplication::setApplicationName(QStringLiteral("Kestrel Computers"));
+
+    kestrel::model1982::KestrelWindow window{model};
+    window.show();
+
+    if (shotPath != nullptr) {
+        // A turn of the event loop so the machine has painted its first frame,
+        // then a second of the ROM's own time to finish the banner.
+        window.machine().runFrames(70);
+        const QPixmap shot = window.grab();
+        if (!shot.save(QString::fromLocal8Bit(shotPath))) {
+            std::fprintf(stderr, "kestrel_computers: cannot write %s\n", shotPath);
+            return 3;
+        }
+        return 0;
+    }
     return QApplication::exec();
 }

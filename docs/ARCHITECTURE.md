@@ -1,146 +1,82 @@
-# Architecture
+# How the code is put together
 
-This repository is the [Kestrel and Kestrel 16 machines](MACHINES.md) without the IDE they
-were first built inside. Nothing here is a stub: the two computers, every engine
-they run, and the tests that pin them.
-
-## The tree
+One emulator, two models, and two assemblers. Everything else is a ROM image.
 
 ```
-include/timewarp/     headers, included as "timewarp/..."
-  core/               small shared utilities (charconv, Qt name tables)
-  expr/               the expression lexer and evaluator
-  scheme/             the Scheme machine
-  audio/              the mixer and the note table
-  io/                 serial ports and the gamepad reader
-  lang/               the interpreter loop, the value type, one executor per language
-  graphics/           the recording host a test draws into
-  canvas/             canvas commands and the thread-safe command queue
-  kestrel/                the 6502 and the Kestrel's map
-  kestrel16/                the 65816 and the Kestrel 16's map
-  ui/                 the Qt widgets both machines are made of
-src/                  the implementations, mirroring include/
-app/                  the launcher: one window, two machines
-tools/kestrel16_asm.cpp      the 65816 assembler that builds the Kestrel 16's ROMs
-tests/                one executable per suite, no external test framework
-Examples/             the programs the machines ship with
-docs/                 the manuals
+                kestrel (CLI)      kestrel_computers (window)
+                      \                    /
+                       \                  /
+                        kestrel_machine
+                        /             \
+              devices (shared)      the two processors
+                                     /              \
+                            model1982 (6502)   model1992 (65816)
+                                     \              /
+                                roms/kestrel   roms/kestrel16
+                                     ^              ^
+                             kestrel_asm     kestrel16_asm
 ```
 
-The include path is the repository's `include/`, so a source says
-`#include "timewarp/ui/retro_computer.hpp"` and nothing else has to know where the
-tree is.
+## The libraries
 
-## The layers
-
-A library is one answer, and the arrows only point one way.
-
-```
-kestrel_computers   kestrel (CLI)
-      |              |
-      +------+-------+
-             |
-      hb_launcher ── hb_ui  ─────────┐   Qt Widgets
-                       /      \       │
-              hb_canvas_qt   kestrel_machine
-                     |             │
-                     |       (both processors and both ROM sets)
-                     |
- hb_canvas       hb_lang        Qt-free
-                   |
-      hb_expr  hb_audio  hb_io  hb_scheme
-```
-
-| Library | What it owns | Qt |
+| Target | What it is | Needs Qt |
 | --- | --- | --- |
-| `hb_expr` | The expression lexer, parser and evaluator used by the line-loop languages | no |
-| `hb_scheme` | The Scheme reader, value type, machine and builtins | no |
-| `hb_audio` | The mixer, the note table and the 22 050 Hz sample clock | no |
-| `hb_io` | The serial port and the gamepad reader | no |
-| `hb_lang` | The interpreter loop, the value type, dispatch and one executor per language | no |
-| `hb_canvas` | `CanvasCommand` and the thread-safe `CanvasCommandQueue` | no |
-| `kestrel_machine` | One machine, two models: both processors, the bus, the tube, the keyboard, the disk and the tape | no |
-| `hb_canvas_qt` | The bridge that drains the queue on the GUI thread | Core |
-| `hb_ui` | Both machine windows and the widgets they are made of | Widgets |
-| `hb_launcher` | The front door: a window naming both machines | Widgets |
+| `kestrel_machine` | The machine: both processors, the bus, the tube, the keyboard, the disk, the tape | no |
+| `kestrel` | The command line: `--model kestrel\|kestrel16`, type at it, print the screen | no |
+| `kestrel_computers` | The window | Qt 6 Widgets |
 
-`kestrel_machine` links nothing but itself: both machines' languages are machine code
-in ROM, so it needs a processor and a bus rather than an interpreter. `hb_ui`
-links `hb_lang` directly for the Kestrel's prompt and PROGRAM page.
+There are no other libraries and no other dependencies.
 
-A build host with no Qt still gets every library above the line, the `hb2` tool and
-seven of the ten test suites. `-DHB_BUILD_GUI=OFF` asks for exactly that.
+## The machine
 
-## The Kestrel
-
-`RetroComputerWindow` ([`retro_computer.hpp`](../include/timewarp/ui/retro_computer.hpp))
-is one window with a front panel, a CRT, a status line and a prompt. It is split by
-what each part does:
+`kestrel::Machine` is built for a `kestrel::Model`. The profile table in
+`src/kestrel/machine.cpp` says what that model is, and the bus decodes against
+it: RAM, the ROM windows, the cartridge, the tube's two arrays and the I/O page.
 
 | File | Part |
 | --- | --- |
-| `retro_computer_ui.cpp` | The front panel, the screen, the tabs and the status line |
-| `retro_computer_basic.cpp` | The line editor, `AUTO` and renumbering |
-| `retro_computer_machine.cpp` | The ROM, the runners, the canvas and the machine images |
-| `retro_computer_dos.cpp` | The prompt's half of the disk words |
-| `retro_computer_boot.cpp` | Power, self test and the frame tick |
-| `retro_computer_settings.cpp` | Persistence and the CONFIG dialog |
-| `retro_computer_support.cpp` | Helpers shared by the above |
+| `src/kestrel/machine.cpp` | The profiles, the address decode, the I/O page, the frame, the disk commands |
+| `src/kestrel/devices.cpp` | The tube, the keyboard, the disk and the tape, parameterised by the profile |
+| `src/kestrel/model1982/cpu6502.cpp` | The Kestrel's processor, whole |
+| `src/kestrel/model1992/cpu65816.cpp` | The Kestrel 16's processor, whole |
+| `src/kestrel/model1982/roms.cpp` | The table of ROMs the 1982 machine can be given |
 
-Under it:
+The two processors are not interchangeable and the machine never substitutes one
+for the other: `cpu6502()` and `cpu65816()` are separate accessors, so asking a
+machine for the processor it does not have is a compile error.
 
-- **`HbMemory`** is the 64K: one address space with screen cells, colour
-  attributes, I/O registers, and a scroll that moves memory rather than a paint
-  offset.
-- **`HbTube`** paints that memory: a cursor, a scrollback and a character set.
-- **`HbDos`** is Kestrel DOS 1.0 — a widget-free class over one JSON image, with
-  rollback on a failed write.
-- **`HbBbs`** is the WARP BOARD, the board on the other end of the line.
-- **`MachineVoice`** is the machine's own sound, through the mixer.
-- **`CrtOverlay`** ([`crt_overlay.hpp`](../include/timewarp/ui/crt_overlay.hpp)) is
-  the glass: scanlines, vignette, curvature, flicker and phosphor, drawn over
-  whichever widget it covers.
+### The two models
 
-A run goes through `NativeRunner`; a session goes through `ReplRunner`. Both feed
-the same `CanvasCommandQueue`, which `hb_canvas_qt` drains on the GUI thread into a
-`TurtleCanvas`.
+| | `model1982` | `model1992` |
+| --- | --- | --- |
+| Processor | 6502, 64 KiB | 65816, 16 MiB / 24-bit |
+| Screen | 40 x 25 at `$8000` | 80 x 50 at `$008000` |
+| I/O | `$8800` | `$A000` |
+| Language | socket ROM at `$A000` | bank `$01` |
+| Disk | 512 x 256 | 4096 x 512 |
 
-## The Kestrel 16
+Each model's map has exactly one home — `include/kestrel/model1982/map.hpp` and
+`include/kestrel/model1992/map.hpp` — and `roms/kestrel/kestrel.inc` and
+`roms/kestrel16/kestrel16.inc` repeat them for the ROMs. The pairs are changed
+together, in the same commit.
 
-The machine is one Qt-free library. `Machine` owns the bus, the processor, the
-sections of the map. Each model's map has exactly one home — `kestrel/map.hpp` and
-`kestrel16/map.hpp` — and `roms/kestrel/kestrel.inc` and `roms/kestrel16/kestrel16.inc` repeat them for the
-ROMs; the pairs are changed together.
+## The ROMs
 
-The two machines are one program. `timewarp::Machine` is built for a `Model`, and
-the profile table in `machine.cpp` says what that model is: its clock, its memory,
-where its screen and its registers are, how big its ROMs are, and how its disk is
-divided. Everything that is the same ten years apart is shared code.
+The languages are not C++: they are `roms/kestrel/*.s` and `roms/kestrel16/*.s`,
+assembled at build time by `kestrel_asm` and `kestrel16_asm` into headers of
+bytes that the machine is given. A change to a ROM is a change to the machine,
+and the machine tests prove it by typing at the machine and reading the screen
+back.
 
-| File | Part |
+## The tests
+
+| Suite | What it proves |
 | --- | --- |
-| `src/machine.cpp` | The profile table, the decoded address space, the I/O page, the frame, the disk commands |
-| `src/devices.cpp` | The tube, the keyboard, the disk and the tape, parameterised by the profile |
-| `src/kestrel/cpu6502.cpp` | The Kestrel's processor, whole |
-| `src/kestrel16/cpu65816.cpp` | The Kestrel 16's processor, whole |
+| `kestrel_asm_tests` | The dialect the 6502 ROMs are written in |
+| `kestrel_cpu_tests` | The 6502: addressing, arithmetic, flags, cycles, interrupts |
+| `kestrel_machine_tests` | The Kestrel: its ROMs boot, and typing at it works |
+| `kestrel16_asm_tests` | Every 65816 addressing mode and width rule, byte for byte |
+| `kestrel16_cpu_tests` | The 65816: widths, banks, the direct page, arithmetic, cycles |
+| `kestrel16_machine_tests` | The Kestrel 16: its ROMs boot, and typing at it works |
 
-What is *not* shared is the two processors and the two ROM images. Each
-processor is the part its machine really had, and the machine never substitutes
-one for the other: a 6502 machine has no 65816 in it, and asking a `Machine` for
-the processor it does not have is a compile error, not a runtime check.
-
-The KERNAL and the language are not C++ at all: they are `roms/kestrel16/kernal.s` and
-`roms/kestrel16/basic.s`, assembled by `kestrel16_asm` at build time and mounted with
-`mountKernal` and `mountBasic`.
-
-| `lexer_tests`, `evaluator_tests` | The expression engine |
-| `scheme_tests` | The Scheme machine |
-| `lang_tests` | Every executor, including the shipped examples |
-| `audio_tests` | The mixer |
-| `canvas_queue_tests`, `canvas_bridge_tests` | The queue and its Qt bridge |
-| `syntax_highlighter_tests` | The editor's colouring |
-| `kestrel16_asm_tests`, `kestrel16_cpu_tests`, `kestrel16_machine_tests` | The 65816 assembler, the processor, and the Kestrel 16 model booting its ROMs |
-| `retro_computer_tests` | The Kestrel: ROM socket, screen modes, direct mode, Kestrel DOS, memory, boot, images, configuration |
-
-`ctest --test-dir build` runs all of them. The two window suites need a display or
-`QT_QPA_PLATFORM=offscreen`, which is what the tests set for themselves.
+`ctest --test-dir build` runs all of them.

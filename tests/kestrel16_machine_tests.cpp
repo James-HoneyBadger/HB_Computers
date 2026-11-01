@@ -7,8 +7,8 @@
 
 #include "check.hpp"
 
-#include "timewarp/machine.hpp"
-#include "timewarp/kestrel16/map.hpp"
+#include "kestrel/machine.hpp"
+#include "kestrel/model1992/map.hpp"
 
 #include "kestrel16/basic_rom.hpp"
 #include "kestrel16/kernal_rom.hpp"
@@ -18,21 +18,21 @@
 
 namespace {
 
-using timewarp::Machine;
-using timewarp::Model;
-using timewarp::SpecialKey;
+using kestrel::Machine;
+using kestrel::Model;
+using kestrel::SpecialKey;
 
 /// A machine with its two ROMs in place, run until it has settled.
 class Booted {
 public:
     Booted() {
         machine_.mountKernal(std::vector<std::uint8_t>(
-                                 timewarp::kestrel16::rom::kKERNALImage.begin(),
-                                 timewarp::kestrel16::rom::kKERNALImage.end()),
+                                 kestrel::model1992::rom::kKERNALImage.begin(),
+                                 kestrel::model1992::rom::kKERNALImage.end()),
                              "kernal");
         machine_.mountBasic(std::vector<std::uint8_t>(
-                                timewarp::kestrel16::rom::kBASICImage.begin(),
-                                timewarp::kestrel16::rom::kBASICImage.end()),
+                                kestrel::model1992::rom::kBASICImage.begin(),
+                                kestrel::model1992::rom::kBASICImage.end()),
                             "basic");
         machine_.reset();
         machine_.runFrames(3);
@@ -63,7 +63,7 @@ public:
     }
     /// The last line with anything on it.
     [[nodiscard]] std::string lastLine() const {
-        for (int row = timewarp::kestrel16::map::kScreenRows - 1; row >= 0; --row) {
+        for (int row = kestrel::model1992::map::kScreenRows - 1; row >= 0; --row) {
             const std::string candidate = machine_.screenLine(row);
             if (!candidate.empty()) {
                 return candidate;
@@ -75,7 +75,7 @@ public:
     /// What the language printed in answer to the last line typed: everything
     /// above the prompt that follows it.
     [[nodiscard]] std::string answer() const {
-        for (int row = timewarp::kestrel16::map::kScreenRows - 1; row >= 0; --row) {
+        for (int row = kestrel::model1992::map::kScreenRows - 1; row >= 0; --row) {
             const std::string candidate = machine_.screenLine(row);
             if (candidate.empty()) {
                 continue;

@@ -46,7 +46,7 @@ assembled into `roms/kestrel16/` and executed at 8 MHz.
 | `$04-$07` | | A cartridge, 256 KiB |
 | `$00`, `$08-$0F` | | RAM |
 
-The map is written twice — once in `include/timewarp/kestrel16/map.hpp` for the
+The map is written twice — once in `include/kestrel/model1992/map.hpp` for the
 emulator and once in `roms/kestrel16/kestrel16.inc` for the ROMs — and the two are changed
 together.
 
@@ -274,6 +274,5 @@ cmake --build build -j && ctest --test-dir build --output-on-failure
 
 In order: the stored program and the control flow that needs one, strings as
 values, arrays and functions, Kestrel DOS 2.0 in the KERNAL, and the window. The
-Kestrel's [firmware page](../kestrel/firmware.md) is the record of the same process one
-machine earlier, and [its manual](../kestrel/README.md) is what this one becomes when
-it has grown up.
+Kestrel's [own manual](../kestrel/README.md) is the record of the same process one
+machine earlier, and is what this one becomes when it has grown up.

@@ -1,460 +1,245 @@
-# Kestrel Owner's Manual
+# The Kestrel Owner's Manual
 
-> **This page describes the previous build of the Kestrel**, in which the eleven
-> languages were native C++ engines and the machine had no processor. The
-> machine is now a 6502 running ROMs, assembled from `roms/kestrel/`; read
-> [Inside the Kestrel: a 6502 and two ROMs](firmware.md) for the machine as it is
-> built today, including exactly what the ROMs do and do not yet implement.
+The Kestrel has a processor, and the processor runs ROMs.
 
-```text
-     **** KESTREL BASIC V2.0 ROM ****
-  64K RAM SYSTEM   32768 BYTES FREE
-          (C) 1982 HONEYBADGER SYSTEMS
-             Kestrel DOS 1.0  KESWARP
-READY.▉
-```
-
-The line under `READY.` is the prompt: it is on the glass, not in a field below
-it. You type straight at the machine — the characters appear where the block
-cursor is — and `Return` hands the line to the ROM.
-
-This is the manual for the machine this repository carries: a home computer from a
-1982 that never happened, where one socket accepted eleven language ROMs and the
-disk was measured in sectors because disks were still physical things. The
-machine is real software — everything in this book happens when you type it.
-
-- **Open it:** `./build/kestrel_computers --hb1`, or the launcher's **Kestrel** button.
-- **The surrounding story:** [the machines](../MACHINES.md).
-- **The rest of this book:** [ROMs](roms.md) · [Kestrel DOS](hb-dos.md) · [WARP BOARD](bbs.md) ·
-  [CONFIG](config.md) · [Inside](inside.md).
+This is the machine's manual: what the hardware is, how the ROMs are made, what
+is in them, and exactly how far they have got.
 
 ---
 
-## Specifications
+## What the machine is
 
 | | |
 | --- | --- |
-| Model | Kestrel Personal Computer System |
-| ROM socket | Eleven language ROMs: BASIC, APL, Logo, PILOT, FOCAL, Scheme, CHIP-8, COMAL, REXX, Smalltalk, Forth |
-| Program memory | 64K, one buffer per ROM, kept when you switch away |
-| Display | One CRT, three modes: TEXT, SPLIT (the default), GRAPHICS |
-| Text side | PROGRAM (a real code editor) and SCREEN (the tube, painted from memory) |
-| Graphics side | The turtle canvas: the drawing surface a program draws on |
-| Keyboard | The prompt line, with history; the tube and the canvas take typing too |
-| Disk | Kestrel DOS 1.0: one volume, 512 sectors of 256 bytes, 30-character names |
-| Monitor | Green, amber, white or ice phosphor; scanlines, vignette, curvature, flicker, glow |
-| Power | The lamp in the header. Plugging in is not modelled |
+| Processor | **MOS 6502 at 1 MHz**, cycle-counted, in `src/kestrel/model1982/cpu6502.cpp` |
+| Memory | 64 KiB address space, 32 KiB of it RAM |
+| Tube | 40 × 25 characters, one ASCII code per cell, plus an ink/paper byte per cell |
+| Keyboard | a 16-key controller buffer, drained by the frame interrupt |
+| Sound | one latch byte, played by the host |
+| Disk | 512 sectors of 256 bytes, a sector-level controller and Kestrel DOS in ROM |
+| ROM | 16 KiB socket at `$A000` for the language, 8 KiB KERNAL at `$E000` |
 
-The machine is described as 64K because that is what the status line says and
-what the period wanted. What it actually is, is a window onto the native engines
-with a very good costume on: see [Inside the Kestrel](inside.md).
+Nothing on that list is a picture of a feature. The screen is memory the
+processor writes; the disk is a sector of bytes the processor moves; the
+`READY.` prompt is a string in a ROM.
 
----
+### The map
 
-## First boot
+```text
+$0000-$00FF   zero page            KERNAL owns $00-$1F, the socket ROM $20-$FF
+$0100-$01FF   the processor's stack
+$0200-$02FF   the input line
+$0300-$06FF   Kestrel DOS buffers (directory, volume header, one data sector)
+$0700-$070F   the keyboard buffer the interrupt handler fills
+$0801-$7EFF   program, variables and free memory
+$7F00-$7FFF   the interpreter's stacks (values, FOR loops, GOSUB frames)
+$8000-$83E7   the screen, 40 x 25
+$8400-$87E7   colour, one byte per cell: ink << 4 | paper
+$8800-$88FF   I/O registers
+$8900-$9FFF   nothing responds
+$A000-$DFFF   the ROM in the socket
+$E000-$FFFF   the KERNAL, with the three vectors in the top six bytes
+```
 
-When the machine opens it cold-boots into a ROM — BASIC, unless CONFIG says
-otherwise — checks the RAM it is about to claim, and flashes the banner above at
-the top of the glass. That is the whole boot screen: a title, the memory, the
-copyright line and the disk, and then the prompt.
-
-The check is a test, not a decoration: it writes a pattern into the free RAM it
-claims to have and reads it back, and it sums the bytes of every ROM's version and
-banner note. A failure says which address failed and stops the boot. It appears when
-CONFIG's start-up message is **Full**, because Short and Off are promises about how
-much the machine says at power-on and a self-test that always printed would break
-them.
-
-Then:
-
-1. **Type a program.** In the BASIC ROM, `10 PRINT "HELLO, TIME TRAVELLER"` at the
-   prompt stores line 10 on the PROGRAM page. `20 GOTO 10` stores another.
-2. **Press Return.** Nothing runs yet; a numbered line is a program line, and
-   storing it is the whole action.
-3. **Press F9**, or type `RUN`. The program runs. Its output appears on SCREEN;
-   its drawing appears on the right of the screen.
-4. **Switch ROMs.** Choose **Logo** in the ROM selector. The machine cold-boots:
-   the screen clears, the banner names Logo, and the prompt becomes `?`. The
-   BASIC program is still in BASIC's memory; switch back and it is there.
-5. **Save your work.** `SAVE "HELLO"` writes the current program to the disk.
-   `CATALOG` shows it. Close the machine, reopen it, `CATALOG` again: it is still
-   there. That is [Kestrel DOS](hb-dos.md) doing its job.
-
-Nothing above needs a file on disk, a project, or anything behind the window. The
-machine is complete on its own — which is the point of a home computer.
+The I/O registers are listed in
+[`map.hpp`](../../include/kestrel/model1982/map.hpp) and again in
+[`kestrel.inc`](../../roms/kestrel/kestrel.inc), deliberately: the emulator decodes the
+addresses and the ROM pokes them, and a test compares the pair by writing the
+registers the ROM writes.
 
 ---
+
+## Switching it on
+
+```text
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./build/kestrel_window
+```
+
+`kestrel_window` is the machine on its own: the window is the tube, the keyboard
+is yours, and there is no interpreter behind it. `--shot <file>` boots the ROM,
+lets the banner finish, and writes the screen to a PNG, which is how the window
+is checked without a person watching it.
+
+The keys are the machine's: `Return`, `Backspace` (Rub Out), `Escape`, and
+`Ctrl+Q` to leave the machine on. Everything printable goes to the keyboard
+controller, sixteen keys at a time.
 
 ## The front panel
 
-From left to right across the top:
+Everything a 1982 owner could change by reaching round the back is a menu, and
+the choices are remembered between sessions (`QSettings`).
 
-| Control | What it does |
+| Menu | What it changes |
 | --- | --- |
-| **Kestrel** and the tagline | Identity. The tagline reads `PERSONAL COMPUTER SYSTEM · 64K RAM` |
-| **ROM** | The language socket. Selecting a ROM cold-boots into it |
-| **SCREEN** | `TEXT`, `SPLIT` or `GRAPHICS` |
-| **CONFIG** | The machine's settings screen — [all of them](config.md) |
-| **POWER** | The lamp **is the switch**: click it and the machine goes dark, the prompt stops answering and the clock stops. Click again and it cold-boots, self-test and all |
+| **Machine → Speed** | 1 MHz (the machine's own clock), 2 MHz, 4 MHz, or "as fast as this computer" -- the 6502 is the same processor; this is how many of its cycles the host gives it per second |
+| **Machine → ROM socket** | which 16 KiB image is at `$A000`; changing it cold-boots the machine into that ROM |
+| **Machine → Cartridge** | fits a 4 KiB image at `$9000`, read-only to the processor, or ejects it |
+| **Machine → Sound** | mutes the latch; the ROM keeps writing to it and the counter keeps counting |
+| **Media → Mount/Save/Format disk** | a `.dsk` is the raw volume: 512 sectors of 256 bytes, 128 KiB |
+| **Media → Insert/Save/Eject tape** | a `.tap` is the byte stream the cassette device serves |
 
-Under the screen:
+The machine API behind the menus is small and has no Qt in it: `setSpeed`,
+`mountSocketRom`, `mountCartridge`, `ejectCartridge`, `setSoundEnabled`,
+`disk().load/save/format`, `tape().load/insert/eject`. The tests drive those
+directly, which is why the menus are not the only place the features work.
 
-| Control | What it does |
-| --- | --- |
-| The prompt | Everything typed here is remembered in history and echoed in the ROM's voice |
-| **RUN** | Runs the program on the PROGRAM page (F9) |
-| **STOP** | Stops a running program (Shift+F9) |
-| **CLS** | Clears the screen and the drawing (Ctrl+L) |
+### The cassette
 
-### The machine's voice
+A 1982 tape was one bit and a motor. The device here is the part under the pulse
+encoding: a byte stream with `play`, `record`, `stop` and `rewind`, and a status
+byte (`$8819`: present, playing, recording, data left). The KERNAL does not yet
+speak a tape format; the **monitor ROM** does -- `S aaaa bbbb` writes a
+four-byte header and the block, `L` reads it back -- so the hardware is proved
+end to end (BASIC keeps to the disk and leaves tape to the monitor).
 
-The Kestrel makes five sounds that no program asked for, and a reader who owned one of
-these remembers all five:
+## The ROM library
 
-| When | What it sounds like |
-| --- | --- |
-| Power on, cold boot, ROM change | a rising two-note chirp as the tube warms up |
-| A line typed at the prompt | one short click |
-| `SAVE`, `LOAD`, `CATALOG`, `INIT`, any disk word | the head stepping: a short rattle |
-| A program reports an error | a low buzz, once per run and not once per line |
-| The tape motor (20.4) | a warble over a hiss |
+`romLibrary()` in [`roms.cpp`](../../src/kestrel/model1982/roms.cpp) is the table of every
+image this build carries. Each is a 16 KiB socket ROM or a 4 KiB cartridge, and
+nothing in the emulator knows what any of them do.
 
-They are tones built from the same mixer a program's `SOUND` uses — one sound chip,
-one voice — and CONFIG has a volume and a mute. A muted machine still *counts* what
-it did: muting is a promise about sound, not about history.
+| id | ROM | State |
+| --- | --- | --- |
+| `basic` | BASIC V2.0 | **complete for what it is**: the statement set, the function library and the disk commands described below |
+| `monitor` | MONITOR V1.0 | **complete for what it is**: `M` examine, `:` deposit, `G` go, `R` registers, `S` save block to tape, `L` load block from tape |
 
-A program has a sixth sound: **the latch at `$A005`**. `POKE 40965, 30` writes a code
-there and the machine plays it on the next frame, then clears the register itself so
-the program does not have to. `100 + code * 8` hertz, 80 milliseconds — enough for a
-program to play a scale by poking fifteen values, which is all a one-register beeper
-could ever do.
+The monitor is the second ROM in the series and the proof that the socket is
+real: it is assembled from [`roms/kestrel/monitor.s`](../../roms/kestrel/monitor.s),
+mounted at run time, and boots into its own banner without the KERNAL changing.
 
-The status line along the bottom is a machine readout, not decoration:
+---
+
+## The ROMs are built, not compiled in
+
+`roms/kestrel/*.s` is 6502 assembly. `tools/kestrel_asm.cpp` assembles it at build time
+into the images the machine boots:
 
 ```text
-ROM BASIC V2.0   MEM 64K   MODE SPLIT   LINE 1:1   Kestrel DOS 0F   READY
+cmake --build build --target kestrel_roms
+build/generated/kestrel/basic_rom.hpp     16 KiB at $A000, as a constexpr array
+build/generated/kestrel/kernal_rom.hpp     8 KiB at $E000
+build/generated/kestrel/basic.sym         every label and its address
+build/generated/kestrel/basic.lst         the listing, instruction by instruction
 ```
 
-It names the ROM and its version, the screen mode, the cursor position on the
-PROGRAM page, how many files the disk holds, and whether a program is `RUNNING`
-or the machine is `READY`.
-
-### The screen
-
-**TEXT** shows only the text side. **GRAPHICS** shows only the canvas.
-**SPLIT** — the default, and the machine's natural state — shows both, with the
-text on the left.
-
-The text side has two pages:
-
-- **PROGRAM** — a `CodeEditor`: gutter, current
-  line, syntax colouring, undo, selection, search. A listing is not pasted into
-  a text box here.
-- **SCREEN** — the machine's screen: the tube, painted from the memory map below, with
-  the banner, prompt echoes, program output and errors written into its cells
-
-A program that draws while the machine is in TEXT switches to SPLIT once, so the
-ink cannot land somewhere it cannot be seen. CONFIG can turn that off for a
-learner who wants to watch the drawing arrive deliberately.
-
-### The screen is memory
-
-The SCREEN page is not a text box that the machine appends lines to. It is a window
-onto the machine's own 64K, and that is the difference between a picture of a home
-computer and one:
-
-| Range | What it is |
-| --- | --- |
-| `$0000`–`$7FFF` | **Free RAM**, 32768 bytes, for `POKE` and for machine code |
-| `$8000`–`$8FFF` | **Screen cells**: 80 × 25 character codes, row-major, 2000 bytes |
-| `$9000`–`$9FFF` | **Colours**: one ink/paper nibble pair per cell, in the same order |
-| `$A000`–`$A0FF` | **I/O registers**: cursor column, cursor row, border, ink, paper, sound latch (`$A005`), frame counter low and high (`$A006`, `$A007`, sixty a second), scrolled flag |
-| `$F000`–`$FFFF` | **ROM**: readable, and a `POKE` into it is refused out loud |
-
-So a character is a byte at an address, and the machine shows it:
-
-```basic
-10 POKE 32768, 72                 ' 'H' in the top-left corner
-20 POKE 32848, 73                 ' 'I' at row 1, column 0
-30 LOCATE 5, 10                   ' the cursor, as a register
-40 PRINT "HERE"                   ' so this lands at row 5, column 10
-50 POKE 32768 + 24 * 80 + 3, 128  ' a graphics character on the bottom row
-```
-
-`POKE` and `PEEK` take **expressions** — a program writes the cell it computed —
-and the tube scrolls by moving *cells*, so `PEEK` of the top row after a scroll
-answers with what is on the screen now. `CLS` clears cells; `COLOR ink, paper` sets
-the nibble pair the next characters use; the border is register two.
-
-The status line's `MEM` is a reading rather than a badge: 32K is the free RAM this
-machine actually has, and it says so because the number comes from the map.
-
-A machine of 1982 could not show a character the tube has no glyph for, and neither
-can this one: the engines prefix messages with an emoji, and the tube drops
-that prefix and transliterates the typographic punctuation in the banner. What is
-left is ASCII, which is what the machine's character set is.
-
-### Keys
-
-Typing works at the prompt line and at the machine's face: click the tube or the
-drawing beside it and the keystrokes are delivered to the prompt, the way they
-would be on a machine whose keyboard was the computer.
-
-| Key | Action |
-| --- | --- |
-| `F1` | `LIST` — print the program on the glass |
-| `F2` | `NEW` — erase the program |
-| `F3` | `CATALOG` — list the disk |
-| `F4` | Put `LOAD "` on the line, caret after the quote |
-| `F5` | Put `SAVE "` on the line |
-| `F6` | The graphics screen |
-| `F7` | The text screen |
-| `F8` | The machine's settings |
-| `F9` | Run the program |
-| `Shift+F9` | Stop |
-| `Ctrl+L` | Clear the screen and the canvas |
-| `Up` / `Down` | Previous and next prompt line, up to the history depth CONFIG sets |
-
-The row of keys along the bottom of the case clicks the same words.
+The assembler is a build tool, not a dependency: the tree still builds with a
+C++20 compiler and nothing else. It iterates to a fixed point rather than
+guessing in two passes, so a branch that cannot reach its target becomes its own
+inverse branch over a `JMP` and a label that lands in zero page is assembled as a
+zero-page instruction without being told to. The images are byte-for-byte
+reproducible, and `.sy`/`.lst` are how a wrong byte is found.
 
 ---
 
-## The prompt
+## What is in the KERNAL (8 KiB)
 
-The prompt is the machine's own command line. It understands two vocabularies,
-in this order:
+* **Reset** -- hardware initialisation, `CLI`, then `JMP $A000`, the cold start
+  of whatever ROM is in the socket.
+* **The frame interrupt** -- counts 50 Hz frames, blinks the cursor, and empties
+  the keyboard controller into the KERNAL's own sixteen-place buffer. It has to:
+  the controller's interrupt line stays high until its last key is read.
+* **The screen** -- `CHROUT` with `CR`, Rub Out, `CLS`, `HOME` and colour codes;
+  wrap at column 40; a scroll that moves the matrix and the colour map and tells
+  a program it happened.
+* **The keyboard** -- `GETIN`, `CHRIN`, and `GETLINE` with Rub Out as its only
+  editor. A 1982 machine at this price was a teletype: you typed the line, and if
+  you wanted a different one you typed it again.
+* **The disk controller** -- read a sector into RAM, write RAM onto a sector.
+* **Kestrel DOS 1.0** -- the volume header, a 64-byte free map, two directory
+  sectors (32 files of 8.3-ish names), 252-byte chains, `CATALOG`, `FIND`,
+  `LOAD`, `SAVE`, `DELETE`, `FORMAT`.
+* **Number output** -- decimal conversion, for the directory listing.
 
-1. **The machine's own words** (below). These never reach a language.
-2. **The selected ROM's language.** Everything else is submitted to a persistent
-   session for that ROM, so `LET X = 5` then `PRINT X` works, and so does
-   `(define (square n) (* n n))` in Scheme.
+Every entry point is a fixed address in the jump table at `$E000`
+(`K_CHROUT`, `K_GETLINE`, `K_DOSSAVE`, …), which is how the socket ROM calls the
+KERNAL, and how a machine-code program a person writes can too.
 
-In the BASIC ROM there is a third case: a line that starts with a number and then
-a keyword is a program line, not a command — see [direct mode](roms.md#basic).
+## What is in the BASIC ROM (16 KiB)
 
-### Machine words
+* The banner, `READY.`, the prompt loop, and a `HELP` command that lists the
+  language the ROM actually carries.
+* **Arithmetic**: 5-byte floating point in the MS layout -- exponent, then a
+  four-byte mantissa whose top bit is the sign -- with add, subtract, multiply,
+  divide, compare, integer conversion, and decimal input and output (nine
+  significant digits, scientific notation outside 1e-4..1e9).
+* **Functions**: `ABS`, `INT`, `SGN`, `SQR`, `RND`, `PEEK`, and the
+  transcendentals `EXP`, `LOG`, `SIN`, `COS`, `TAN`, `ATN`, the last four by
+  series after range reduction, accurate to about nine digits.
+* **Expressions**: `OR`, `AND`, `NOT`, comparisons (`=`, `<>`, `<`, `>`, `<=`,
+  `>=`), `+ - * /`, `^` (an integer power is multiplied out, so `2^10` is
+  exactly 1024), unary sign, brackets, numbers in decimal and `E` notation.
+* **Variables**: one or two characters, numeric and `$` string names, looked up
+  and created as they are met.
+* **Functions of your own**: `DEF FN A(X)=X*X+1`, then `FN A(3)`. The body is
+  kept where it was written in the program, so a definition typed at the prompt
+  is worth nothing -- the text it points at is gone by the next line. Four
+  definitions at a time, numeric only.
+* **Strings**: string variables with a heap that grows down from the top of
+  memory (no collector -- what is written is not given back), assignment, use in
+  `PRINT`, `+` to join two of them, `= <> < > <= >=` to compare them (shorter
+  sorts first), and `LEN`, `ASC`, `CHR$`, `STR$`, `VAL`, `LEFT$`, `RIGHT$`,
+  `MID$`. A string where a number belongs, or the other way round, is
+  `?TYPE MISMATCH`.
+* **Arrays**: `DIM A(10)`, `DIM M(2,3)`, `DIM A$(10)` -- up to four dimensions,
+  of numbers or of strings, elements of
+  five bytes each, the last subscript moving fastest, allocated from the same
+  heap as the strings and kept for the life of the program. A name used with
+  one subscript before it is dimensioned becomes an array of eleven, as it did
+  on the machines of the day; `?BAD SUBSCRIPT` and `?REDIMENSIONED ARRAY` say
+  the rest.
+* **Program storage**: numbered lines stored in number order with linked
+  headers, `LIST`, `LIST n`, `RUN` from the start, `NEW`, `DELETE n[,m]`, and
+  multi-statement lines with `:`.
+* **Statements**: `PRINT` (with `?`, `;` and `,`), `LET` (with or without the
+  keyword), `IF`/`THEN`/`ELSE`, `FOR`/`TO`/`STEP`/`NEXT`, `GOTO`, `GOSUB`,
+  `RETURN`, `ON`…`GOTO`/`GOSUB`, `INPUT`, `GET` (one key, no Return),
+  `DATA`/`READ`/`RESTORE` (numbers and quoted strings alike), `REM`, `END`,
+  `STOP` with `CONT` to carry on from where it stopped, `POKE`, `CLS`.
+* **Disk**: `SAVE "NAME"`, `LOAD "NAME"`, `CATALOG`, all through Kestrel DOS, which
+  keeps the name, the first sector and the length in the directory.
+* **Errors** as the machine reports them: `?SYNTAX ERROR`,
+  `?DIVISION BY ZERO ERROR`, `?OUT OF MEMORY`, `?OUT OF DATA`, `?BAD DATA`,
+  `?ILLEGAL QUANTITY`, `?TYPE MISMATCH`, `?STRING TOO LONG`, `?BAD SUBSCRIPT`,
+  `?REDIMENSIONED ARRAY`, `?UNDEF'D STATEMENT`,
+  `?RETURN WITHOUT GOSUB`,
+  `?NEXT WITHOUT FOR`, `?BAD FILE NAME`, `?DISK ERROR`, `?OVERFLOW`, with the
+  line number attached when a program is running.
 
-| Word | What it does |
-| --- | --- |
-| `RUN` | Run the program on the PROGRAM page. With a name, `RUN "NAME"`, load that file and run it |
-| `LIST` | Print the program to the screen |
-| `NEW` | Erase the program and end the prompt session |
-| `EDIT` | Move to the PROGRAM page |
-| `TEXT`, `GFX`/`GRAPHICS`, `SPLIT` | Change the screen mode |
-| `CLS`/`CLEAR` | Clear the screen and the drawing |
-| `ROMS` | List the language ROMs, marking the one in the socket |
-| `CONFIG`/`SETUP` | Open the settings screen |
-| `HELP`, or a bare `?` | Print the machine's vocabulary |
-| `CATALOG`, `SAVE`, `LOAD`, `DELETE`, `RENAME`, `LOCK`, `UNLOCK`, `VERIFY`, `TYPE`, `STATUS`, `LLIST`, `LPRINT`, `INIT` | [Kestrel DOS](hb-dos.md) |
-| `DIAL` | [WARP BOARD](bbs.md) |
+## Where the boundary is
 
-In the BASIC ROM, the prompt also has the machine's **line editor**, which is the
-part of a 1982 BASIC people actually spent their evenings in:
+This is a working machine. Being exact about the edge is the difference between
+a ROM and a demonstration:
 
-| Word | What it does |
-| --- | --- |
-| `AUTO [start[, step]]` | Puts the next line number in the prompt and advances it after every line you type; an empty line ends it. With no argument it continues after the listing |
-| `RENUM [start[, step]]` | Renumbers the listing **and every jump in it** — `GOTO`, `GOSUB`, `THEN`, `ELSE`, `RESTORE`, `GO TO`, `GO SUB`, including the list after `ON x GOTO 10, 20, 30` |
-| `DELETE 20-30` | Deletes a range (`DELETE 20` is one line, `DELETE 20-` is everything from 20) |
-| `LIST 20-30` | Lists a range; a bare `LIST` still lists the whole program |
-| `UNDO` | Puts back the listing `NEW` erased. One deep, and it says so |
-| `TRON` / `TROFF` | Prints each line's number as it runs — `[10]`, `[20]`, … — which is the only way to see which arm of a `GOTO` a program took |
+**Working and tested** (see `tests/kestrel_machine_tests.cpp`, which types at the
+machine and reads the screen): everything listed above, plus the screen as
+memory, sector-level disk access, the frame clock and the sound latch.
 
-`RENUM` is careful on purpose. A comment (`REM GOTO 40`) and a string
-(`PRINT "GOTO 40"`) are prose and are left byte for byte; a target that names a line
-the program does not have is **left alone and counted**, because it was already a
-runtime error and renumbering it would make it a different one. `DELETE "NAME"` is
-still the disk, because a file name is in quotes and a line range is not.
+**Not in this ROM yet:** tape `CSAVE`/`CLOAD` from BASIC. The tape hardware is
+proven end to end by the monitor's `S` and `L`, which write and read the block
+format `[address][count][bytes]`; a `CLOAD` for BASIC was written and removed
+again because a misread header could copy over the screen, and a command that
+can do that is worse than one that is missing. `HELP` says so, on the machine.
 
-### Two ways to run
-
-There are two execution paths behind the machine, and the difference matters:
-
-- **The prompt session** is a `ReplRunner`: it keeps bindings between lines and
-  is where curiosity happens.
-- **`RUN`** is a `NativeRunner`: the whole program, once, to completion, on the
-  same engine the assembler and tests drive.
-
-`RUN` ends the prompt session first. A program therefore never starts inside
-variables left by an earlier command — the machine's version of "put your toys
-away before you start". Selecting a different ROM ends the session too. The
-next line after either starts a fresh one.
-
----
-
-## What the machine remembers
-
-The machine writes two different things to two different places, and the
-distinction is worth knowing because it is the difference between "my settings"
-and "my session".
-
-### Session state — `retroComputer`
-
-| Key | Holds |
-| --- | --- |
-| `geometry` | The window's size and position |
-| `language` | The ROM you were left in |
-| `mode` | The screen mode you were left in |
-| `programs/<rom>` | Each ROM's program, when CONFIG's *Remember each ROM's program* is on |
-
-With program memory switched off, the machine erases what it already kept, so
-the next start cannot show programs the setting says are not remembered.
-
-### Configuration — `retroComputer/config`
-
-Boot ROM, boot screen, start-up message, prompt-history depth, program memory,
-switch-to-SPLIT, phosphor, the two text sizes and the five glass strengths. Every
-key is listed in [CONFIG](config.md#where-it-is-stored).
-
-### What is *not* remembered
-
-- **Prompt history.** Up and Down recall this session's lines; closing the
-  machine forgets them. The history depth CONFIG sets is a budget, not a file.
-- **A running program.** Programs do not survive a restart. `SAVE` is how a
-  program outlives the afternoon; that is the lesson.
-
-The disk is separate from both, because it is: one image file,
-`~/.time_warp/disks/HBWARP.dsk`, moved with the rest of the machine's data by
-`TIME_WARP_DATA_DIR`. See [Kestrel DOS](hb-dos.md#the-image).
+**Not started:** the other ten language ROMs (Logo, PILOT, FOCAL, COMAL, REXX,
+APL, Smalltalk, Forth, Scheme, CHIP-8). The socket is designed for them: each is
+a 16 KiB image at `$A000` whose first three bytes are the cold start and whose
+next three are the warm start, and the KERNAL needs no changes.
 
 ---
 
-## The whole machine as one file
+## Adding to the ROM
 
-A machine is more than a program: it is the ROM it is left in, the screen, every
-ROM's program, the phosphor and the configuration, and the disk. Two words write that
-as one document and boot from it:
+1. Write it in `roms/kestrel/*.s`, in the dialect `tools/kestrel_asm.cpp` documents at the
+   top of that file.
+2. Call the KERNAL through the `K_` addresses in `kestrel.inc`, never by reaching
+   into its internals.
+3. `cmake --build build --target kestrel_roms` assembles it; `basic.lst` shows what
+   came out and `basic.sym` says where every label landed.
+4. Prove it in `tests/kestrel_machine_tests.cpp` by typing at the machine and
+   reading the screen -- never by calling into the ROM from C++.
 
-```basic
-SAVE MACHINE "HV"          ' writes HV.hb1 in the machine's data directory
-LOAD MACHINE "HV"          ' cold-boots from it
-SAVE MACHINE "hv.hb1"      ' a name with a .hb1 on it, or a path, is used as given
-```
-
-`SAVE MACHINE` reports how many programs and how many files it wrote, because a
-machine that saved nothing and said "OK" is the failure this project keeps guarding
-against. `LOAD MACHINE` refuses — with a sentence, leaving the machine as it was —
-a file that is not a machine image or one written by a newer build
-(`this machine image is format 3; this build reads up to format 1`).
-
-The image is JSON and reads like one, so a teacher can inspect it, put it in version
-control, or make one by hand:
-
-```json
-{
-  "format": 1,
-  "name": "HV",
-  "language": "logo",
-  "mode": 1,
-  "programs": { "logo": "REPEAT 4 [FD 60 RT 90]" },
-  "config": { "phosphor": 1, "screenTextSize": 14 },
-  "volume": { "volume": "KESWARP", "files": [] }
-}
-```
-
-`language` is a ROM's protocol key (`basic`, `logo`, `pilot`, … — the eleven the machine
-has), `mode` is `0` TEXT, `1` GRAPHICS or `2` SPLIT (the order of the machine's own
-`ScreenMode`, which is what the number is), and `volume` is the Kestrel DOS volume
-itself — the file it lives in is the reader's business, so a disk handed to somebody
-else is a volume rather than a path on this machine.
-
----
-
-## Running the machine from a terminal
-
-```bash
-./build/kestrel_computers --hb1                       # open the machine
-./build/kestrel_computers --machine hv.hb1            # boot a machine image
-./build/kestrel_computers --hb1 --screenshot hb1.png  # photograph the machine
-```
-
-With `--hb1`, `--screenshot` photographs the machine rather than the launcher, so
-a script that demonstrates the boot screen captures the boot screen.
-
-The full option list:
-
-```bash
-./build/kestrel_computers --help
-```
-
----
-
-## The limits, stated plainly
-
-A machine is defined by what it will not do.
-
-| Limit | Value | What happens at the edge |
-| --- | --- | --- |
-| ROMs | Eleven, one at a time | Nothing else exists to select |
-| Program memory | One buffer per ROM | Switching keeps it; closing the machine keeps it only if *Remember each ROM's program* is on |
-| Screen | TEXT, SPLIT, GRAPHICS | A whole-program run cannot show more |
-| Disk volume | One, named `KESWARP` | There are no directories and no second volume |
-| Disk size | 512 sectors of 256 bytes | A file that will not fit is refused (`?DISK FULL`), never truncated |
-| File name | 30 characters, upper-cased | `SAVE Hello` and `SAVE "HELLO"` are the same request |
-| Lock | Per file | A locked file refuses `SAVE` over it and `DELETE`; it can still be `TYPE`d, `LOAD`ed and renamed, and the lock travels with the name |
-| `INIT` | Must be said twice | Any other line in between is a change of mind |
-
-The machine will not crash, corrupt a save, or leave a key stuck. Those are not
-period features; they are the parallel-universe part.
-
----
-
-## Programs to run on it
-
-Nine programs in [`Examples/kestrel/`](../../Examples/hb1/) are written for this
-machine rather than for a text editor. Each one uses something only the Kestrel has,
-and each runs from the prompt as well as from the PROGRAM page — the tube writes
-land as the same arithmetic, and the drawing lands on the canvas. `retro_computer_tests` loads every one of them
-into a real machine and requires it to leave ink behind, so a program here that stops
-working fails the build rather than a lesson.
-
-| Program | What it shows |
-| --- | --- |
-| [`tube_writer.bas`](../../Examples/hb1/tube_writer.bas) | The screen is memory: characters and colours written with `POKE` into `$8000`/`$9000`, read back with `PEEK`, and a turtle frame round the result |
-| [`ram_probe.bas`](../../Examples/hb1/ram_probe.bas) | The 32K below the screen: a pattern written across it, three cells read back, and one bar drawn per byte |
-| [`frame_clock.bas`](../../Examples/hb1/frame_clock.bas) | Both clocks: the frame counter in registers `$A006`/`$A007`, and `ON TIMER` … `TIMER ON` interrupting a loop, with one spoke per interrupt |
-| [`colour_chart.bas`](../../Examples/hb1/colour_chart.bas) | The phosphor ramp: sixteen steps of brightness written into the attribute byte, as ink, as paper, and as a strip |
-| [`sound_board.bas`](../../Examples/hb1/sound_board.bas) | The machine's voice, asked for on purpose: eight notes as `SOUND frequency, ticks`, with a block poked into the tube for each |
-| [`memory_map.bas`](../../Examples/hb1/memory_map.bas) | The map, read rather than believed: four `PEEK`s from four regions, the hole that answers zero, and the ROM that refuses a write |
-| [`canvas_lines.bas`](../../Examples/hb1/canvas_lines.bas) | The other surface: axes, eight filled bars and two circles on the 320 × 200 canvas, with the tube narrating beside it |
-| [`sprite_lab.bas`](../../Examples/hb1/sprite_lab.bas) | A sprite made out of nothing: drawn with `PSET`, taken with `GET`, and `PUT` a hundred and twenty times across the frame |
-| [`turtle_garden.logo`](../../Examples/hb1/turtle_garden.logo) | The same machine in another ROM: a house, a sun and two flowers, in Logo |
-
-To run one on the machine:
-
-1. Open it in any text editor and copy the listing, or copy it from the
-   repository.
-2. On the Kestrel, press **EDIT** (or click the PROGRAM page) and paste over the
-   listing, then **RUN** (F9).
-3. Watch the SCREEN page: a tube write is visible as a character, and
-   `PEEK` answers with what is in the cell.
-
-`SAVE "TUBE"` puts it on the disk when you want it there tomorrow, and
-[Kestrel DOS](hb-dos.md) has the rest of that conversation.
-
-**The demo volume.** All nine programs are already saved on a 5.25" volume:
-[`Examples/kestrel/HBWARP.dsk`](../../Examples/hb1/HBWARP.dsk) is a disk image in
-[the documented format](hb-dos.md#the-image), so nothing has to be typed. The first
-time a machine is opened from the launcher, the shipped image is installed as
-`~/.time_warp/disks/HBWARP.dsk` (or `$TIME_WARP_DATA_DIR/disks/`) if there is no
-disk there yet; after that the disk is yours and is never replaced. `CATALOG` lists
-the nine, `LOAD "FRAME CLOCK"` puts one in memory, and `RUN` runs it. The machine
-has exactly one volume, so keep a copy of anything you save. `retro_computer_tests`
-opens the shipped image, checks that the programs load, and checks that a first boot
-from the launcher installs it, so the disk cannot rot without a test failing.
-
----
-
-## Where next
-
-- Learn the eleven ROMs: [the ROM library](roms.md).
-- Keep a program: [Kestrel DOS 1.0](hb-dos.md).
-- Call somebody: [WARP BOARD](bbs.md), the board on the other end of the line.
-- Make it yours: [CONFIG](config.md).
-- Change the machine's mind: [Inside the Kestrel](inside.md).
-- See what a later release could add: [enhancements](enhancements.md), the
-  proposals written down and still open.
-- See the machine a decade later: [the Model 92](model-92.md), the same company's
-  1992 computer -- and the machine it became, [the Kestrel 16](../kestrel16/README.md).
-- Meet its predecessor in spirit: the CHIP-8 ROM above shares its assembler and
-  machine, and its listings are in [`Examples/chip8/`](../../Examples/chip8/).
+The CPU has its own suite (`tests/kestrel_cpu_tests.cpp`) covering addressing modes,
+BCD arithmetic, the stack, the three interrupts, the `JMP ($xxFF)` bug and the
+cycle counts the 20 000-cycle frame depends on.

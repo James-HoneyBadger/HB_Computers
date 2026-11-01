@@ -6,7 +6,7 @@
 
 #include "check.hpp"
 
-#include "timewarp/kestrel16/cpu65816.hpp"
+#include "kestrel/model1992/cpu65816.hpp"
 
 #include <cstdint>
 #include <initializer_list>
@@ -14,8 +14,8 @@
 
 namespace {
 
-using timewarp::kestrel16::Bus;
-using timewarp::kestrel16::Cpu65816;
+using kestrel::model1992::Bus;
+using kestrel::model1992::Cpu65816;
 
 /// Sixteen megabytes of plain memory, which is the whole address space.
 class RamBus final : public Bus {

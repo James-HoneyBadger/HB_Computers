@@ -6,7 +6,7 @@
 // machine with different profiles. This is what a person sees: type at it, let it
 // run, print the screen. Everything on that screen came out of the model's ROMs.
 
-#include "timewarp/machine.hpp"
+#include "kestrel/machine.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -18,9 +18,9 @@
 namespace {
 
 struct Options {
-    timewarp::Model model = timewarp::Model::Kestrel;
+    kestrel::Model model = kestrel::Model::Kestrel;
     int frames = 40;
-    timewarp::Machine::Speed speed = timewarp::Machine::Speed::Turbo;
+    kestrel::Machine::Speed speed = kestrel::Machine::Speed::Turbo;
     std::vector<std::string> lines;
     bool screen = true;
 };
@@ -37,12 +37,12 @@ void usage() {
         "  --no-screen  print nothing; useful only for timing\n");
 }
 
-bool parseSpeed(std::string_view text, timewarp::Machine::Speed& out) {
-    if (text == "1") { out = timewarp::Machine::Speed::Mhz1; return true; }
-    if (text == "2") { out = timewarp::Machine::Speed::Mhz2; return true; }
-    if (text == "4") { out = timewarp::Machine::Speed::Mhz4; return true; }
-    if (text == "8") { out = timewarp::Machine::Speed::Mhz8; return true; }
-    if (text == "turbo") { out = timewarp::Machine::Speed::Turbo; return true; }
+bool parseSpeed(std::string_view text, kestrel::Machine::Speed& out) {
+    if (text == "1") { out = kestrel::Machine::Speed::Mhz1; return true; }
+    if (text == "2") { out = kestrel::Machine::Speed::Mhz2; return true; }
+    if (text == "4") { out = kestrel::Machine::Speed::Mhz4; return true; }
+    if (text == "8") { out = kestrel::Machine::Speed::Mhz8; return true; }
+    if (text == "turbo") { out = kestrel::Machine::Speed::Turbo; return true; }
     return false;
 }
 
@@ -62,9 +62,9 @@ int main(int argc, char** argv) {
         if (arg == "--model") {
             const std::string_view name = next();
             if (name == "kestrel") {
-                options.model = timewarp::Model::Kestrel;
+                options.model = kestrel::Model::Kestrel;
             } else if (name == "kestrel16" || name == "kestrel-16") {
-                options.model = timewarp::Model::Kestrel16;
+                options.model = kestrel::Model::Kestrel16;
             } else {
                 std::fprintf(stderr, "kestrel: no such model: %.*s\n",
                              static_cast<int>(name.size()), name.data());
@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    timewarp::Machine machine{options.model};
+    kestrel::Machine machine{options.model};
     machine.setSpeed(options.speed);
     machine.reset();
     machine.runFrames(options.frames);
