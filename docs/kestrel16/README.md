@@ -160,6 +160,10 @@ THE ANSWER IS 42
 | Statement | |
 | --- | --- |
 | `PRINT` | Expressions and strings, separated by `;` (no space) and `,` (a space). A trailing `;` leaves the line open. `?` is shorthand |
+| `RUN` [`n`] | Run the program, or start it at line `n` |
+| `LIST` [`n`] | Show the program, or from line `n` on |
+| `GOTO n` | Continue at line `n` |
+| `NEW` | Throw the program and the variables away |
 | `LET` | `LET A=41`, or `A=41`; variables are `A` to `Z`, sixteen bits each |
 | `CLS` | Clear the screen and print the banner |
 | `REM` | A remark |
@@ -183,14 +187,35 @@ READY> WIBBLE
 ?WHAT?
 ```
 
+### The stored program
+
+A line that begins with a number is a program line: it is stored, not run. What
+follows the number is what will run later, and a line typed again replaces the
+old one. A number on its own removes that line.
+
+```basic
+10 PRINT "A"
+20 GOTO 40
+30 PRINT "B"
+40 PRINT "C"
+RUN
+A
+C
+```
+
+Lines are held in bank zero from `$0800`, as records of a number, the text and a
+zero, in ascending order — there are no link pointers to be left pointing into a
+line that was edited, and a line is found by scanning. The program may not pass
+`$7E00`; past it the machine says `?NO ROOM`. A jump to a line that is not there
+says `?NO LINE` and stops the program.
+
 ### What it does not do yet
 
 The honest list, because a manual that hides it is worse than useless:
 
-- **no stored program** — there are no line numbers, so no `RUN`, `LIST`, `GOTO`,
-  `GOSUB`, `FOR`/`NEXT` or `IF`. The line reader and the statement dispatcher are
-  built for them: a line number in front of a statement is the next thing to go
-  in;
+- **no `IF`, no `GOSUB`, no `FOR`/`NEXT`** — the statements that need a line to
+  come back to are the next thing to go in; the program store and the runner they
+  need are already there;
 - **no strings as values** — `PRINT "text"` works, `A$` does not;
 - **no arrays, no functions** — no `DIM`, no `ABS` or `LEN`, no `DEF FN`;
 - **no filesystem** — the disk device moves sectors, and Kestrel DOS 2.0's jump

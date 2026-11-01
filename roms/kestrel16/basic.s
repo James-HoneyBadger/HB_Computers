@@ -31,6 +31,26 @@ ZP_FLAG         = $42           ; PRINT's separator state
 ZP_VAR          = $43           ; which variable an assignment is writing
 ZP_BAD          = $44           ; an expression held something unreadable
 ZP_SGN          = $45           ; 16-bit: 1 when the quotient's sign is negative
+ZP_STATE        = $46           ; 0 at the prompt, 1 running a program
+ZP_JFLAG        = $47           ; a statement moved control: 1 line, 2 resume, 3 stop
+ZP_TMP16        = $48           ; 16-bit scratch
+ZP_LINE         = $4A           ; the address of the line being run, $FFFF at the prompt
+ZP_LNUM         = $4C           ; 16-bit, the line's number
+ZP_DLINE        = $4E           ; where the prompt's own line starts
+ZP_PROGTOP      = $50           ; one past the last byte of the program
+ZP_FORSP        = $52
+ZP_GSUBSP       = $53
+ZP_PP           = $54           ; a 24-bit pointer into the program
+ZP_QP           = $57           ; a second one
+ZP_CNT2         = $5A           ; 16-bit scratch
+ZP_NEWLEN       = $5C           ; 16-bit, the record being written
+ZP_TMPLEN       = $5E           ; 16-bit, a text's length
+
+PROG_LIMIT      = $7E00         ; the program may not grow past here
+FOR_BASE        = $7E00         ; FOR frames, ten bytes each
+FOR_MAX         = 6
+GOSUB_BASE      = $7EC0         ; GOSUB frames, four bytes each
+GOSUB_MAX       = 16
 
 VARS            = $0007C0       ; twenty-six words, A to Z
 
@@ -43,6 +63,7 @@ ENTRY:
         STA IO_PAPER
         JSL L_CLS
         JSR SAY_BANNER
+        JSR PROG_NEW
 MAIN_LOOP:
         JSR SAY_NEWLINE
         JSR SAY_READY
@@ -60,8 +81,55 @@ MAIN_LOOP:
         STA ZP_SRC+1
         LDA #BANK_KERNAL
         STA ZP_SRC+2
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'0'
+        BCC MAIN_EXECUTE
+        CMP #'9'+1
+        BCS MAIN_EXECUTE
+        JSR STORE_INPUT
+        BRA MAIN_LOOP
+MAIN_EXECUTE:
         JSR EXEC_LINE
         BRA MAIN_LOOP
+
+; STORE_INPUT: a line that begins with a number is a program line, not something
+; to run: the number is read, and what follows it is what will run later.
+STORE_INPUT:
+        REP #$20
+        LDA.W #0
+        STA ZP_TMP16
+        SEP #$20
+STORE_NUM_LOOP:
+        LDA [ZP_SRC]
+        CMP #'0'
+        BCC STORE_NUM_DONE
+        CMP #'9'+1
+        BCS STORE_NUM_DONE
+        SEC
+        SBC #'0'
+        STA ZP_CH
+        REP #$20
+        LDA ZP_TMP16
+        ASL A
+        STA ZP_CNT2
+        ASL A
+        ASL A
+        CLC
+        ADC ZP_CNT2             ; ten times
+        STA ZP_TMP16
+        SEP #$20
+        LDA ZP_CH
+        REP #$20
+        AND.W #$00FF
+        CLC
+        ADC ZP_TMP16
+        STA ZP_TMP16
+        SEP #$20
+        INC ZP_SRC
+        BRA STORE_NUM_LOOP
+STORE_NUM_DONE:
+        JMP STORE_LINE
 
 ; ---------------------------------------------------------------------------
 ; The messages
@@ -97,6 +165,21 @@ KW_END_END:
 KW_NEW:
         .text "NEW"
 KW_NEW_END:
+KW_RUN:
+        .text "RUN"
+KW_RUN_END:
+KW_LIST:
+        .text "LIST"
+KW_LIST_END:
+KW_GOTO:
+        .text "GOTO"
+KW_GOTO_END:
+TXT_NOLINE:
+        .text "?NO LINE"
+TXT_NOLINE_END:
+TXT_NOROOM:
+        .text "?NO ROOM"
+TXT_NOROOM_END:
 
 SAY_BANNER:
         LDA #<TXT_BANNER
@@ -107,6 +190,28 @@ SAY_BANNER:
         STA ZP_PTR+2
         LDX.W #TXT_BANNER_END - TXT_BANNER
         JSL L_PRINT
+        RTS
+SAY_NOLINE:
+        LDA #<TXT_NOLINE
+        STA ZP_PTR
+        LDA #>TXT_NOLINE
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_NOLINE_END - TXT_NOLINE
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_NOROOM:
+        LDA #<TXT_NOROOM
+        STA ZP_PTR
+        LDA #>TXT_NOROOM
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_NOROOM_END - TXT_NOROOM
+        JSL L_PRINT
+        JSR SAY_NEWLINE
         RTS
 SAY_READY:
         LDA #<TXT_READY
@@ -231,10 +336,101 @@ MATCHKW_NO:
         RTS
 
 ; ---------------------------------------------------------------------------
-; EXEC_LINE: run the statement line at ZP_SRC.
+; EXEC_LINE: run the line at ZP_SRC.
+;
+; A line is statements separated by colons, run in order, which is what a program
+; line is too -- so the same loop serves the prompt and a running program, and
+; ZP_STATE is the only thing that differs: at the prompt a line ends at its last
+; statement, and in a program it ends at the next line.
 ; ---------------------------------------------------------------------------
 
 EXEC_LINE:
+        LDA #0
+        STA ZP_STATE
+        STA ZP_JFLAG
+        JSR RESET_STACKS
+        REP #$20
+        LDA ZP_SRC
+        STA ZP_DLINE            ; the prompt's own text
+        LDA.W #$FFFF
+        STA ZP_LINE             ; not a program line: the line ends the run
+        SEP #$20
+EXEC_SEQ:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        BEQ EXEC_SEQ_END
+        CMP #':'
+        BNE EXEC_SEQ_ONE
+        INC ZP_SRC
+        BRA EXEC_SEQ
+EXEC_SEQ_ONE:
+        JSR EXEC_STMT
+        LDA ZP_JFLAG
+        BNE EXEC_CONTROL
+        BRA EXEC_SEQ
+EXEC_CONTROL:
+        LDA ZP_JFLAG
+        CMP #3
+        BEQ EXEC_STOP
+        CMP #2
+        BEQ EXEC_RESUME
+        LDA #0
+        STA ZP_JFLAG
+        LDA #1
+        STA ZP_STATE            ; a jump from the prompt starts the program
+        JMP RUN_LINE
+EXEC_RESUME:
+        LDA #0
+        STA ZP_JFLAG
+        LDA #1
+        STA ZP_STATE
+        JMP EXEC_SEQ
+EXEC_STOP:
+        LDA #0
+        STA ZP_JFLAG
+        STA ZP_STATE
+        RTS
+EXEC_SEQ_END:
+        REP #$20
+        LDA ZP_LINE
+        CMP.W #$FFFF
+        SEP #$20
+        BNE EXEC_NEXT_LINE
+        RTS
+EXEC_NEXT_LINE:
+        JSR SKIPSP
+        REP #$20
+        LDA ZP_SRC              ; the terminator: the next record starts after it
+        INC A
+        STA ZP_LINE
+        SEP #$20
+        BRA RUN_LINE
+
+; RUN_LINE: begin the program line at ZP_LINE, or finish if that is the end mark.
+RUN_LINE:
+        REP #$20
+        LDX ZP_LINE
+        LDA $0000,X             ; the line's number; zero is the end of the program
+        BEQ RUN_FINISHED
+        STA ZP_LNUM
+        TXA
+        CLC
+        ADC.W #2
+        STA ZP_SRC              ; the text, past the number
+        SEP #$20
+        LDA #0
+        STA ZP_SRC+2
+        BRA EXEC_SEQ
+RUN_FINISHED:
+        SEP #$20
+        JSR SAY_NEWLINE
+        RTS
+
+; ---------------------------------------------------------------------------
+; EXEC_STMT: run one statement at ZP_SRC.
+; ---------------------------------------------------------------------------
+
+EXEC_STMT:
         JSR SKIPSP
         LDA [ZP_SRC]
         BEQ EXEC_DONE
@@ -260,11 +456,23 @@ EXEC_TRY_LET:
         LDX.W #<KW_REM
         LDY.W #KW_REM_END - KW_REM
         JSR MATCHKW
-        BCS EXEC_DONE
+        BCS DO_REM
         LDX.W #<KW_NEW
         LDY.W #KW_NEW_END - KW_NEW
         JSR MATCHKW
         BCS DO_NEW
+        LDX.W #<KW_RUN
+        LDY.W #KW_RUN_END - KW_RUN
+        JSR MATCHKW
+        BCS DO_RUN
+        LDX.W #<KW_LIST
+        LDY.W #KW_LIST_END - KW_LIST
+        JSR MATCHKW
+        BCS DO_LIST
+        LDX.W #<KW_GOTO
+        LDY.W #KW_GOTO_END - KW_GOTO
+        JSR MATCHKW
+        BCS DO_GOTO
         LDX.W #<KW_END
         LDY.W #KW_END_END - KW_END
         JSR MATCHKW
@@ -272,17 +480,29 @@ EXEC_TRY_LET:
         JSR IS_ALPHA
         BCS DO_LET
         JSR SAY_WHAT
-        BRA EXEC_DONE
+        BRA DO_REM               ; skip the rest of the line, so nothing spins
 DO_NEW:
-        BRA EXEC_DONE
+        JSR PROG_NEW
+        JMP EXEC_DONE
+; A remark is the rest of the line, colons and all, and it is skipped rather
+; than executed: a statement that consumes nothing would be run again for ever.
+DO_REM:
+DO_REM_LOOP:
+        LDA [ZP_SRC]
+        BEQ DO_REM_DONE
+        INC ZP_SRC
+        BRA DO_REM_LOOP
+DO_REM_DONE:
+        JMP EXEC_DONE
 DO_CLS:
         JSL L_CLS
         JSR SAY_BANNER
         JSR SAY_NEWLINE
         BRA EXEC_DONE
 DO_END:
-        JSR SAY_NEWLINE
-        BRA EXEC_DONE
+        LDA #3                  ; END stops a program; at the prompt it just ends the line
+        STA ZP_JFLAG
+        JMP EXEC_DONE
 DO_LET:
         JSR DO_ASSIGN
         BRA EXEC_DONE
@@ -750,3 +970,5 @@ PRNUM_OUT:
         BNE PRNUM_OUT
         PLP
         RTS
+
+        .include "prog.inc"

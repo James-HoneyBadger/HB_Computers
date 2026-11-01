@@ -262,6 +262,33 @@ void test_the_screen_is_the_roms() {
 }
 
 
+void test_a_stored_program() {
+    // A line that begins with a number is stored, not run; LIST shows it, RUN
+    // runs it, and a GOTO jumps within it.
+    Booted booted;
+    booted.run("10 PRINT \"A\"");
+    booted.run("20 GOTO 40");
+    booted.run("30 PRINT \"B\"");
+    booted.run("40 PRINT \"C\"");
+    booted.run("LIST");
+    TW_CHECK(booted.shows("10  PRINT \"A\""));
+    TW_CHECK(booted.shows("20  GOTO 40"));
+    booted.run("RUN");
+    TW_CHECK(booted.shows("A"));
+    TW_CHECK(booted.shows("C"));
+
+    // Retyping a line replaces it; a number on its own removes it.
+    booted.run("20 PRINT \"D\"");
+    booted.run("30");
+    booted.run("LIST");
+    TW_CHECK(booted.shows("20  PRINT \"D\""));
+    TW_CHECK(booted.shows("10  PRINT \"A\""));
+
+    // A jump to a line that is not there says so, and stops the program.
+    booted.run("RUN 99");
+    TW_CHECK(booted.shows("?NO LINE"));
+}
+
 void test_signed_division() {
     // Division is on signed sixteen-bit values: the sign comes off before the
     // divide and goes back on afterwards, and the quotient rounds towards zero.
@@ -308,5 +335,6 @@ int main() {
     test_the_frame_and_the_keyboard();
     test_the_screen_is_the_roms();
     test_signed_division();
+    test_a_stored_program();
     return tw::test::summary("kestrel16_machine_tests");
 }
