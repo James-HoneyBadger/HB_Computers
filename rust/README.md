@@ -13,8 +13,24 @@ cd rust
 cargo run --offline --bin kestrel -- --type 'PRINT 2+2*3'
 cargo run --offline --bin kestrel -- --model kestrel16 --type 'PRINT 1000*20'
 cargo run --offline --bin kestrel -- --file ../samples/kestrel/03-fibonacci.bas --type RUN
+cargo run --offline --bin kestrel_emu                 # the interactive one
+cargo run --offline --bin kestrel_computers           # the window
 cargo test --offline
 ```
+
+The window is the one place the port cannot be proved by a diff: it is proved by
+being opened and typed at. It draws the tube from the attribute bytes, takes the
+keys a person presses, and drops files onto the machine -- a cartridge, a socket
+ROM or a tape, decided by the file's size.
+
+What it has not carried over from the Qt window, and why:
+
+- `--shot`, the PNG a headless CI run would keep: egui's screenshot API and the
+  `image` crate would be another dependency for one flag;
+- menus for the disk and the tape: the file picker was Qt's, and a dropped file
+  is a better answer on a modern desktop, so `Tape > Stop` is the whole menu;
+- settings that survive a restart: eframe can persist them, and nothing yet
+  needs to.
 
 | Crate | Ports | State |
 | --- | --- | --- |
@@ -24,7 +40,7 @@ cargo test --offline
 | `kestrel-machine` | `src/kestrel/machine.cpp` | done, `machine.rs` |
 | `kestrel-cli` | `tools/kestrel.cpp` | done, the `kestrel` binary |
 | `kestrel-cli` | `tools/kestrel_emu.cpp` | done, the `kestrel_emu` binary |
-| `kestrel-app` | `app/main.cpp` and `window.cpp`, in egui | next |
+| `kestrel-app` | `app/main.cpp` and `model1982/window.cpp`, in egui | done, the `kestrel_computers` binary |
 
 ## What proves it
 
