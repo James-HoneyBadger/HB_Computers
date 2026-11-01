@@ -1,28 +1,22 @@
 # The HB-1 Model 92
 
 The machine described in [the owner's manual](README.md) is finished and validated by
-the tests in [the test suites](../../tests/). This page is the **proposal for the
-successor** that the HB-2 was built from, kept as it was written so that a reader can compare the
-specification with the machine and see what it cost.
+the tests in [the test suites](../../tests/). This page is the **proposal for its
+successor** as it was written in 1982's own terms, kept unedited so a reader can see
+what was planned and what the plan cost.
 
-**Status.** All eight proposals are built, as the machine now called the
-**HB-2** ([its manual](../hb2/README.md)): the bus and the machine object, the video
-and audio chips, HB DOS 2.0, the input devices, HB-16 with its assembler, disassembler
-and monitor, HB-OS with the desktop, the module bay -- and the window the whole page
-was written to earn. The gaps the first draft left closed with them: `SYS` in BASIC runs
-HB-16 from a program's computed address, the cassette is a device with its own words and
-its own four services, the joystick registers are fed by the host's gamepad so `STICK`
-answers on the machine, and the module bay's fourth kind -- a package of processes --
-boots onto a machine as it stands rather than replacing it. The desktop runs eight
-processes at a time, which is what the specification table below asks for: the eleven of
-the slogan are the eleven languages, not eleven windows on a 320-pixel screen.
-[The HB-2 manual's status section](../hb2/README.md#what-is-built-and-what-is-not) is
-the page to read before assuming a proposal here is not done.
+**Status: the proposal was not built.** It is kept as it was written, because it
+is the record of a road not taken, and because the machine that *was* built is
+the answer to a better question. The eight proposals below describe a machine with
+a processor of its own, an operating system with a desktop and a module bay. When
+the HB-1 was rebuilt from the processor up — a 6502, a memory map and a language in
+ROM, proved by typing at it — it became obvious that its successor should be built
+the same way, on a processor that really existed in 1992: a WDC 65C816. That
+machine is [the HB-2](../hb2/README.md), and it is a home computer of the same
+family rather than a workstation of a different one.
 
-Where [enhancements](enhancements.md) proposes what a 1982 machine left undone, this
-page proposes the machine the same company would have shipped ten years later. It is
-the same exercise in the same terms — what it is, why the machine wants it, and what
-would count as proof — at the scale of a new computer rather than a new word.
+Read the pages below as a specification for something else. Nothing in them is a
+claim about the machine in this tree.
 
 Nothing here changes 25.0.
 

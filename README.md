@@ -6,19 +6,19 @@ Two complete computers, and the engines they run on.
   1 MHz, a 64K, a 40 x 25 tube, a disk measured in 256-byte sectors, an 8 KiB
   KERNAL and a language ROM in the socket -- real 6502 machine code, assembled
   from `roms/hb1/` and run by the machine, not by the host; and
-- the **HB-2** — its 1992 successor: a bus, a 640 × 480 framebuffer and a
-  blitter, four channels of sampled audio, hardware sprites, and HB-16, a
-  processor of the machine's own, with a desktop, a disk and a prompt.
+- the **HB-2** — its 1992 successor: a 65816 at 8 MHz, a megabyte of banked
+  memory, an 80 x 50 tube, and HB BASIC 2.0 in a sixty-four kilobyte ROM bank of
+  its own, with the KERNAL beside it.
 
-Both are real programs, not screenshots. You can type at them, break them, and
-come back to the same machine. The HB-1's languages are in its ROMs: the host
-supplies a processor, a tube, a keyboard and a disk, and the interpreter that
-answers `READY.` is 6502 code in the socket. The HB-2 runs nine languages on its
-own bus as well as an instruction set you can disassemble.
+Both are real programs, not screenshots, and both are the same kind of machine:
+the host supplies a processor, memory, a tube, a keyboard and a disk, and the
+languages are machine code in ROM. The interpreter that answers `READY.` on the
+HB-1 is 6502 code in the socket; the one that answers `READY` on the HB-2 is
+65816 code in bank one.
 
-The HB-1 is being rebuilt from the processor up; [its firmware
-page](docs/hb1/firmware.md) records what the ROMs contain today and where the
-edge of the implemented language is.
+Both are being rebuilt from the processor up; [the HB-1 firmware
+page](docs/hb1/firmware.md) and [the HB-2 manual](docs/hb2/README.md) record what
+the ROMs contain today and where the edge of each language is.
 
 | | |
 | --- | --- |
@@ -31,7 +31,7 @@ edge of the implemented language is.
 
 The engines need a C++20 compiler and CMake 3.20 or newer. The machine windows
 need Qt 6 Widgets as well; a build host without it still gets every engine, the
-headless HB-2 tool and most of the test suites.
+the headless tools and most of the test suites.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -45,11 +45,9 @@ ctest --test-dir build --output-on-failure
 ## Running
 
 ```bash
-./build/hb_computers              # the launcher: pick a machine
+./build/hb_computers              # the launcher
 ./build/hb_computers --hb1        # power on the HB-1
-./build/hb_computers --hb2        # power on the HB-2
 ./build/hb_computers --machine HV.hb1      # restore the HB-1 from an image
-./build/hb_computers --listing prog.s --hb2 # load a listing into the HB-2
 ```
 
 The HB-1 flashes its banner at the top of the glass and leaves you at `READY.`
@@ -61,23 +59,15 @@ setup, run), and the key row along the bottom of the case clicks the same words.
 A program that draws switches the display to the graphics screen; `F7` brings the
 text back.
 
-The HB-2 powers on into **HB-OS** at 640 × 480: two processes, each in a framed
-window with a title bar and a menu bar, cascaded on a teal desktop with an icon
-bar along the bottom, taking turns on the machine's own 60 Hz clock. The
-**Program** page holds the listing that drew that desktop, and **Run** assembles
-and runs whatever is there. The programs it ships with are in
-[`Examples/hb2/`](Examples/hb2/).
-
-The HB-2 alone runs on a shell, which is how the manual's examples are checked:
+The HB-2 has no window yet. Its machine boots its own ROMs under `hb2_machine_tests`,
+which types at it and reads the screen back:
 
 ```bash
-./build/hb2 Examples/hb2/palette.s --ticks 4 --screen
-./build/hb2 --tasks Examples/hb2/task_a.s Examples/hb2/task_b.s --ticks 6
-./build/hb2 --map
+./build/hb2_machine_tests
 ```
 
-A program that runs, halts and draws nothing is reported as a failure, because a
-machine that runs and shows nothing is the bug this project exists to catch.
+Its ROMs are assembled from `roms/hb2/` by `hb2asm`, which is also a suite of its
+own: `hb2_asm_tests` writes out every encoding the dialect has by hand.
 
 ## What is in the tree
 
@@ -85,9 +75,10 @@ machine that runs and shows nothing is the bug this project exists to catch.
 include/timewarp/   the engines and the widgets, as headers
 src/                their implementations
 app/                the launcher window and its main()
-tools/hb2.cpp       the HB-2 without a window
+tools/hb2asm.cpp    the 65816 assembler that builds both machines' ROMs
 tests/              one executable per suite, no external test framework
 Examples/           the programs the machines ship with
+roms/hb1/ roms/hb2/ the machines' own machine code, assembled at build time
 docs/               the manuals
 ```
 

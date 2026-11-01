@@ -16,11 +16,11 @@ include/timewarp/     headers, included as "timewarp/..."
   lang/               the interpreter loop, the value type, one executor per language
   graphics/           the recording host a test draws into
   canvas/             canvas commands and the thread-safe command queue
-  hb2/                the HB-2: bus, processor, video, sound, DOS, shell, HB-OS
+  hb2/                the HB-2: the 65816, the bus, the tube, the disk, the tape
   ui/                 the Qt widgets both machines are made of
 src/                  the implementations, mirroring include/
 app/                  the launcher: one window, two machines
-tools/hb2.cpp         the HB-2 without a window
+tools/hb2asm.cpp      the 65816 assembler that builds the HB-2's ROMs
 tests/                one executable per suite, no external test framework
 Examples/             the programs the machines ship with
 docs/                 the manuals
@@ -60,14 +60,14 @@ hb_computers  hb2 (CLI)
 | `hb_io` | The serial port and the gamepad reader | no |
 | `hb_lang` | The interpreter loop, the value type, dispatch and one executor per language | no |
 | `hb_canvas` | `CanvasCommand` and the thread-safe `CanvasCommandQueue` | no |
-| `hb_hb2` | The HB-2: bus, HB-16, video, sound, DOS, shell, HB-OS, monitor, modules, tape | no |
+| `hb_hb2` | The HB-2: the 65816, the bus, the tube, the keyboard, the disk, the tape | no |
 | `hb_canvas_qt` | The bridge that drains the queue on the GUI thread | Core |
 | `hb_ui` | Both machine windows and the widgets they are made of | Widgets |
 | `hb_launcher` | The front door: a window naming both machines | Widgets |
 
-`hb_hb2` links `hb_lang` because the HB-2's ROM socket runs nine of the same
-engines on its own bus. `hb_ui` links `hb_lang` directly for the HB-1's prompt and
-PROGRAM page.
+`hb_hb2` links nothing but itself: its languages are machine code in ROM, so it
+needs a processor and a bus rather than an interpreter. `hb_ui` links `hb_lang`
+directly for the HB-1's prompt and PROGRAM page.
 
 A build host with no Qt still gets every library above the line, the `hb2` tool and
 seven of the ten test suites. `-DHB_BUILD_GUI=OFF` asks for exactly that.
@@ -109,59 +109,30 @@ the same `CanvasCommandQueue`, which `hb_canvas_qt` drains on the GUI thread int
 ## The HB-2
 
 The machine is one Qt-free library. `Machine` owns the bus, the processor, the
-video and audio chips, the clock, the peripherals, the tape and the ROM socket. The
-address map has exactly one home — [`devices.inc`](../include/timewarp/hb2/devices.inc)
-— and the bus routes with it, the monitor prints it and the manual was written from
-it.
+sections of the map. The address map has exactly one home —
+[`map.hpp`](../include/timewarp/hb2/map.hpp) — and `roms/hb2/hb2.inc` repeats it for
+the ROMs; the two are changed together.
 
 | File | Part |
 | --- | --- |
-| `bus.cpp` | The decoded address space and the refusal at an unmapped address |
-| `cpu.cpp` | HB-16: eight registers, counted cycles, halt and fault |
-| `video.cpp` | The three modes, the DAC, the blitter and the sprites |
-| `audio.cpp` | Four channels of 8-bit PCM and the waveform bank |
-| `dos.cpp` | HB DOS 2.0: two drives, directories and a sector map |
-| `shell.cpp` | The prompt's words |
-| `hbos.cpp` | HB-OS: the scheduler, the tasks and the desktop |
-| `monitor.cpp` | The monitor's registers and memory views |
-| `asm.cpp` | The assembler the window, the tool and the tests share |
-| `machine.cpp` | The object that ties them together |
+| `cpu65816.cpp` | The processor: emulation and native modes, the M and X widths, the banks, the direct page, the cycle counts |
+| `machine.cpp` | The decoded address space, the frame interrupt, the I/O page |
+| `video.cpp` | The 80 x 50 cells and the attribute byte each |
+| `keyboard.cpp` | The key queue the ROM reads |
+| `disk.cpp` | A sector store: 4096 sectors of 512 bytes |
+| `tape.cpp` | A byte stream with a play head |
 
-`Hb2Window` ([`hb2_window.hpp`](../include/timewarp/ui/hb2_window.hpp)) shows it:
-four pages — Screen, Prompt, Monitor, Program — and a 60 Hz timer that ticks the
-machine and paints what the chip composed.
+The KERNAL and the language are not C++ at all: they are `roms/hb2/kernal.s` and
+`roms/hb2/basic.s`, assembled by `hb2asm` at build time and mounted with
+`mountKernal` and `mountBasic`.
 
-`hb2` ([`tools/hb2.cpp`](../tools/hb2.cpp)) is the same machine on a shell: it
-assembles, runs a number of frames, prints the registers, the screen and a hash of
-the framebuffer, and fails a program that ran and drew nothing.
-
-## State
-
-| What | Where |
-| --- | --- |
-| Preferences (both machines) | `QSettings` under `~/.config/HoneyBadger/HB Computers.conf` |
-| HB DOS 1.0 volumes | `~/.time_warp/disks/`, seeded once from [`Examples/hb1/HBWARP.dsk`](../Examples/hb1/HBWARP.dsk) |
-| Machine images | `~/.time_warp/` (`.hb1`) |
-| HB-2 drives, tape and module bay | `~/.time_warp/hb2/` |
-| Example programs | `Examples/`, found beside the build tree |
-
-`TIME_WARP_DATA_DIR` moves everything under `~/.time_warp`, which is why a test can
-run against a scratch folder and never touch a real machine.
-
-## Tests
-
-Every suite is an executable with a `main`, built on the two-hundred-line harness
-in `tests/check.hpp`; there is no gtest and no package to install.
-
-| Suite | Covers |
-| --- | --- |
 | `lexer_tests`, `evaluator_tests` | The expression engine |
 | `scheme_tests` | The Scheme machine |
 | `lang_tests` | Every executor, including the shipped examples |
 | `audio_tests` | The mixer |
 | `canvas_queue_tests`, `canvas_bridge_tests` | The queue and its Qt bridge |
 | `syntax_highlighter_tests` | The editor's colouring |
-| `hb2_tests` | The HB-2, the map, the processor, video, sound, DOS, HB-OS |
+| `hb2_asm_tests`, `hb2_cpu_tests`, `hb2_machine_tests` | The 65816 assembler, the processor, and the machine booting its ROMs |
 | `retro_computer_tests` | The HB-1: ROM socket, screen modes, direct mode, HB DOS, memory, boot, images, configuration |
 
 `ctest --test-dir build` runs all of them. The two window suites need a display or

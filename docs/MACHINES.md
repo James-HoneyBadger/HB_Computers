@@ -7,14 +7,14 @@ break and come back to.
 - the **[HB-1](hb1/README.md)** — a personal computer from a 1982 that never
   happened, shipped with eleven language ROMs in one socket, a prompt, a CRT and a
   disk; and
-- the **[HB-2](hb2/README.md)** — the HB-1's 1992 successor, built from
-  [the Model 92 proposal](hb1/model-92.md): a bus, a 640 × 480 framebuffer and a
-  blitter, four channels of sampled audio, hardware sprites, and HB-16, a processor
-  of the machine's own, with a desktop, a disk of its own and a prompt.
+- the **[HB-2](hb2/README.md)** — the HB-1's 1992 successor: a 65816 at 8 MHz, a
+  megabyte of banked memory, an 80 x 50 tube, and HB BASIC 2.0 in a sixty-four
+  kilobyte bank of its own.
 
-Both are real programs. The HB-1 runs the native engines in process; the HB-2 runs
-nine of them on its own bus as well as an instruction set of its own, and it is a
-machine you can disassemble.
+Both are real programs, and both are the same kind of thing: the host supplies a
+processor, memory, a tube, a keyboard and a disk, and the languages are machine
+code assembled into a ROM image and executed. Neither machine has an interpreter
+written for it in C++.
 
 ---
 
@@ -80,20 +80,22 @@ mnemonic so old listings assemble.
 
 | | HB-1 | HB-2 |
 | --- | --- | --- |
-| What it is | A complete home computer: CRT, prompt, ROM socket, editor, canvas, disk | A 1992 workstation: a bus, a framebuffer, four channels of sampled audio, a desktop |
+| What it is | A complete home computer: a 6502, a 64K, a tube, a disk, ROMs in a socket | The same machine ten years on: a 65816, a megabyte, banked ROMs |
 | Year, in its universe | 1982 | 1992 |
-| Screen | TEXT / SPLIT / GRAPHICS sharing one CRT | 80×25 text, 320×200×256 and 640×480×16, with the 1982 map as `MODE 0` |
-| Languages | All eleven, one ROM at a time | HB-16 machine code, plus nine of the engines on the ROM socket |
-| Storage | HB DOS 1.0, 512 sectors, one volume | HB DOS 2.0 with two drives, directories and a sector map, and a cassette |
-| Interaction | A prompt with history, BASIC direct mode, F9 to run | A prompt, a monitor, a screen and a listing page; eight processes on a desktop |
-| Where it lives | `hb_computers --hb1`, or the launcher | `hb_computers --hb2`, or the launcher |
-| Manual | [HB-1 Owner's Manual](hb1/README.md) | [HB-2 Manual](hb2/README.md) and [HB-16](hb2/instruction-set.md) |
-| Teaches | That a computer is a system: memory, storage, languages, a screen | That a system is a set of programs: a bus, a processor, an operating system and a desk to put them on |
+| Processor | MOS 6502 at 1 MHz | WDC 65C816 at 8 MHz, native mode |
+| Screen | 40 x 25 cells with a colour byte each | 80 x 50 cells, sixteen colours for ink and paper |
+| Languages | Eleven, one ROM at a time, in a 16 KiB socket | HB BASIC 2.0 in a bank of its own, with the KERNAL beside it |
+| Numbers | Five-byte floating point, eight-bit integers | Sixteen-bit integers |
+| Storage | HB DOS 1.0, 512 sectors of 256 bytes | A 2 MiB volume in 4096 sectors of 512 bytes; HB DOS 2.0 is not written yet |
+| Where it lives | `hb_computers --hb1`, or the launcher | `hb2_machine_tests`, and `hb2asm` for its ROMs |
+| Manual | [HB-1 Owner's Manual](hb1/README.md) | [HB-2 Manual](hb2/README.md) |
+| Teaches | That a computer is a chip, a map and a program in ROM | That a decade buys width: sixteen-bit numbers, banked memory, and a bigger language |
 
-They are deliberately different kinds of thing. The HB-1 is a place to live; the
-HB-2 is what the same company shipped ten years later, and what that decade asked
-of it. Together they bracket the era: the home computer that made a computer out
-of a chip, and the workstation that made it run several programs at once.
+They are deliberately the same kind of thing, ten years apart. Both are machines
+whose languages are machine code in ROM, executed by a processor the host
+supplies; neither is an interpreter written twice. What separates them is what the
+decade actually changed: a wider processor, memory in banks, and a language with
+sixteen-bit numbers in a ROM big enough to hold one.
 
 ---
 
@@ -101,23 +103,18 @@ of a chip, and the workstation that made it run several programs at once.
 
 Neither machine is a special case inside the application:
 
-- the HB-1 draws through the `CanvasCommandQueue` into the turtle canvas, and the
-  HB-2 composes its own framebuffer from the same kind of command the machine's
-  `INT` services leave behind;
-- both run programs on the same native engines — `hb_lang` for the line-by-line
-  languages, `hb_scheme` for Scheme, and the CHIP-8 assembler and machine that the
-  HB-1's CHIP-8 ROM uses. The HB-2's ROM socket puts nine of those engines on the
-  machine's own bus through `Interpreter::MachineBus`, so a language program's
-  `POKE` reaches the machine rather than a map beside it;
-- the two machines use `NativeRunner` for a run that finishes and `ReplRunner` for
-  a session that does not, which is why a program can never start inside a previous
-  command's variables;
-- both are driven, in tests, through the same public surface a user touches:
-  `submitCommand()`, `runProgram()`, `disk()` — and, on the HB-2, `runRom()`,
-  `spawn()` and `scheduler()`.
+- both decode an address map in one place for the emulator and repeat it in the
+  ROMs' include file, so a register cannot be at one address for the machine and
+  another for the code;
+- both prove themselves by typing at the machine rather than by calling a ROM
+  routine from C++: a keystroke goes in, frames run, and the screen is read back;
+- both assemble their ROMs at build time, from the same shape of source, with the
+  same kind of listing and symbol file;
+- both run at fifty frames a second, and both count a program's idea of time in
+  processor cycles.
 
-Both are native and neither involves a second interpreter. How the pieces are put
-together is [ARCHITECTURE.md](ARCHITECTURE.md).
+The HB-2 is the HB-1's design carried forward rather than a second design. How the
+pieces are put together is [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
@@ -139,8 +136,7 @@ together is [ARCHITECTURE.md](ARCHITECTURE.md).
 
 | Book | What it covers |
 | --- | --- |
-| [Owner's Manual](hb2/README.md) | The bus, the map, the video chip, the sound, the shell, the desktop, the limits |
-| [The instruction set](hb2/instruction-set.md) | Every HB-16 opcode as implemented, and the encoding the assembler and disassembler share |
+| [Owner's Manual](hb2/README.md) | The map, the I/O page, the KERNAL's services, the language, the dialect, the limits |
 
 ### Around them
 
