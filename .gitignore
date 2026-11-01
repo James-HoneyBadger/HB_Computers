@@ -1,0 +1,29 @@
+# Build trees
+build/
+build-*/
+cmake-build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+install_manifest.txt
+CTestTestfile.cmake
+Testing/
+
+# Objects and binaries
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Desktop noise
+.DS_Store

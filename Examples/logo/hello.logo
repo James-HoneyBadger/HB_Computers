@@ -1,0 +1,3 @@
+PRINT [Hello from Logo]
+FORWARD 50
+RIGHT 90
