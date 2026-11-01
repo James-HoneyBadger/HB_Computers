@@ -2,7 +2,7 @@
 //
 // The devices both machines are made of.
 //
-// The HB-1 and the HB-2 are the same design ten years apart, and their tube, their
+// The Kestrel and the Kestrel 16 are the same design ten years apart, and their tube, their
 // keyboard, their disk and their cassette are the same devices with different
 // numbers attached: a matrix of character cells with an attribute byte each, a
 // queue of keystrokes, a store of sectors, and a tape with a play head. The
@@ -109,7 +109,7 @@ public:
     void eject() noexcept;
 
     /// A blank volume: a signature and a volume name, and nothing else.
-    void format(std::string_view volume = "HBWARP");
+    void format(std::string_view volume = "KESWARP");
     [[nodiscard]] std::string volumeName() const;
 
     [[nodiscard]] int sectors() const noexcept { return sectors_; }
@@ -125,7 +125,7 @@ public:
     /// half a disk is a worse lie than no disk.
     bool load(const std::vector<std::uint8_t>& bytes);
     void loadOrFormat(const std::vector<std::uint8_t>& bytes,
-                      std::string_view volume = "HBWARP");
+                      std::string_view volume = "KESWARP");
 
     [[nodiscard]] std::uint8_t* sector(int index);
     [[nodiscard]] const std::uint8_t* sector(int index) const;

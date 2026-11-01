@@ -4,7 +4,7 @@
 ; rewrites the DAC so the same picture is a different picture. Nothing here is a
 ; skin: every bar is a store, and the palette is memory the program owns.
 ;
-;   ./native/build/time_warp_gates hb Examples/hb2/palette.s --ticks 4 --screen
+;   ./native/build/time_warp_gates hb Examples/kestrel16/palette.s --ticks 4 --screen
 ;
 ; The last INT is the program saying it is done; the machine records the code.
 

@@ -9,18 +9,18 @@
 #include <algorithm>
 #include <cstring>
 
-#include "hb1/basic_rom.hpp"
-#include "hb1/kernal_rom.hpp"
-#include "hb2/basic_rom.hpp"
-#include "hb2/kernal_rom.hpp"
+#include "kestrel/basic_rom.hpp"
+#include "kestrel/kernal_rom.hpp"
+#include "kestrel16/basic_rom.hpp"
+#include "kestrel16/kernal_rom.hpp"
 
 namespace timewarp {
 
 namespace {
 
 Profile makeProfile(Model model) {
-    if (model == Model::Hb1) {
-        return Profile{Model::Hb1, "HB-1",
+    if (model == Model::Kestrel) {
+        return Profile{Model::Kestrel, "Kestrel",
                        1'000'000, 50, 20'000,
                        0x8000,
                        0x8000, 40, 25, 0x8400,
@@ -30,7 +30,7 @@ Profile makeProfile(Model model) {
                        0xA000, 16384,
                        512, 256, 16};
     }
-    return Profile{Model::Hb2, "HB-2",
+    return Profile{Model::Kestrel16, "Kestrel 16",
                    8'000'000, 50, 160'000,
                    0x100000,
                    0x8000, 80, 50, 0x8FA0,
@@ -44,9 +44,9 @@ Profile makeProfile(Model model) {
 }  // namespace
 
 const Profile& profileOf(Model model) {
-    static const Profile hb1 = makeProfile(Model::Hb1);
-    static const Profile hb2 = makeProfile(Model::Hb2);
-    return model == Model::Hb1 ? hb1 : hb2;
+    static const Profile kestrel = makeProfile(Model::Kestrel);
+    static const Profile kestrel16 = makeProfile(Model::Kestrel16);
+    return model == Model::Kestrel ? kestrel : kestrel16;
 }
 
 Machine::Machine(Model model)
@@ -55,7 +55,7 @@ Machine::Machine(Model model)
       video_(profile_.columns, profile_.rows),
       keyboard_(profile_.keyboardCapacity),
       disk_(profile_.diskSectors, profile_.diskSectorSize),
-      ink_(profile_.model == Model::Hb1 ? 0x07 : 0x07),
+      ink_(profile_.model == Model::Kestrel ? 0x07 : 0x07),
       paper_(0x00),
       border_(0x09) {
     layOutRegisters();
@@ -91,7 +91,7 @@ void Machine::layOutRegisters() {
     at(0x0F, Reg::DiskStatus);
     at(0x10, Reg::DiskAddressLow);
     at(0x11, Reg::DiskAddressHigh);
-    if (profile_.model == Model::Hb1) {
+    if (profile_.model == Model::Kestrel) {
         // A 1982 disk controller: a sixteen-bit buffer pointer and a query
         // register that reports the volume's size.
         at(0x12, Reg::DiskCountLow);
@@ -120,20 +120,20 @@ void Machine::layOutRegisters() {
 }
 
 void Machine::mountShippedRoms() {
-    if (profile_.model == Model::Hb1) {
-        mountKernal(std::vector<std::uint8_t>(std::begin(hb1::rom::kKERNALImage),
-                                              std::end(hb1::rom::kKERNALImage)),
+    if (profile_.model == Model::Kestrel) {
+        mountKernal(std::vector<std::uint8_t>(std::begin(kestrel::rom::kKERNALImage),
+                                              std::end(kestrel::rom::kKERNALImage)),
                     "kernal");
-        mountBasic(std::vector<std::uint8_t>(std::begin(hb1::rom::kBASICImage),
-                                             std::end(hb1::rom::kBASICImage)),
+        mountBasic(std::vector<std::uint8_t>(std::begin(kestrel::rom::kBASICImage),
+                                             std::end(kestrel::rom::kBASICImage)),
                    "basic");
         return;
     }
-    mountKernal(std::vector<std::uint8_t>(std::begin(hb2::rom::kKERNALImage),
-                                          std::end(hb2::rom::kKERNALImage)),
+    mountKernal(std::vector<std::uint8_t>(std::begin(kestrel16::rom::kKERNALImage),
+                                          std::end(kestrel16::rom::kKERNALImage)),
                 "kernal");
-    mountBasic(std::vector<std::uint8_t>(std::begin(hb2::rom::kBASICImage),
-                                         std::end(hb2::rom::kBASICImage)),
+    mountBasic(std::vector<std::uint8_t>(std::begin(kestrel16::rom::kBASICImage),
+                                         std::end(kestrel16::rom::kBASICImage)),
                "basic");
 }
 
@@ -191,7 +191,7 @@ void Machine::reset() {
     keyboard_.clear();
     cursorColumn_ = 0;
     cursorRow_ = 0;
-    cursorOn_ = profile_.model == Model::Hb1;
+    cursorOn_ = profile_.model == Model::Kestrel;
     scrolled_ = false;
     frameCounter_ = 0;
     frameFlag_ = false;
@@ -202,13 +202,13 @@ void Machine::reset() {
     lastKey_ = 0;
     diskSector_ = 0;
     diskAddress_ = 0;
-    // The HB-1's count register reports the volume's size, so it answers from
+    // The Kestrel's count register reports the volume's size, so it answers from
     // the moment the machine is switched on.
-    diskCount_ = profile_.model == Model::Hb1 && disk_.present()
+    diskCount_ = profile_.model == Model::Kestrel && disk_.present()
                      ? static_cast<std::uint16_t>(profile_.diskSectors)
                      : 0;
     diskStatus_ = 0;
-    if (profile_.model == Model::Hb1) {
+    if (profile_.model == Model::Kestrel) {
         cpu6502_.reset();
     } else {
         cpu65816_.reset();
@@ -236,7 +236,7 @@ std::uint8_t Machine::readRegister(Reg kind) {
     }
     case Reg::KeyboardStatus:
         return keyboard_.available()
-                   ? static_cast<std::uint8_t>(profile_.model == Model::Hb1 ? 0xFF : 0x80)
+                   ? static_cast<std::uint8_t>(profile_.model == Model::Kestrel ? 0xFF : 0x80)
                    : 0x00;
     case Reg::CursorColumn: return cursorColumn_;
     case Reg::CursorRow: return cursorRow_;
@@ -250,7 +250,7 @@ std::uint8_t Machine::readRegister(Reg kind) {
         return static_cast<std::uint8_t>(frameCounter_ >> 8);
     case Reg::FrameFlag:
         return frameFlag_
-                   ? static_cast<std::uint8_t>(profile_.model == Model::Hb1 ? 0xFF : 0x80)
+                   ? static_cast<std::uint8_t>(profile_.model == Model::Kestrel ? 0xFF : 0x80)
                    : 0x00;
     case Reg::DiskStatus: return diskStatus_;
     case Reg::DiskCountLow:
@@ -261,11 +261,11 @@ std::uint8_t Machine::readRegister(Reg kind) {
     case Reg::LastKey: return lastKey_;
     case Reg::Scrolled:
         return scrolled_
-                   ? static_cast<std::uint8_t>(profile_.model == Model::Hb1 ? 0xFF : 0x80)
+                   ? static_cast<std::uint8_t>(profile_.model == Model::Kestrel ? 0xFF : 0x80)
                    : 0x00;
     case Reg::CursorOn:
         return cursorOn_
-                   ? static_cast<std::uint8_t>(profile_.model == Model::Hb1 ? 0x01 : 0x80)
+                   ? static_cast<std::uint8_t>(profile_.model == Model::Kestrel ? 0x01 : 0x80)
                    : 0x00;
     case Reg::TapeData: return tape_.readByte();
     case Reg::TapeStatus: return tape_.status();
@@ -328,13 +328,13 @@ void Machine::writeRegister(Reg kind, std::uint8_t value) {
                        (static_cast<std::uint32_t>(value) << 16);
         break;
     case Reg::DiskCountLow:
-        if (profile_.model == Model::Hb1) {
-            break;  // the HB-1's count register is the volume's answer
+        if (profile_.model == Model::Kestrel) {
+            break;  // the Kestrel's count register is the volume's answer
         }
         diskCount_ = static_cast<std::uint16_t>((diskCount_ & 0xFF00) | value);
         break;
     case Reg::DiskCountHigh:
-        if (profile_.model == Model::Hb1) {
+        if (profile_.model == Model::Kestrel) {
             break;
         }
         diskCount_ = static_cast<std::uint16_t>((diskCount_ & 0x00FF) |
@@ -359,7 +359,7 @@ std::uint8_t Machine::read(std::uint32_t address) {
     const std::uint8_t bank = static_cast<std::uint8_t>(address >> 16);
     const auto offset = static_cast<std::uint16_t>(address & 0xFFFF);
 
-    if (profile_.model == Model::Hb1) {
+    if (profile_.model == Model::Kestrel) {
         const std::uint16_t at = offset;
         if (at < profile_.ramBytes) {
             return ram_[at];
@@ -446,7 +446,7 @@ void Machine::write(std::uint32_t address, std::uint8_t value) {
     const std::uint8_t bank = static_cast<std::uint8_t>(address >> 16);
     const auto offset = static_cast<std::uint16_t>(address & 0xFFFF);
 
-    if (profile_.model == Model::Hb1) {
+    if (profile_.model == Model::Kestrel) {
         const std::uint16_t at = offset;
         if (at < profile_.ramBytes) {
             ram_[at] = value;
@@ -512,7 +512,7 @@ void Machine::write(std::uint32_t address, std::uint8_t value) {
 }
 
 void Machine::executeDiskCommand(std::uint8_t command) {
-    if (profile_.model == Model::Hb1) {
+    if (profile_.model == Model::Kestrel) {
         diskStatus_ = 0;
         if (!disk_.present()) {
             diskStatus_ = 0x80;
@@ -621,7 +621,7 @@ void Machine::runCycles(long cycles) {
     long done = 0;
     while (done < cycles) {
         int taken = 0;
-        if (profile_.model == Model::Hb1) {
+        if (profile_.model == Model::Kestrel) {
             cpu6502_.setIrqLine(interruptPending());
             taken = cpu6502_.step();
         } else {
@@ -658,7 +658,7 @@ void Machine::typeLine(std::string_view text) {
 }
 
 void Machine::pressBreak() {
-    if (profile_.model == Model::Hb1) {
+    if (profile_.model == Model::Kestrel) {
         cpu6502_.requestNmi();
     } else {
         cpu65816_.requestNmi();

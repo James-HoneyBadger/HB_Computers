@@ -5,7 +5,7 @@
 ; screen is the proof that the round trip happened -- and the same four services,
 ; 20 to 23, are what the prompt's CSAVE, CLOAD and REWIND call.
 ;
-;   ./native/build/time_warp_gates hb Examples/hb2/tape.s --ticks 2
+;   ./native/build/time_warp_gates hb Examples/kestrel16/tape.s --ticks 2
 
         MOV R0, #0
         INT 5                   ; MODE 0: the 1982 text map, where printing is cells

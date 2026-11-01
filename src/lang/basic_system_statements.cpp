@@ -322,7 +322,7 @@ std::string Machine::poke(const std::string& args) {
         const auto address = static_cast<long>(eval(address_text));
         const auto value = static_cast<long>(eval(value_text));
         // The range is the machine's: a processor with sixteen address lines takes
-        // 0-65535, and the HB-2's 1 MiB takes 0-1048575. Without a machine it is the
+        // 0-65535, and the Kestrel 16's 1 MiB takes 0-1048575. Without a machine it is the
         // language's own map, which has always been 16 bits.
         const long limit = static_cast<long>(interpreter_.machine_address_limit()) - 1;
         if (address < 0 || address > limit) {

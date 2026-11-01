@@ -4,7 +4,7 @@
 ; to switch away from it. Its output appears in its own window, not on the console:
 ; a process prints into its window, and the desktop composes the windows.
 ;
-;   ./native/build/time_warp_gates hb --tasks Examples/hb2/task_a.s Examples/hb2/task_b.s --ticks 6 --screen
+;   ./native/build/time_warp_gates hb --tasks Examples/kestrel16/task_a.s Examples/kestrel16/task_b.s --ticks 6 --screen
 
 again:  LEA R0, line            ; print the process's name
         INT 8

@@ -32,7 +32,7 @@ QLabel* paragraph(const QString& text) {
 }  // namespace
 
 MachineLauncher::MachineLauncher(QWidget* parent) : QMainWindow{parent} {
-    setWindowTitle(QStringLiteral("HB Computers"));
+    setWindowTitle(QStringLiteral("Kestrel Computers"));
     resize(760, 480);
 
     auto* central = new QWidget{this};
@@ -53,10 +53,10 @@ MachineLauncher::MachineLauncher(QWidget* parent) : QMainWindow{parent} {
         "Both are real machines: you can type at them, break them and come back "
         "to the same state.")));
 
-    auto* hb1 = new QPushButton{QStringLiteral("HB-1  \u00b7  1982")};
+    auto* hb1 = new QPushButton{QStringLiteral("Kestrel  \u00b7  1982")};
     hb1->setObjectName(QStringLiteral("hb1Button"));
     hb1->setMinimumHeight(56);
-    connect(hb1, &QPushButton::clicked, this, [this] { openHb1(); });
+    connect(hb1, &QPushButton::clicked, this, [this] { openKestrel(); });
     layout->addWidget(hb1);
     layout->addWidget(paragraph(QStringLiteral(
         "Eleven language ROMs in one socket, a prompt, a 64K, a tube and a disk "
@@ -72,9 +72,9 @@ MachineLauncher::MachineLauncher(QWidget* parent) : QMainWindow{parent} {
 void MachineLauncher::buildActions() {
     auto* menu = menuBar()->addMenu(QStringLiteral("&Machines"));
 
-    hb1_action_ = menu->addAction(QStringLiteral("HB-1 Computer"));
+    hb1_action_ = menu->addAction(QStringLiteral("Kestrel Computer"));
     hb1_action_->setObjectName(QStringLiteral("retroComputerAction"));
-    connect(hb1_action_, &QAction::triggered, this, [this] { openHb1(); });
+    connect(hb1_action_, &QAction::triggered, this, [this] { openKestrel(); });
 
     menu->addSeparator();
     auto* quit = menu->addAction(QStringLiteral("&Quit"));
@@ -82,7 +82,7 @@ void MachineLauncher::buildActions() {
     connect(quit, &QAction::triggered, this, &QWidget::close);
 }
 
-timewarp::ui::RetroComputerWindow* MachineLauncher::openHb1() {
+timewarp::ui::RetroComputerWindow* MachineLauncher::openKestrel() {
     if (hb1_ == nullptr) {
         installDemoDisk();
         auto* window = new timewarp::ui::RetroComputerWindow{this};
@@ -99,7 +99,7 @@ timewarp::ui::RetroComputerWindow* MachineLauncher::openHb1() {
     if (hb1_->consoleView() != nullptr) {
         hb1_->consoleView()->setFocus(Qt::OtherFocusReason);
     }
-    statusBar()->showMessage(QStringLiteral("HB-1 powered on."));
+    statusBar()->showMessage(QStringLiteral("Kestrel powered on."));
     return hb1_;
 }
 
@@ -121,12 +121,12 @@ void MachineLauncher::installDemoDisk() {
         return;
     }
     if (QFile::copy(source, target)) {
-        statusBar()->showMessage(tr("HB DOS volume installed: %1").arg(target));
+        statusBar()->showMessage(tr("Kestrel DOS volume installed: %1").arg(target));
     }
 }
 
 bool MachineLauncher::openMachineImage(const QString& path, QString* error) {
-    auto* machine = openHb1();
+    auto* machine = openKestrel();
     QString reason;
     if (!machine->loadMachine(path, &reason)) {
         if (error != nullptr) {

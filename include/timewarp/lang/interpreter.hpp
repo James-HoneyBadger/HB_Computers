@@ -379,7 +379,7 @@ public:
     /// Without a bus -- the IDE editor, `time_warp_check`, the parity gates -- a
     /// program gets `State::memory`, the sparse map a language may carry, and the
     /// statements behave exactly as they did. With one, a statement reaches real
-    /// hardware, which is the difference between the HB-1 and an editor tab.
+    /// hardware, which is the difference between the Kestrel and an editor tab.
     ///
     /// Each hook returns false when the machine refused: a `poke` into ROM is the
     /// case that matters, because the program has to be told.
@@ -397,14 +397,14 @@ public:
         std::function<void(const std::string& line)> write_text;
         /// Machine code, run on the machine's own processor from `address`, returning
         /// what it printed. `SYS` is the one statement that needs a processor rather
-        /// than an address space, and the HB-2 is the machine that has one.
+        /// than an address space, and the Kestrel 16 is the machine that has one.
         std::function<std::string(int address)> sys;
         /// The machine's joystick registers, which are the ones a 1992 program reads.
         /// Absent on a machine with no joystick, and then `STICK`/`STRIG` answer 0.
         std::function<int(int index)> stick;
         std::function<bool(int index)> strig;
         /// The highest address `POKE`/`PEEK` may reach: 65536 on a machine whose
-        /// processor has sixteen address lines, the top of its map on the HB-2. Zero
+        /// processor has sixteen address lines, the top of its map on the Kestrel 16. Zero
         /// means the language's own map, which is the editor and the parity gates.
         int address_limit = 0;
     };

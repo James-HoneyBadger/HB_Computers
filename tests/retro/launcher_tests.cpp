@@ -42,7 +42,7 @@ void test_launcher_installs_the_shipped_disk() {
     QFile::remove(image);
 
     LauncherHandle handle;
-    auto* machine = handle.launcher->openHb1();
+    auto* machine = handle.launcher->openKestrel();
     TW_CHECK(machine != nullptr);
     if (machine == nullptr) {
         return;

@@ -4,7 +4,7 @@
 ; making progress at once is something a test can assert rather than something a
 ; picture merely suggests.
 ;
-;   ./native/build/time_warp_gates hb --tasks Examples/hb2/task_a.s Examples/hb2/task_b.s --ticks 6 --screen
+;   ./native/build/time_warp_gates hb --tasks Examples/kestrel16/task_a.s Examples/kestrel16/task_b.s --ticks 6 --screen
 
 again:  LEA R0, line
         INT 8

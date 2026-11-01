@@ -2,7 +2,7 @@
 //
 // The machine: one emulator with two models.
 //
-// The HB-1 and the HB-2 are the same design ten years apart, so they are the same
+// The Kestrel and the Kestrel 16 are the same design ten years apart, so they are the same
 // program with different numbers. A `Machine` is built for a `Model`, and the
 // profile table says what that model is: its clock, its memory, where its screen
 // and its registers are, how big its ROMs are, and how its disk is divided.
@@ -26,13 +26,13 @@
 #include <vector>
 
 #include "timewarp/devices.hpp"
-#include "timewarp/hb1/cpu6502.hpp"
-#include "timewarp/hb2/cpu65816.hpp"
+#include "timewarp/kestrel/cpu6502.hpp"
+#include "timewarp/kestrel16/cpu65816.hpp"
 
 namespace timewarp {
 
 /// Which machine this is.
-enum class Model { Hb1, Hb2 };
+enum class Model { Kestrel, Kestrel16 };
 
 /// Everything that differs between the two, in one table.
 struct Profile {
@@ -58,8 +58,8 @@ struct Profile {
     int cartridgeSize;
 
     /// The KERNAL's window in bank zero, and the language ROM's address, which
-    /// is a bank of its own on the HB-2 and a window beside the KERNAL on the
-    /// HB-1.
+    /// is a bank of its own on the Kestrel 16 and a window beside the KERNAL on the
+    /// Kestrel.
     std::uint32_t kernalBase;
     int kernalSize;
     std::uint32_t basicBase;
@@ -72,7 +72,7 @@ struct Profile {
 
 [[nodiscard]] const Profile& profileOf(Model model);
 
-class Machine final : public hb2::Bus {
+class Machine final : public kestrel16::Bus {
 public:
     /// How fast the host clocks the machine. The processor is always the same
     /// one; this is how many of its cycles the host gives it per second, which
@@ -80,7 +80,7 @@ public:
     /// watching the screen.
     enum class Speed { Mhz1, Mhz2, Mhz4, Mhz8, Turbo };
 
-    explicit Machine(Model model = Model::Hb1);
+    explicit Machine(Model model = Model::Kestrel);
 
     [[nodiscard]] Model model() const noexcept { return profile_.model; }
     [[nodiscard]] const Profile& profile() const noexcept { return profile_; }
@@ -105,7 +105,7 @@ public:
         return kernal_;
     }
 
-    /// The language: a socket ROM on the HB-1, a bank of its own on the HB-2.
+    /// The language: a socket ROM on the Kestrel, a bank of its own on the Kestrel 16.
     bool mountBasic(const std::vector<std::uint8_t>& image,
                     std::string_view id);
     [[nodiscard]] std::string_view basicId() const noexcept { return basicId_; }
@@ -113,7 +113,7 @@ public:
         return basic_;
     }
 
-    /// Puts a ROM in the HB-1's language socket. The machine resets, which is
+    /// Puts a ROM in the Kestrel's language socket. The machine resets, which is
     /// what a socket with a new chip in it does: the reset vector in the new
     /// image is where the processor starts.
     bool mountSocketRom(const std::vector<std::uint8_t>& image,
@@ -199,10 +199,10 @@ public:
     /// The processor, as the model's own type. Asking a 6502 machine for the
     /// 65816 is a mistake the type system should catch, so there is one accessor
     /// for each and no common one.
-    [[nodiscard]] hb1::Cpu6502& cpu6502() noexcept { return cpu6502_; }
-    [[nodiscard]] const hb1::Cpu6502& cpu6502() const noexcept { return cpu6502_; }
-    [[nodiscard]] hb2::Cpu65816& cpu65816() noexcept { return cpu65816_; }
-    [[nodiscard]] const hb2::Cpu65816& cpu65816() const noexcept {
+    [[nodiscard]] kestrel::Cpu6502& cpu6502() noexcept { return cpu6502_; }
+    [[nodiscard]] const kestrel::Cpu6502& cpu6502() const noexcept { return cpu6502_; }
+    [[nodiscard]] kestrel16::Cpu65816& cpu65816() noexcept { return cpu65816_; }
+    [[nodiscard]] const kestrel16::Cpu65816& cpu65816() const noexcept {
         return cpu65816_;
     }
 
@@ -254,7 +254,7 @@ private:
     };
 
     /// The 6502's view: sixteen address lines, into the same bus.
-    class Bus16 final : public hb1::Bus {
+    class Bus16 final : public kestrel::Bus {
     public:
         explicit Bus16(Machine& machine) : machine_(machine) {}
         [[nodiscard]] std::uint8_t read(std::uint16_t address) override {
@@ -279,8 +279,8 @@ private:
 
     Profile profile_;
     Bus16 bus16_{*this};
-    hb1::Cpu6502 cpu6502_{bus16_};
-    hb2::Cpu65816 cpu65816_{*this};
+    kestrel::Cpu6502 cpu6502_{bus16_};
+    kestrel16::Cpu65816 cpu65816_{*this};
 
     std::vector<std::uint8_t> ram_;
     Video video_;

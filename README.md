@@ -1,13 +1,13 @@
-# HB Computers
+# Kestrel Computers
 
 Two complete computers, and the engines they run on.
 
-- the **HB-1** — a personal computer from a 1982 that never happened: a 6502 at
+- the **Kestrel** — a personal computer from a 1982 that never happened: a 6502 at
   1 MHz, a 64K, a 40 x 25 tube, a disk measured in 256-byte sectors, an 8 KiB
   KERNAL and a language ROM in the socket -- real 6502 machine code, assembled
-  from `roms/hb1/` and run by the machine, not by the host; and
-- the **HB-2** — its 1992 successor: a 65816 at 8 MHz, a megabyte of banked
-  memory, an 80 x 50 tube, and HB BASIC 2.0 in a sixty-four kilobyte ROM bank of
+  from `roms/kestrel/` and run by the machine, not by the host; and
+- the **Kestrel 16** — its 1992 successor: a 65816 at 8 MHz, a megabyte of banked
+  memory, an 80 x 50 tube, and KESTREL 16 BASIC 2.0 in a sixty-four kilobyte ROM bank of
   its own, with the KERNAL beside it.
 
 Both are real programs, and they are one program: `timewarp::Machine` is built for
@@ -15,18 +15,18 @@ a model, and the profile table says what that model is. They are also the same
 kind of machine:
 the host supplies a processor, memory, a tube, a keyboard and a disk, and the
 languages are machine code in ROM. The interpreter that answers `READY.` on the
-HB-1 is 6502 code in the socket; the one that answers `READY` on the HB-2 is
+Kestrel is 6502 code in the socket; the one that answers `READY` on the Kestrel 16 is
 65816 code in bank one.
 
-Both are being rebuilt from the processor up; [the HB-1 firmware
-page](docs/hb1/firmware.md) and [the HB-2 manual](docs/hb2/README.md) record what
+Both are being rebuilt from the processor up; [the Kestrel firmware
+page](docs/kestrel/firmware.md) and [the Kestrel 16 manual](docs/kestrel16/README.md) record what
 the ROMs contain today and where the edge of each language is.
 
 | | |
 | --- | --- |
 | [`docs/MACHINES.md`](docs/MACHINES.md) | What the two machines are, in one page |
-| [`docs/hb1/README.md`](docs/hb1/README.md) | The HB-1 owner's manual |
-| [`docs/hb2/README.md`](docs/hb2/README.md) | The HB-2 owner's manual |
+| [`docs/kestrel/README.md`](docs/kestrel/README.md) | The Kestrel owner's manual |
+| [`docs/kestrel16/README.md`](docs/kestrel16/README.md) | The Kestrel 16 owner's manual |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the code is put together |
 
 ## Building
@@ -47,12 +47,12 @@ ctest --test-dir build --output-on-failure
 ## Running
 
 ```bash
-./build/hb_computers              # the launcher
-./build/hb_computers --hb1        # power on the HB-1
-./build/hb_computers --machine HV.hb1      # restore the HB-1 from an image
+./build/kestrel_computers              # the launcher
+./build/kestrel_computers --hb1        # power on the Kestrel
+./build/kestrel_computers --machine HV.hb1      # restore the Kestrel from an image
 ```
 
-The HB-1 flashes its banner at the top of the glass and leaves you at `READY.`
+The Kestrel flashes its banner at the top of the glass and leaves you at `READY.`
 with a block cursor — you type straight at the machine, not into a field below it.
 The disk has the machine's nine programs on it: `CATALOG` lists them,
 `LOAD "TUBE WRITER"` puts one in memory, `RUN` sets it going. `F1`–`F9` are the
@@ -64,16 +64,16 @@ text back.
 One executable boots either model, which is the point of the merge:
 
 ```bash
-./build/hb_computer --model hb1 --type "PRINT 2+2"
-./build/hb_computer --model hb2 --type "PRINT 2+2"
-./build/hb_computer --model hb2 --frames 20 --speed 8
+./build/kestrel --model kestrel --type "PRINT 2+2"
+./build/kestrel --model kestrel16 --type "PRINT 2+2"
+./build/kestrel --model kestrel16 --frames 20 --speed 8
 ```
 
-The HB-2 has no window yet; its model boots its own ROMs under
-`hb2_machine_tests`, which types at it and reads the screen back.
+The Kestrel 16 has no window yet; its model boots its own ROMs under
+`kestrel16_machine_tests`, which types at it and reads the screen back.
 
-Its ROMs are assembled from `roms/hb2/` by `hb2asm`, which is also a suite of its
-own: `hb2_asm_tests` writes out every encoding the dialect has by hand.
+Its ROMs are assembled from `roms/kestrel16/` by `kestrel16_asm`, which is also a suite of its
+own: `kestrel16_asm_tests` writes out every encoding the dialect has by hand.
 
 ## What is in the tree
 
@@ -81,10 +81,11 @@ own: `hb2_asm_tests` writes out every encoding the dialect has by hand.
 include/timewarp/   the engines and the widgets, as headers
 src/                their implementations
 app/                the launcher window and its main()
-tools/hb2asm.cpp    the 65816 assembler that builds both machines' ROMs
+tools/              the two assemblers that build the ROMs, and the CLI
+roms/kestrel/       the Kestrel's 6502 machine code, assembled at build time
+roms/kestrel16/     the Kestrel 16's 65816 machine code, assembled at build time
 tests/              one executable per suite, no external test framework
 Examples/           the programs the machines ship with
-roms/hb1/ roms/hb2/ the machines' own machine code, assembled at build time
 docs/               the manuals
 ```
 

@@ -8,7 +8,7 @@
 ; It draws a meter while it plays, one bar a channel, because a machine that only
 ; makes a noise and shows nothing is the kind of demo this project treats as broken.
 ;
-;   ./native/build/time_warp_gates hb Examples/hb2/chord.s --ticks 4 --screen
+;   ./native/build/time_warp_gates hb Examples/kestrel16/chord.s --ticks 4 --screen
 
         ORG $1000
 

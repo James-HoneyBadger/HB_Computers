@@ -808,7 +808,7 @@ void ForthMachine::run_primitive(Primitive primitive, const char* name) {
             return;
         case Primitive::Poke: {
             // `POKE ( value address -- )` reaches the *machine*: `128 32768 POKE` on
-            // the HB-1 writes a character cell on the tube, as BASIC's POKE does.
+            // the Kestrel writes a character cell on the tube, as BASIC's POKE does.
             // With no machine attached the same word writes this program's own 64K,
             // so a poke and a peek always agree instead of the write vanishing.
             const long long address = pop(name);

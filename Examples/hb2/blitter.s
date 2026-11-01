@@ -5,7 +5,7 @@
 ; stores and leaves the pixels to the chip, which is what a 1992 machine spent its
 ; money on.
 ;
-;   ./native/build/time_warp_gates hb Examples/hb2/blitter.s --ticks 4 --screen
+;   ./native/build/time_warp_gates hb Examples/kestrel16/blitter.s --ticks 4 --screen
 
         ORG $1000
 

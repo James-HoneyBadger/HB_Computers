@@ -299,7 +299,7 @@ void test_launcher_owns_the_machine_actions() {
     TW_CHECK(hb1 != nullptr);
     if (hb1 != nullptr) {
         // The menu names the machine, not the launcher it lives in.
-        TW_CHECK(hb1->text().contains(QStringLiteral("HB-1")));
+        TW_CHECK(hb1->text().contains(QStringLiteral("Kestrel")));
         hb1->trigger();
         auto* machine = window->findChild<RetroComputerWindow*>();
         TW_CHECK(machine != nullptr);

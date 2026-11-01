@@ -7,7 +7,7 @@
 ; The round-robin scheduler that would put a process in each window is a later
 ; proposal; this is the picture it will have to paint.
 ;
-;   ./native/build/time_warp_gates hb Examples/hb2/desktop.s --ticks 4 --screen
+;   ./native/build/time_warp_gates hb Examples/kestrel16/desktop.s --ticks 4 --screen
 
         ORG $1000
 

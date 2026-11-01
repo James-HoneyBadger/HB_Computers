@@ -4,7 +4,7 @@
 ; exactly that, then two sprites placed on the screen. A game asks the collision
 ; register whether they met; reading it clears it, so the question is asked once.
 ;
-;   ./native/build/time_warp_gates hb Examples/hb2/sprite.s --ticks 4 --screen
+;   ./native/build/time_warp_gates hb Examples/kestrel16/sprite.s --ticks 4 --screen
 
         ORG $1000
 

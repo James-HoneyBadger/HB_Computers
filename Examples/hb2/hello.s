@@ -1,12 +1,12 @@
 ; hello.s -- the 1982 tube, on a 1992 machine.
 ;
-; MODE 0 is the map the HB-1 has, byte for byte: text cells at $8000, attributes at
+; MODE 0 is the map the Kestrel has, byte for byte: text cells at $8000, attributes at
 ; $9000, the cursor at $A000. This program writes the cells directly, which is what a
 ; 1982 program did, and prints through the operating system's own call, which is what
 ; a 1992 one does. Both end up in the same memory, and the screen dump is the same
 ; screen.
 ;
-;   ./native/build/time_warp_gates hb Examples/hb2/hello.s --ticks 2 --screen
+;   ./native/build/time_warp_gates hb Examples/kestrel16/hello.s --ticks 2 --screen
 
         ORG $1000
 
@@ -42,5 +42,5 @@ banner_done:
         MOV R0, #0
         INT 0
 
-banner:  DB "HB-2 Model 92", 0
+banner:  DB "Kestrel 16 Model 92", 0
 message: DB "A 1992 machine, in the map a 1982 program knows.", 10, 0

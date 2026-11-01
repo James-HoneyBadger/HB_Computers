@@ -1,7 +1,7 @@
 # Examples Catalog
 
 This catalog lists the 95 example programs currently shipped with Time Warp Studio,
-plus the HB-1's own disk image. It covers all eleven active languages.
+plus the Kestrel's own disk image. It covers all eleven active languages.
 
 Each language has a **showcase** program — the first row in each section below —
 that walks through that language's whole surface: its statements, its data types,
@@ -169,25 +169,25 @@ so it can be opened, edited and re-assembled. The language is documented in
 | `forth/hello.fs` | The first program: `.` and `CR`, a recursive `FACT`, a counted loop and `EMIT` |
 | `forth/turtle.fs` | Nested squares, a pentagon and a star, each in its own palette colour |
 
-## HB-1
+## Kestrel
 
-These are written for the [HB-1 machine](../docs/hb1/README.md) rather than
+These are written for the [Kestrel machine](../docs/kestrel/README.md) rather than
 for the IDE: they use the machine's screen memory, its I/O registers and its timer.
 They also run in the IDE, where the same arithmetic lands on the editor's canvas.
-The owner's manual explains [how to run one on the machine](../docs/hb1/README.md#programs-to-run-on-it).
+The owner's manual explains [how to run one on the machine](../docs/kestrel/README.md#programs-to-run-on-it).
 
 | File | Description |
 | --- | --- |
-| `hb1/tube_writer.bas` | POKEs a message and its colours into the screen cells at `$8000`/`$9000`, reads a cell back with `PEEK`, then frames it with the turtle |
-| `hb1/ram_probe.bas` | Writes a pattern across the 32K below the screen, reads three cells back, and draws one bar per byte |
-| `hb1/frame_clock.bas` | Reads the 60 Hz frame counter at `$A006`/`$A007`, arms `ON TIMER`, and turns the interrupt count into a dial |
-| `hb1/HBWARP.dsk` | The first three programs already saved on an HB DOS volume, ready to copy into `~/.time_warp/disks` |
-| `hb1/colour_chart.bas` | Sixteen steps of phosphor: the brightness ramp as ink, as paper, and as a strip, all written into the attribute byte |
-| `hb1/sound_board.bas` | Eight notes as `SOUND frequency, ticks`, with a block poked into the tube for each one |
-| `hb1/memory_map.bas` | Four `PEEK`s, one from each region of the map, plus the hole that answers zero and the ROM that refuses a write |
-| `hb1/canvas_lines.bas` | The other surface: axes, eight filled bars and two circles on the 320x200 canvas, while the tube narrates |
-| `hb1/sprite_lab.bas` | One sprite made with `PSET`, taken with `GET` and `PUT` a hundred and twenty times across the canvas |
-| `hb1/turtle_garden.logo` | The same machine in the Logo ROM: a house, a sun and two flowers, in turtle commands |
+| `kestrel/tube_writer.bas` | POKEs a message and its colours into the screen cells at `$8000`/`$9000`, reads a cell back with `PEEK`, then frames it with the turtle |
+| `kestrel/ram_probe.bas` | Writes a pattern across the 32K below the screen, reads three cells back, and draws one bar per byte |
+| `kestrel/frame_clock.bas` | Reads the 60 Hz frame counter at `$A006`/`$A007`, arms `ON TIMER`, and turns the interrupt count into a dial |
+| `kestrel/KESWARP.dsk` | The first three programs already saved on an Kestrel DOS volume, ready to copy into `~/.time_warp/disks` |
+| `kestrel/colour_chart.bas` | Sixteen steps of phosphor: the brightness ramp as ink, as paper, and as a strip, all written into the attribute byte |
+| `kestrel/sound_board.bas` | Eight notes as `SOUND frequency, ticks`, with a block poked into the tube for each one |
+| `kestrel/memory_map.bas` | Four `PEEK`s, one from each region of the map, plus the hole that answers zero and the ROM that refuses a write |
+| `kestrel/canvas_lines.bas` | The other surface: axes, eight filled bars and two circles on the 320x200 canvas, while the tube narrates |
+| `kestrel/sprite_lab.bas` | One sprite made with `PSET`, taken with `GET` and `PUT` a hundred and twenty times across the canvas |
+| `kestrel/turtle_garden.logo` | The same machine in the Logo ROM: a house, a sun and two flowers, in turtle commands |
 
 ## Validation
 
