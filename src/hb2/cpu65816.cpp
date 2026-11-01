@@ -720,7 +720,13 @@ int Cpu65816::step() {
                 static_cast<std::uint16_t>((c_ & accMask) - 1);
             result(value);
         } else {
-            writeData(ea, static_cast<std::uint16_t>(readData(ea) - 1));
+            // A memory increment is one byte wide whatever the accumulator is:
+            // the 65816 has no sixteen-bit INC, which is what makes the
+            // hand-written sixteen-bit loops work. It sets the flags from that
+            // byte, which is how a loop counts down to zero.
+            const auto value = static_cast<std::uint8_t>(read8(ea) - 1);
+            write8(ea, value);
+            setZeroNegative8(value);
         }
         break;
     }
@@ -730,7 +736,9 @@ int Cpu65816::step() {
                 static_cast<std::uint16_t>((c_ & accMask) + 1);
             result(value);
         } else {
-            writeData(ea, static_cast<std::uint16_t>(readData(ea) + 1));
+            const auto value = static_cast<std::uint8_t>(read8(ea) + 1);
+            write8(ea, value);
+            setZeroNegative8(value);
         }
         break;
     }

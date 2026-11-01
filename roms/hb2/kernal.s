@@ -257,9 +257,10 @@ PUTCHAR:
         REP #$10
         PHX
         PHY
-        LDX ZP_OFFSET
+        STA ZP_CHAR
+        JSR CELLOFFSET
+        LDA ZP_CHAR
         STA SCREEN,X
-        PHA
         LDA IO_INK
         ASL A
         ASL A
@@ -267,9 +268,6 @@ PUTCHAR:
         ASL A
         ORA IO_PAPER
         STA ATTRS,X
-        PLA
-        INX
-        STX ZP_OFFSET
         INC ZP_COL
         LDA ZP_COL
         CMP #COLUMNS
@@ -286,11 +284,10 @@ BACKSPACE:
         PHP
         SEP #$20
         REP #$10
-        LDX ZP_OFFSET
-        CPX.W #0
+        LDA ZP_COL
         BEQ BACKSPACE_DONE
-        DEX
-        STX ZP_OFFSET
+        DEC ZP_COL
+        JSR CELLOFFSET
         LDA #32
         STA SCREEN,X
         LDA IO_INK
@@ -300,14 +297,6 @@ BACKSPACE:
         ASL A
         ORA IO_PAPER
         STA ATTRS,X
-        LDA ZP_COL
-        BNE BACKSPACE_COL
-        LDA #0
-        BRA BACKSPACE_STORE
-BACKSPACE_COL:
-        DEC A
-BACKSPACE_STORE:
-        STA ZP_COL
 BACKSPACE_DONE:
         PLP
         RTS
@@ -328,25 +317,25 @@ NEWLINE:
         LDA #ROWS-1
         STA ZP_ROW
 NEWLINE_ROW_OK:
-        JSR ROWTOOFFSET
-        STX ZP_OFFSET
         LDA ZP_CHAR
         PLP
         RTS
 
-; X = row * 80.
-ROWTOOFFSET:
+; X = row * 80 + column. The tube's position is the pair in ZP_ROW and ZP_COL
+; and nothing else, so the two can never drift apart.
+CELLOFFSET:
         PHP
         SEP #$20
-        LDA ZP_ROW
         REP #$20
-        STA ZP_TMP
+        LDA ZP_ROW
+        AND.W #$00FF
+        STA ZP_MUL1
         ASL A
         ASL A
         ASL A
         ASL A
-        STA ZP_TMP2
-        LDA ZP_TMP
+        STA ZP_MUL2
+        LDA ZP_MUL1
         ASL A
         ASL A
         ASL A
@@ -354,7 +343,14 @@ ROWTOOFFSET:
         ASL A
         ASL A
         CLC
-        ADC ZP_TMP2
+        ADC ZP_MUL2             ; row * 80
+        STA ZP_MUL1
+        SEP #$20
+        LDA ZP_COL
+        REP #$20
+        AND.W #$00FF
+        CLC
+        ADC ZP_MUL1
         TAX
         SEP #$20
         PLP
@@ -433,8 +429,6 @@ HOME:
         LDA #0
         STA ZP_COL
         STA ZP_ROW
-        STA ZP_OFFSET
-        STA ZP_OFFSET+1
         STA IO_CURCOL
         STA IO_CURROW
         PLP
@@ -451,16 +445,6 @@ LOCATE:
         TYA
         STA ZP_ROW
         REP #$10
-        JSR ROWTOOFFSET
-        SEP #$20
-        LDA ZP_COL
-        REP #$20
-        STA ZP_TMP
-        TXA
-        CLC
-        ADC ZP_TMP
-        STA ZP_OFFSET
-        SEP #$20
         PLP
         RTS
 

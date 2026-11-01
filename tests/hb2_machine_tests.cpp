@@ -60,14 +60,29 @@ public:
     [[nodiscard]] bool shows(const std::string& needle) const {
         return text().find(needle) != std::string::npos;
     }
-    /// The last line with anything on it, which is where the machine's answer
-    /// to the last thing typed will be.
+    /// The last line with anything on it.
     [[nodiscard]] std::string lastLine() const {
         for (int row = timewarp::hb2::map::kScreenRows - 1; row >= 0; --row) {
             const std::string candidate = machine_.screenLine(row);
             if (!candidate.empty()) {
                 return candidate;
             }
+        }
+        return {};
+    }
+
+    /// What the language printed in answer to the last line typed: everything
+    /// above the prompt that follows it.
+    [[nodiscard]] std::string answer() const {
+        for (int row = timewarp::hb2::map::kScreenRows - 1; row >= 0; --row) {
+            const std::string candidate = machine_.screenLine(row);
+            if (candidate.empty()) {
+                continue;
+            }
+            if (candidate.rfind("READY>", 0) == 0 || candidate == "?WHAT?") {
+                continue;
+            }
+            return candidate;
         }
         return {};
     }
@@ -89,24 +104,52 @@ void test_the_machine_boots() {
     TW_CHECK_EQ(booted.machine().cpu().illegalOpcodes(), 0u);
 }
 
-// The language's own interpreter is the next thing to finish: the prompt,
-// the line reader and the echo work, and the statements that follow a line
-// being interpreted do not yet. These are the checks it has to pass, kept here
-// so that finishing it is a matter of turning them on.
-#if 0
 void test_arithmetic_at_the_prompt() {
     Booted booted;
     booted.run("PRINT 2+2");
-    TW_CHECK_EQ(booted.lastLine(), std::string{"4"});
+    TW_CHECK_EQ(booted.answer(), std::string{"4"});
     booted.run("PRINT 10*3+1");
-    TW_CHECK_EQ(booted.lastLine(), std::string{"31"});
+    TW_CHECK_EQ(booted.answer(), std::string{"31"});
+    booted.run("PRINT 100/4");
+    TW_CHECK_EQ(booted.answer(), std::string{"25"});
+    booted.run("PRINT 9-4");
+    TW_CHECK_EQ(booted.answer(), std::string{"5"});
+    booted.run("PRINT (2+3)*4");
+    TW_CHECK_EQ(booted.answer(), std::string{"20"});
+    booted.run("PRINT -5");
+    TW_CHECK_EQ(booted.answer(), std::string{"-5"});
+}
+
+void test_variables_and_strings() {
+    Booted booted;
     booted.run("LET A=41");
     booted.run("PRINT A+1");
-    TW_CHECK_EQ(booted.lastLine(), std::string{"42"});
+    TW_CHECK_EQ(booted.answer(), std::string{"42"});
     booted.run("PRINT \"HELLO\"");
-    TW_CHECK_EQ(booted.lastLine(), std::string{"HELLO"});
+    TW_CHECK_EQ(booted.answer(), std::string{"HELLO"});
+    booted.run("PRINT \"A=\";A");
+    TW_CHECK_EQ(booted.answer(), std::string{"A=41"});
 }
-#endif
+
+void test_sixteen_bit_numbers() {
+    Booted booted;
+    booted.run("PRINT 30000+1");
+    TW_CHECK_EQ(booted.answer(), std::string{"30001"});
+    booted.run("LET B=1000");
+    booted.run("PRINT B*20");
+    TW_CHECK_EQ(booted.answer(), std::string{"20000"});
+}
+
+void test_cls_and_unknown_statements() {
+    Booted booted;
+    booted.run("PRINT \"BEFORE\"");
+    TW_CHECK(booted.shows("BEFORE"));
+    booted.run("CLS");
+    TW_CHECK(booted.shows("HB BASIC 2.0"));
+    TW_CHECK(!booted.shows("BEFORE"));
+    booted.run("WIBBLE");
+    TW_CHECK(booted.shows("?WHAT?"));
+}
 
 void test_the_keyboard_reaches_the_screen() {
     Booted booted;
@@ -171,6 +214,10 @@ void test_the_screen_is_the_roms() {
 
 int main() {
     test_the_machine_boots();
+    test_arithmetic_at_the_prompt();
+    test_variables_and_strings();
+    test_sixteen_bit_numbers();
+    test_cls_and_unknown_statements();
     test_the_keyboard_reaches_the_screen();
     test_a_line_is_collected();
     test_a_wrong_sized_rom_is_refused();

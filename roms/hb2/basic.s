@@ -28,6 +28,7 @@ ZP_B            = $3D           ; 16-bit operand
 ZP_CNT          = $3F           ; 16-bit counter
 ZP_CH           = $41           ; the character under the pointer
 ZP_FLAG         = $42           ; PRINT's separator state
+ZP_VAR          = $43           ; which variable an assignment is writing
 
 VARS            = $0007C0       ; twenty-six words, A to Z
 
@@ -300,16 +301,19 @@ DO_ASSIGN:
         JSR TO_UPPER
         SEC
         SBC #'A'
-        STA ZP_CH
+        STA ZP_VAR              ; the expression may use ZP_CH as scratch
         INC ZP_SRC
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #'='
-        BNE ASSIGN_DONE
+        BEQ ASSIGN_STORE
+        JSR SAY_WHAT
+        RTS
+ASSIGN_STORE:
         INC ZP_SRC
         JSR EXPR
         REP #$20
-        LDA ZP_CH
+        LDA ZP_VAR
         AND.W #$00FF
         ASL A
         TAY
@@ -400,6 +404,7 @@ EXPR_ADD:
         ADC ZP_VAL
         TAX
         SEP #$20
+        PHX
         BRA EXPR_LOOP
 EXPR_SUB:
         INC ZP_SRC
@@ -413,6 +418,7 @@ EXPR_SUB:
         SBC ZP_VAL
         TAX
         SEP #$20
+        PHX
         BRA EXPR_LOOP
 
 TERM:
@@ -437,9 +443,11 @@ TERM_MUL:
         TYA
         STA ZP_B
         JSR UMUL16
+        REP #$20                ; the product is a word, so read it as one
         LDA ZP_A
         TAX
         SEP #$20
+        PHX
         BRA TERM_LOOP
 TERM_DIV:
         INC ZP_SRC
@@ -451,9 +459,11 @@ TERM_DIV:
         TYA
         STA ZP_A
         JSR UDIV16
+        REP #$20
         LDA ZP_A
         TAX
         SEP #$20
+        PHX
         BRA TERM_LOOP
 
 ; ZP_A * ZP_B -> ZP_A

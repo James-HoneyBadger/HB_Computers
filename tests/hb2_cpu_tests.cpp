@@ -315,6 +315,41 @@ void test_arithmetic() {
     }
 }
 
+void test_memory_increments_are_bytes() {
+    // INC and DEC on memory are one byte wide even with a sixteen-bit
+    // accumulator, which is what sixteen-bit arithmetic written by hand relies
+    // on: the byte after the operand must not be touched.
+    Run run{kOrigin, {0xE6, 0x10}};  // INC $10
+    run.bus.poke(0x0010, 0xFF);
+    run.bus.poke(0x0011, 0x7E);
+    run.step();
+    TW_CHECK_EQ(run.bus.peek(0x0010), 0x00);  // wrapped, not carried
+    TW_CHECK_EQ(run.bus.peek(0x0011), 0x7E);
+    Run dec{kOrigin, {0xC6, 0x10}};  // DEC $10
+    dec.bus.poke(0x0010, 0x00);
+    dec.bus.poke(0x0011, 0x7E);
+    dec.step();
+    TW_CHECK_EQ(dec.bus.peek(0x0010), 0xFF);
+    TW_CHECK_EQ(dec.bus.peek(0x0011), 0x7E);
+    // And it sets the flags from that byte, which is how a countdown loop ends.
+    TW_CHECK_EQ(dec.regs().p & Cpu65816::kZero, 0);
+    TW_CHECK_EQ(dec.regs().p & Cpu65816::kNegative, Cpu65816::kNegative);
+    Run zeroed{kOrigin, {0xC6, 0x10}};  // DEC $10, leaving zero
+    zeroed.bus.poke(0x0010, 0x01);
+    zeroed.step();
+    TW_CHECK_EQ(zeroed.regs().p & Cpu65816::kZero, Cpu65816::kZero);
+    // The accumulator forms do follow the M flag.
+    Run wide{kOrigin, {0x1A}};  // INC A
+    wide.cpu.setRegisters([&] {
+        auto registers = wide.regs();
+        registers.c = 0xFFFF;
+        return registers;
+    }());
+    wide.step();
+    TW_CHECK_EQ(wide.regs().c, 0x0000);
+    TW_CHECK_EQ(wide.regs().p & Cpu65816::kZero, Cpu65816::kZero);
+}
+
 void test_stack_and_transfers() {
     // A sixteen-bit push puts the high byte away first.
     {
@@ -442,6 +477,7 @@ int main() {
     test_direct_page();
     test_new_address_modes();
     test_arithmetic();
+    test_memory_increments_are_bytes();
     test_stack_and_transfers();
     test_block_move();
     test_cycle_counts();

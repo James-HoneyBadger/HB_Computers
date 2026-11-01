@@ -119,6 +119,8 @@ ZP_CHAR         = $25
 ZP_SCRATCH      = $26
 ZP_SCRATCH2     = $27
 ZP_SCRATCH3     = $28
+ZP_MUL1         = $29           ; 16-bit scratch, for the cursor arithmetic
+ZP_MUL2         = $2B
 
 ; The KERNAL's jump table: every service is a fixed address, which is how the
 ; language bank, and any program a person writes, reaches the machine.
