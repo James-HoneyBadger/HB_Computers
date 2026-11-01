@@ -1,5 +1,11 @@
 # HB-1 Owner's Manual
 
+> **This page describes the previous build of the HB-1**, in which the eleven
+> languages were native C++ engines and the machine had no processor. The
+> machine is now a 6502 running ROMs, assembled from `roms/hb1/`; read
+> [Inside the HB-1: a 6502 and two ROMs](firmware.md) for the machine as it is
+> built today, including exactly what the ROMs do and do not yet implement.
+
 ```text
      **** HB-1 BASIC V2.0 ROM ****
   64K RAM SYSTEM   32768 BYTES FREE

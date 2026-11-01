@@ -5,7 +5,6 @@
 
 #include "retro/support.hpp"
 #include "machine_launcher.hpp"
-#include "timewarp/ui/hb2_window.hpp"
 
 namespace tw::retro {
 
@@ -297,9 +296,7 @@ void test_launcher_owns_the_machine_actions() {
     clearMachineSettings();
     auto* window = new hb::MachineLauncher;
     QAction* hb1 = window->findChild<QAction*>(QStringLiteral("retroComputerAction"));
-    QAction* hb2 = window->findChild<QAction*>(QStringLiteral("hb2Action"));
     TW_CHECK(hb1 != nullptr);
-    TW_CHECK(hb2 != nullptr);
     if (hb1 != nullptr) {
         // The menu names the machine, not the launcher it lives in.
         TW_CHECK(hb1->text().contains(QStringLiteral("HB-1")));
@@ -308,15 +305,6 @@ void test_launcher_owns_the_machine_actions() {
         TW_CHECK(machine != nullptr);
         if (machine != nullptr) {
             TW_CHECK(machine->isVisible());
-            machine->close();
-        }
-    }
-    if (hb2 != nullptr) {
-        TW_CHECK(hb2->text().contains(QStringLiteral("HB-2")));
-        hb2->trigger();
-        auto* machine = window->findChild<timewarp::ui::Hb2Window*>();
-        TW_CHECK(machine != nullptr);
-        if (machine != nullptr) {
             machine->close();
         }
     }

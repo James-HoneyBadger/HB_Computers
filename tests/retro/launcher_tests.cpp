@@ -11,7 +11,6 @@
 
 #include "machine_launcher.hpp"
 #include "timewarp/ui/app_paths.hpp"
-#include "timewarp/ui/hb2_window.hpp"
 #include "timewarp/ui/retro_computer.hpp"
 
 #include <QCoreApplication>
@@ -75,23 +74,6 @@ void test_typing_at_the_glass_reaches_the_prompt() {
     }
     TW_CHECK_EQ(machine.promptInput()->text(), QStringLiteral("PRINT"));
     machine.promptInput()->clear();
-}
-
-void test_hb2_powers_on_into_hb_os() {
-    clearMachineSettings();
-    LauncherHandle handle;
-    auto* machine = handle.launcher->openHb2();
-    TW_CHECK(machine != nullptr);
-    if (machine == nullptr) {
-        return;
-    }
-    // A machine with nothing in its RAM would fault on its second frame. HB-OS
-    // is what the window boots into instead: two processes, each with a window.
-    TW_CHECK_EQ(machine->machine().scheduler().size(), std::size_t{2});
-    TW_CHECK(machine->running());
-    TW_CHECK(machine->machine().video().mode() != timewarp::hb2::Video::Mode::Text);
-    TW_CHECK_EQ(machine->machine().desktop().count(), std::size_t{2});
-    machine->close();
 }
 
 }  // namespace tw::retro

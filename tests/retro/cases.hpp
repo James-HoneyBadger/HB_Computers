@@ -25,7 +25,6 @@ void test_rom_and_program_survive_a_restart();
 void test_launcher_owns_the_machine_actions();
 void test_launcher_installs_the_shipped_disk();
 void test_typing_at_the_glass_reaches_the_prompt();
-void test_hb2_powers_on_into_hb_os();
 void test_config_button_opens_the_settings_screen();
 void test_the_machine_offers_the_assistant();
 void test_config_prompt_command_opens_the_settings_screen();

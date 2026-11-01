@@ -16,7 +16,6 @@
 #include <QWidget>
 
 #include "timewarp/ui/app_paths.hpp"
-#include "timewarp/ui/hb2_window.hpp"
 #include "timewarp/ui/retro_computer.hpp"
 
 namespace hb {
@@ -63,15 +62,6 @@ MachineLauncher::MachineLauncher(QWidget* parent) : QMainWindow{parent} {
         "Eleven language ROMs in one socket, a prompt, a 64K, a tube and a disk "
         "measured in 256-byte sectors.")));
 
-    auto* hb2 = new QPushButton{QStringLiteral("HB-2  \u00b7  1992")};
-    hb2->setObjectName(QStringLiteral("hb2Button"));
-    hb2->setMinimumHeight(56);
-    connect(hb2, &QPushButton::clicked, this, [this] { openHb2(); });
-    layout->addWidget(hb2);
-    layout->addWidget(paragraph(QStringLiteral(
-        "A bus, a 640 \u00d7 480 framebuffer and a blitter, sampled audio, "
-        "hardware sprites and HB-16, a processor of its own.")));
-
     layout->addStretch(1);
     setCentralWidget(central);
 
@@ -85,10 +75,6 @@ void MachineLauncher::buildActions() {
     hb1_action_ = menu->addAction(QStringLiteral("HB-1 Computer"));
     hb1_action_->setObjectName(QStringLiteral("retroComputerAction"));
     connect(hb1_action_, &QAction::triggered, this, [this] { openHb1(); });
-
-    hb2_action_ = menu->addAction(QStringLiteral("HB-2 Computer"));
-    hb2_action_->setObjectName(QStringLiteral("hb2Action"));
-    connect(hb2_action_, &QAction::triggered, this, [this] { openHb2(); });
 
     menu->addSeparator();
     auto* quit = menu->addAction(QStringLiteral("&Quit"));
@@ -139,29 +125,6 @@ void MachineLauncher::installDemoDisk() {
     }
 }
 
-timewarp::ui::Hb2Window* MachineLauncher::openHb2() { return showHb2(true); }
-
-timewarp::ui::Hb2Window* MachineLauncher::showHb2(bool boot) {
-    QString boot_error;
-    if (hb2_ == nullptr) {
-        auto* window = new timewarp::ui::Hb2Window{this};
-        window->setAttribute(Qt::WA_DeleteOnClose);
-        hb2_ = window;
-        connect(window, &QObject::destroyed, this, [this] { hb2_ = nullptr; });
-        if (boot) {
-            window->bootDesktop(&boot_error);
-        }
-    }
-    hb2_->show();
-    hb2_->raise();
-    hb2_->activateWindow();
-    hb2_->promptEntry()->setFocus(Qt::OtherFocusReason);
-    statusBar()->showMessage(boot_error.isEmpty()
-                                 ? QStringLiteral("HB-2 powered on.")
-                                 : tr("HB-2 powered on without HB-OS: %1").arg(boot_error));
-    return hb2_;
-}
-
 bool MachineLauncher::openMachineImage(const QString& path, QString* error) {
     auto* machine = openHb1();
     QString reason;
@@ -171,18 +134,6 @@ bool MachineLauncher::openMachineImage(const QString& path, QString* error) {
         }
         return false;
     }
-    return true;
-}
-
-bool MachineLauncher::openHb2Listing(const QString& path, QString* error) {
-    QFile file{path};
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        if (error != nullptr) {
-            *error = QStringLiteral("cannot read %1: %2").arg(path, file.errorString());
-        }
-        return false;
-    }
-    showHb2(false)->setListing(QString::fromUtf8(file.readAll()));
     return true;
 }
 

@@ -44,7 +44,6 @@ int main(int argc, char** argv) {
     test_launcher_owns_the_machine_actions();
     test_launcher_installs_the_shipped_disk();
     test_typing_at_the_glass_reaches_the_prompt();
-    test_hb2_powers_on_into_hb_os();
     test_config_button_opens_the_settings_screen();
     test_config_prompt_command_opens_the_settings_screen();
     test_settings_preview_apply_and_persist();

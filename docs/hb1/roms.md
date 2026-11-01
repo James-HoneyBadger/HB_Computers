@@ -1,5 +1,11 @@
 # The ROM library
 
+> **This page describes the previous build of the HB-1**, in which the eleven
+> languages were native C++ engines and the machine had no processor. The
+> machine is now a 6502 running ROMs, assembled from `roms/hb1/`; read
+> [Inside the HB-1: a 6502 and two ROMs](firmware.md) for the machine as it is
+> built today, including exactly what the ROMs do and do not yet implement.
+
 Eleven languages, one socket. Selecting a ROM on the front panel cold-boots the
 machine into it: both engines stop, the screen clears, the ROM's program memory is
 brought back, and the banner names the language you are about to use.

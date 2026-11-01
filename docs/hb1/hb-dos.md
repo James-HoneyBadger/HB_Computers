@@ -1,5 +1,11 @@
 # HB DOS 1.0 Reference Manual
 
+> **This page describes the previous build of the HB-1**, in which the eleven
+> languages were native C++ engines and the machine had no processor. The
+> machine is now a 6502 running ROMs, assembled from `roms/hb1/`; read
+> [Inside the HB-1: a 6502 and two ROMs](firmware.md) for the machine as it is
+> built today, including exactly what the ROMs do and do not yet implement.
+
 ```text
 HB DOS 1.0   HB SYSTEMS 1982   VOLUME HBWARP
 ```

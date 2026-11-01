@@ -65,6 +65,75 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
+# The HB-1: a 6502, its ROMs, and the machine that runs them
+# ---------------------------------------------------------------------------
+#
+# The ROMs are 6502 machine code, assembled from roms/hb1/*.s at build time.
+# `hb1asm` is a build tool, not a dependency: the tree still builds with nothing
+# but a C++20 compiler, and the images are generated where the compiler can see
+# them.
+
+add_executable(hb1asm tools/hb1asm.cpp)
+hb_enable_warnings(hb1asm)
+
+add_executable(hb2asm tools/hb2asm.cpp)
+hb_enable_warnings(hb2asm)
+
+set(HB1_ROM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/roms/hb1)
+set(HB1_GENERATED ${CMAKE_BINARY_DIR}/generated/hb1)
+file(GLOB HB1_ROM_SOURCES CONFIGURE_DEPENDS
+    ${HB1_ROM_DIR}/*.s
+    ${HB1_ROM_DIR}/*.inc
+)
+
+# hb1_rom(<name> <origin> <size>)
+function(hb1_rom name origin size)
+    set(header ${HB1_GENERATED}/${name}_rom.hpp)
+    add_custom_command(
+        OUTPUT ${header}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${HB1_GENERATED}
+        COMMAND hb1asm ${HB1_ROM_DIR}/${name}.s
+                --name ${name}
+                --origin ${origin}
+                --size ${size}
+                --fill 0xFF
+                --header ${header}
+                --symbols ${HB1_GENERATED}/${name}.sym
+                --listing ${HB1_GENERATED}/${name}.lst
+        WORKING_DIRECTORY ${HB1_ROM_DIR}
+        DEPENDS hb1asm ${HB1_ROM_SOURCES}
+        COMMENT "Assembling the ${name} ROM"
+        VERBATIM
+    )
+    set(HB1_ROM_HEADERS ${HB1_ROM_HEADERS} ${header} PARENT_SCOPE)
+endfunction()
+
+hb1_rom(kernal 0xE000 8192)
+hb1_rom(basic 0xA000 16384)
+hb1_rom(monitor 0xA000 16384)
+
+add_custom_target(hb1_roms DEPENDS ${HB1_ROM_HEADERS})
+message(STATUS "HB-1 ROMs: ${HB1_ROM_HEADERS}")
+
+add_library(hb1
+    src/hb1/cpu6502.cpp
+    src/hb1/disk.cpp
+    src/hb1/keyboard.cpp
+    src/hb1/machine.cpp
+    src/hb1/roms.cpp
+    src/hb1/tape.cpp
+    src/hb1/video.cpp
+)
+add_library(hb::hb1 ALIAS hb1)
+target_include_directories(hb1 PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated>)
+target_compile_features(hb1 PUBLIC cxx_std_20)
+hb_enable_warnings(hb1)
+target_compile_options(hb1 PRIVATE ${HB_GNU_WARNING_FLAGS} ${HB_NULL_DEREFERENCE})
+add_dependencies(hb1 hb1_roms)
+
+# ---------------------------------------------------------------------------
 # The Qt-free engines
 # ---------------------------------------------------------------------------
 
@@ -151,8 +220,9 @@ hb_enable_warnings(hb_canvas)
 # HB-2, the machine
 # ---------------------------------------------------------------------------
 #
-# The Model 92's bus, video chip, sound chip, clock, peripherals and HB-16. The
-# machine's ROM socket runs the native engines, so it links them.
+# A 65816 with sixteen megabytes of address space, and the ROM socket that holds
+# its KERNAL and its BASIC. The languages are machine code in `roms/hb2/`, the
+# same way the HB-1's are.
 
 file(GLOB HB_HB2_SOURCES CONFIGURE_DEPENDS src/hb2/*.cpp)
 add_library(hb_hb2 ${HB_HB2_SOURCES})
@@ -160,7 +230,6 @@ add_library(hb::hb2 ALIAS hb_hb2)
 target_include_directories(hb_hb2 PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_compile_features(hb_hb2 PUBLIC cxx_std_20)
-target_link_libraries(hb_hb2 PUBLIC hb::lang)
 hb_enable_warnings(hb_hb2)
 
 # ---------------------------------------------------------------------------
@@ -168,11 +237,6 @@ hb_enable_warnings(hb_hb2)
 # ---------------------------------------------------------------------------
 
 if(HB_BUILD_TOOLS)
-    # The HB-2 without the window: assemble and run a listing, print what it did.
-    add_executable(hb2 tools/hb2.cpp)
-    target_link_libraries(hb2 PRIVATE hb::hb2)
-    hb_enable_warnings(hb2)
-    install(TARGETS hb2 RUNTIME DESTINATION bin)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -213,7 +277,6 @@ if(HB_BUILD_GUI AND HB_QT_FOUND)
     set(HB_UI_HEADERS
         include/timewarp/ui/app_paths.hpp
         include/timewarp/ui/code_editor.hpp
-        include/timewarp/ui/hb2_window.hpp
         include/timewarp/ui/hb_bbs.hpp
         include/timewarp/ui/hb_clock.hpp
         include/timewarp/ui/hb_dos.hpp
@@ -235,7 +298,6 @@ if(HB_BUILD_GUI AND HB_QT_FOUND)
     add_library(hb_ui
         src/ui/app_paths.cpp
         src/ui/code_editor.cpp
-        src/ui/hb2_window.cpp
         src/ui/hb_bbs.cpp
         src/ui/hb_clock.cpp
         src/ui/hb_dos.cpp
@@ -272,7 +334,7 @@ if(HB_BUILD_GUI AND HB_QT_FOUND)
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
     target_compile_features(hb_ui PUBLIC cxx_std_20)
     target_link_libraries(hb_ui PUBLIC ${HB_QT}::Widgets)
-    target_link_libraries(hb_ui PRIVATE hb::lang hb::scheme hb::hb2 hb::canvas_qt)
+    target_link_libraries(hb_ui PRIVATE hb::lang hb::scheme hb::canvas_qt)
     if(${HB_QT}Svg_FOUND)
         target_link_libraries(hb_ui PUBLIC ${HB_QT}::Svg)
         target_compile_definitions(hb_ui PUBLIC TIME_WARP_HAVE_SVG=1)
@@ -293,6 +355,20 @@ if(HB_BUILD_GUI AND HB_QT_FOUND)
     target_link_libraries(hb_launcher PUBLIC hb::ui)
     set_target_properties(hb_launcher PROPERTIES AUTOMOC ON)
     hb_enable_warnings(hb_launcher)
+
+    # The HB-1 on its own: the 6502 machine and the tube it draws on. It is a
+    # separate program from the launcher above because it is a separate machine
+    # -- there is no interpreter behind this window.
+    add_executable(hb1_computer
+        app/hb1_main.cpp
+        src/hb1/window.cpp
+        include/timewarp/hb1/window.hpp
+    )
+    target_link_libraries(hb1_computer PRIVATE hb::hb1 ${HB_QT}::Widgets)
+    target_include_directories(hb1_computer PRIVATE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+    set_target_properties(hb1_computer PROPERTIES AUTOMOC ON)
+    hb_enable_warnings(hb1_computer)
 
     add_executable(hb_computers app/main.cpp)
     target_link_libraries(hb_computers PRIVATE hb::launcher)
@@ -343,13 +419,22 @@ if(HB_BUILD_TESTS)
 
     hb_add_suite(audio_tests hb::lang)
 
-    add_executable(hb2_tests tests/hb2_tests.cpp)
-    target_link_libraries(hb2_tests PRIVATE hb::hb2)
-    target_include_directories(hb2_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    target_compile_definitions(hb2_tests PRIVATE
-        HB2_EXAMPLES="${CMAKE_CURRENT_SOURCE_DIR}/Examples/hb2")
-    hb_enable_warnings(hb2_tests)
-    add_test(NAME hb2_tests COMMAND hb2_tests)
+    # The HB-1: the processor and the machine it is wired into. The ROMs are
+    # assembled first, so these suites run the same bytes the window does.
+    # The 65816 assembler is run as the program the build uses, so the bytes in
+    # its test are the bytes in the ROM.
+    add_executable(hb2_asm_tests tests/hb2_asm_tests.cpp)
+    target_include_directories(hb2_asm_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    target_compile_definitions(hb2_asm_tests PRIVATE
+        HB2ASM_PATH="$<TARGET_FILE:hb2asm>")
+    add_dependencies(hb2_asm_tests hb2asm)
+    hb_enable_warnings(hb2_asm_tests)
+    add_test(NAME hb2_asm_tests COMMAND hb2_asm_tests)
+
+    hb_add_suite(hb1_cpu_tests hb::hb1)
+    hb_add_suite(hb2_cpu_tests hb::hb2)
+    hb_add_suite(hb1_asm_tests hb::hb1)
+    hb_add_suite(hb1_machine_tests hb::hb1)
 
     if(TARGET hb::ui)
         hb_add_suite(canvas_bridge_tests hb::canvas_qt)

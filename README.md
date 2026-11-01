@@ -2,17 +2,23 @@
 
 Two complete computers, and the engines they run on.
 
-- the **HB-1** — a personal computer from a 1982 that never happened: eleven
-  language ROMs in one socket, a prompt, a 64K, a CRT and a disk measured in
-  256-byte sectors; and
+- the **HB-1** — a personal computer from a 1982 that never happened: a 6502 at
+  1 MHz, a 64K, a 40 x 25 tube, a disk measured in 256-byte sectors, an 8 KiB
+  KERNAL and a language ROM in the socket -- real 6502 machine code, assembled
+  from `roms/hb1/` and run by the machine, not by the host; and
 - the **HB-2** — its 1992 successor: a bus, a 640 × 480 framebuffer and a
   blitter, four channels of sampled audio, hardware sprites, and HB-16, a
   processor of the machine's own, with a desktop, a disk and a prompt.
 
 Both are real programs, not screenshots. You can type at them, break them, and
-come back to the same machine. Neither is an emulator: the HB-1 runs a native
-implementation of each of its languages, and the HB-2 runs nine of them on its own
-bus as well as an instruction set you can disassemble.
+come back to the same machine. The HB-1's languages are in its ROMs: the host
+supplies a processor, a tube, a keyboard and a disk, and the interpreter that
+answers `READY.` is 6502 code in the socket. The HB-2 runs nine languages on its
+own bus as well as an instruction set you can disassemble.
+
+The HB-1 is being rebuilt from the processor up; [its firmware
+page](docs/hb1/firmware.md) records what the ROMs contain today and where the
+edge of the implemented language is.
 
 | | |
 | --- | --- |
