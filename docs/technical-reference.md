@@ -340,6 +340,32 @@ been wrong about them before:
 `illegalOpcodes()` and `lastIllegalOpcode()` report what a machine fetched that
 it could not execute, which is how a runaway ROM is caught in a test.
 
+## Kestrel BASIC's numbers
+
+The 1982 machine's arithmetic is 6502 code in the socket ROM, in
+`roms/kestrel/fp.s`, and it is five bytes a number:
+
+| Byte | Holds |
+| --- | --- |
+| 0 | The exponent, biased by 128; an exponent of zero means the number is zero |
+| 1–4 | The mantissa, most significant byte first, with the sign in bit 7 of the first |
+
+The value is `(mantissa / 2^32) * 2^(exponent - 128)`, normalised so the
+mantissa's leading bit is set — that is, `0.5 <= |m| < 1`. Nine significant
+decimal digits fall out of that, and a range from about `2.9E-39` to `1.7E38`.
+
+Both ends are outcomes, and neither is silent:
+
+- **above the top** — the exponent would have to pass 255 — the machine reports
+  `?OVERFLOW`. That is a `JMP` to the error printer from the arithmetic itself;
+  the first attempt at this left the exponent to wrap, which turned `1E39` into
+  `8.6E-39` and `1E38+1E38` into zero;
+- **below the bottom** — the exponent would reach zero, which is the code for
+  zero — the result is zero, quietly. `1E-39`, `1E-38/100` and `EXP(-90)` are all
+  `0`.
+
+The Kestrel 16 has no floating point at all: sixteen-bit integers, which wrap.
+
 ## What the machines do not have
 
 - **No floating point hardware.** Kestrel BASIC's arithmetic is 6502 code in the

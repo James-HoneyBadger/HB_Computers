@@ -956,6 +956,25 @@ void test_junk_after_a_statement_is_an_error() {
     TW_CHECK(screen.find("?UNDEF'D STATEMENT ERROR") != std::string::npos);
 }
 
+void test_the_numbers_end_where_they_end() {
+    // Five-byte floating point runs from about 2.9E-39 to 1.7E38. Above the top
+    // the machine says so; below the bottom there is nothing to say, and the
+    // answer is zero. Left to wrap in an exponent byte, 1E39 came back as
+    // 8.63616842E-39 and 1E38+1E38 as 0.
+    TW_CHECK(screenAfter("PRINT 1E39").find("?OVERFLOW ERROR") != std::string::npos);
+    TW_CHECK(screenAfter("PRINT 1E38+1E38").find("?OVERFLOW ERROR") != std::string::npos);
+    TW_CHECK(screenAfter("PRINT 1E37*100").find("?OVERFLOW ERROR") != std::string::npos);
+    TW_CHECK(screenAfter("PRINT -1E39").find("?OVERFLOW ERROR") != std::string::npos);
+    TW_CHECK(screenAfter("PRINT EXP(200)").find("?OVERFLOW ERROR") != std::string::npos);
+    TW_CHECK_EQ(asked("PRINT 1E-39"), std::string{"0"});
+    TW_CHECK_EQ(asked("PRINT 1E-38/100"), std::string{"0"});
+    TW_CHECK_EQ(asked("PRINT EXP(-90)"), std::string{"0"});
+    // What does fit still prints, at both ends.
+    TW_CHECK(asked("PRINT 1E38").find("E+37") != std::string::npos);
+    TW_CHECK(asked("PRINT 1E-38").find("E-39") != std::string::npos);
+    TW_CHECK_EQ(asked("PRINT 1E37*10"), std::string{"9.99999986E+37"});
+}
+
 void test_mid_takes_a_position_from_one() {
     TW_CHECK_EQ(asked("PRINT MID$(" "\"HELLO\"" ",2,3)"), std::string{"ELL"});
     TW_CHECK_EQ(asked("PRINT LEN(MID$(" "\"HELLO\"" ",9))"), std::string{"0"});
@@ -1004,6 +1023,7 @@ int main() {
     test_on_gosub_returns_to_the_next_statement();
     test_if_needs_its_then();
     test_junk_after_a_statement_is_an_error();
+    test_the_numbers_end_where_they_end();
     test_mid_takes_a_position_from_one();
     return tw::test::summary("kestrel_machine_tests");
 }

@@ -298,7 +298,11 @@ FADD_STORE:
 FADD_RESULT_ZERO:
         JMP FZERO
 FADD_OVERFLOW:
-        JMP FZERO              ; the caller turns a silent zero into ?OVERFLOW
+        ; The carry out of the mantissa pushed the exponent past 255: there is
+        ; no number here that big, and saying so is the honest answer. It used
+        ; to come back as a silent zero, which no caller ever turned into
+        ; ?OVERFLOW as the comment promised.
+        JMP FP_OVERFLOW
 
 ; SHIFT_A_RIGHT: A >>= B_EXP, dropping what falls off the end.
 SHIFT_A_RIGHT:
@@ -357,6 +361,16 @@ SWAP_AB_LOOP:
         BNE SWAP_AB_LOOP
         RTS
 
+; FP_OVERFLOW: the result is outside the range an exponent byte can hold.
+; ARITHMETIC
+; ---------------------------------------------------------------------------
+
+; The one place a result too large for the format is reported. ERROR lives in
+; the language ROM, which is the only image that includes this file.
+FP_OVERFLOW:
+        LDA #E_OVERFLOW
+        JMP ERROR
+
 ; ---------------------------------------------------------------------------
 ; Multiplication
 ; ---------------------------------------------------------------------------
@@ -387,13 +401,27 @@ FMUL:
 
         ; The exponent adds: value = mF*mA * 2^(eF+eA-256), and the product
         ; mF*mA/2^64 keeps the same meaning, so the stored exponent is
-        ; eF+eA-128.
+        ; eF+eA-128. The sum is nine bits, and both ends of its range are
+        ; outcomes of their own: below 129 the product is smaller than this
+        ; number can hold and is zero, and above 383 it is larger and is
+        ; ?OVERFLOW. Left to wrap in eight bits, 1E39 came back as 8.6E-39.
         LDA B_FAC
         CLC
         ADC B_ARG
+        BCS FMUL_EXP_HIGH
+        CMP #129                ; eF+eA <= 128: the exponent would be zero or less
+        BCC FMUL_ZERO
         SEC
         SBC #128
         STA B_DIGITS
+        JMP FMUL_EXP_OK
+FMUL_EXP_HIGH:
+        CMP #128                ; the sum was 256+this; the exponent wants <= 255
+        BCS FMUL_OVERFLOW
+        CLC
+        ADC #128
+        STA B_DIGITS
+FMUL_EXP_OK:
 
         ; 32 rounds of shift and add: P <<= 1, and if the top bit of B is set,
         ; P's low half gains A.
@@ -487,6 +515,8 @@ FMUL_STORE:
         LDA B_WORK+3
         STA B_FAC+4
         RTS
+FMUL_OVERFLOW:
+        JMP FP_OVERFLOW
 FMUL_ZERO:
         JMP FZERO
 
@@ -518,12 +548,27 @@ FDIV:
         JSR LOADFAC
         JSR LOADARG
 
+        ; The exponent subtracts: the quotient's exponent is eF-eA+128. The
+        ; difference is nine bits with a sign, and dropping the borrow -- which
+        ; is what adding 128 modulo 256 did -- put 1E-38/100 in the region of
+        ; 1E37. Too small is zero; too large is ?OVERFLOW.
         LDA B_FAC
         SEC
         SBC B_ARG
+        BCC FDIV_EXP_NEG
+        CMP #128                ; eF-eA >= 128: the exponent would pass 255
+        BCS FMUL_OVERFLOW
         CLC
         ADC #128
         STA B_DIGITS
+        JMP FDIV_EXP_OK
+FDIV_EXP_NEG:
+        CMP #129                ; the byte is eF-eA+256; the exponent wants >= 1
+        BCC FDIV_ZERO
+        SEC
+        SBC #128
+        STA B_DIGITS
+FDIV_EXP_OK:
 
         ; The long division wants |A| < |B|; when it is not, A is halved and
         ; the exponent carries the difference.
@@ -531,6 +576,7 @@ FDIV:
         BCC FDIV_READY
         JSR SHR_A
         INC B_DIGITS
+        BEQ FMUL_OVERFLOW
 FDIV_READY:
         ; R (five bytes) = A, so the extra bit has somewhere to go.
         LDA #0

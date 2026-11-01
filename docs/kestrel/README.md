@@ -252,7 +252,8 @@ mistaken for it. `STEP` may be negative; `STEP 0` loops for ever, as it did then
 `>=`. `AND`, `OR` and `NOT` combine comparisons. `+` also joins two strings, and
 strings compare with the same operators (the shorter sorts first when one is a
 prefix of the other). Numbers are five-byte floating point: `1`, `2.5`, `-3` and
-`1E3` all parse.
+`1E3` all parse. The format holds about `2.9E-39` to `1.7E38`: past the top it
+says `?OVERFLOW`, and past the bottom the answer is `0`.
 
 ### Variables and arrays
 

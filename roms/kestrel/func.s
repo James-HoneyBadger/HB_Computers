@@ -325,23 +325,32 @@ EXP_BODY:
         JSR SETPTR
         JSR FACTO
         JSR FTOI
-        BCS EXP_OVERFLOW
+        BCC EXP_K_INT
+        ; Too big for sixteen bits either way: which end depends on the sign
+        ; of x, which was kept in B_SCR2 while all this was computed.
+        LDA B_SCR2+1
+        BMI EXP_UNDERFLOW
+        JMP EXP_OVERFLOW
+EXP_K_INT:
         STA B_INT2
         STY B_INT2+1
         ; The scale factor has to fit in the exponent, which is one byte, so
-        ; it may run from -127 to 126.
+        ; it may run from -127 to 126. Above that the answer is too big and
+        ; below it the answer is too small -- which is zero, not an error.
         LDA B_INT2+1
-        BNE EXP_K_NEGATIVE
+        BPL EXP_K_POSITIVE
+        CMP #$FF
+        BNE EXP_UNDERFLOW
+        LDA B_INT2
+        CMP #$81
+        BCC EXP_UNDERFLOW
+        JMP EXP_K_OK
+EXP_K_POSITIVE:
+        BNE EXP_OVERFLOW        ; a high byte of one or more: past 255
         LDA B_INT2
         CMP #127
         BCS EXP_OVERFLOW
         JMP EXP_K_OK
-EXP_K_NEGATIVE:
-        CMP #$FF
-        BNE EXP_OVERFLOW
-        LDA B_INT2
-        CMP #$81
-        BCC EXP_OVERFLOW
 EXP_K_OK:
         ; r = x - k*ln2
         LDA #<B_SCR3
@@ -377,6 +386,11 @@ EXP_K_OK:
         ADC B_INT2
         STA B_FAC
         RTS
+EXP_UNDERFLOW:
+        ; e^-90 is smaller than this format holds, and zero is what it has to
+        ; come back as: the same rule the arithmetic uses for any result that
+        ; falls off the bottom.
+        JMP FZERO
 EXP_OVERFLOW:
         LDA #E_OVERFLOW
         JMP ERROR

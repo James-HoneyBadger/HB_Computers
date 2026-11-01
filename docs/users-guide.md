@@ -163,6 +163,21 @@ A$="AB":PRINT A$<"ABC"
 Numbers are five-byte floating point, so `1`, `2.5`, `-3` and `1E3` all parse,
 and `10/4` is `2.5` rather than `2`.
 
+The range runs from about `2.9E-39` to `1.7E38`, and both ends say what they mean:
+
+```basic
+PRINT 1E38
+9.99999986E+37
+PRINT 1E39
+
+?OVERFLOW ERROR
+PRINT 1E-39
+0
+```
+
+A result above the top is `?OVERFLOW`. One below the bottom is zero — there is no
+number to report and none to print, so the machine prints the zero it has.
+
 ---
 
 ## Functions
@@ -175,7 +190,7 @@ and `10/4` is `2.5` rather than `2`.
 | `SQR(x)` | the square root |
 | `RND(1)` | a number from 0 up to but not including 1, from the machine's noise generator |
 | `PEEK(a)` | the byte at `a` |
-| `SIN` `COS` `TAN` `ATN` `EXP` `LOG` | the usual meanings |
+| `SIN` `COS` `TAN` `ATN` `EXP` `LOG` | the usual meanings. An angle too large to reduce is `?OVERFLOW`; `EXP` of a large negative number is zero |
 | `LEN(A$)` | how many characters |
 | `ASC(A$)` | the code of the first character |
 | `CHR$(n)` | the character with that code |
