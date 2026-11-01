@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 //
-// kestrel_asm -- the Kestrel's ROM assembler.
+// kestrel16_asm -- the Kestrel 16's ROM assembler.
 //
-// The Kestrel's languages are not tables in this repository's C++ any more: they
-// are 6502 machine code, assembled from `roms/kestrel/*.s` at build time into the
-// images the machine boots. This is the tool that turns the sources into those
-// images, and it is deliberately small -- a two-phase assembler for the
-// WDC 65C816 instruction set plus the handful of directives the ROMs need:
+// The Kestrel 16's languages are machine code too: assembled from
+// `roms/kestrel16/*.s` at build time into the images the machine boots. This is
+// `kestrel_asm` with the WDC 65C816 added -- the wider registers, the banks, and
+// the addressing modes the 6502 did not have -- plus the directives the ROMs
+// need:
 //
-//   kestrel_asm basic.s --origin $A000 --size 16384 --fill $FF
+//   kestrel16_asm basic.s --origin 0x10000 --size 65536 --fill $FF
 //          --header basic_rom.hpp --symbols basic.sym --listing basic.lst
 //
 // Layout is resolved by iterating to a fixed point (rather than the usual single
@@ -1641,6 +1641,14 @@ private:
                 emitByte(current, stmt, emit, op->code);
                 emitByte(current, stmt, emit,
                          static_cast<std::uint8_t>(offset & 0xFF));
+            } else if (op->code == 0x80) {
+                // BRA is the one branch with no inverse: $80 ^ $20 is $A0,
+                // which is LDY, not a branch. A BRA that cannot reach is a JMP.
+                emitByte(current, stmt, emit, 0x4C);
+                emitByte(current, stmt, emit,
+                         static_cast<std::uint8_t>(value & 0xFF));
+                emitByte(current, stmt, emit,
+                         static_cast<std::uint8_t>((value >> 8) & 0xFF));
             } else {
                 emitByte(current, stmt, emit,
                          static_cast<std::uint8_t>(op->code ^ 0x20));

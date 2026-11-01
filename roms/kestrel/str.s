@@ -368,6 +368,15 @@ FN_MID:
         JSR FTOI
         BCS ERR_ILLEGAL_QUANTITY
         STA B_INT2
+        CPY #0
+        BEQ FN_MID_START_LOW
+        BPL FN_MID_START_OK     ; 256 or more is simply past the end
+        JMP ERR_ILLEGAL_QUANTITY
+FN_MID_START_LOW:
+        LDA B_INT2
+        BNE FN_MID_START_OK
+        JMP ERR_ILLEGAL_QUANTITY ; counting from one, so zero is not a position
+FN_MID_START_OK:
         JSR SKIPSP
         JSR CURCHAR
         CMP #','
@@ -376,6 +385,10 @@ FN_MID:
         JSR EXPR                ; how many, when it is given
         JSR FTOI
         BCS ERR_ILLEGAL_QUANTITY
+        CPY #0
+        BPL FN_MID_COUNT_OK
+        JMP ERR_ILLEGAL_QUANTITY ; a negative count is not a count
+FN_MID_COUNT_OK:
         STA B_INT2+1
         JMP FN_MID_CLOSE
 FN_MID_TO_END:
@@ -389,9 +402,11 @@ FN_MID_CLOSE:
         STA B_INT2
         CMP B_STRLEN3
         BCC FN_MID_INSIDE
-        LDA #0                  ; starting past the end leaves nothing
-        STA B_STRLEN
+        ; Starting past the end leaves nothing. The kept string has to come back
+        ; first, because restoring it brings its length with it.
         JSR STRKEPT
+        LDA #0
+        STA B_STRLEN
         JMP STRSET
 FN_MID_INSIDE:
         LDA B_STRLEN3

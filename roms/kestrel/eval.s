@@ -127,28 +127,11 @@ FAC2ARG:
 ; ---------------------------------------------------------------------------
 
 ; KEYMATCH: the zero-terminated keyword at (ZP_PTR2) matches at (B_IPTR)?
-; Carry set when it does, and (B_IPTR) has moved past it.
+; Carry set when it does, and (B_IPTR) has moved past it. This is the statement
+; keywords' own matcher, so an operator is read by the same rule a statement is:
+; the word has to end where the keyword does, and a failed match moves nothing.
 KEYMATCH:
-        LDY #0
-KEYMATCH_LOOP:
-        LDA (ZP_PTR2),Y
-        BEQ KEYMATCH_YES
-        PHA
-        JSR CURCHAR
-        JSR UPPER
-        STA B_TEMP
-        PLA
-        CMP B_TEMP
-        BNE KEYMATCH_NO
-        JSR ADV
-        INY
-        JMP KEYMATCH_LOOP
-KEYMATCH_YES:
-        SEC
-        RTS
-KEYMATCH_NO:
-        CLC
-        RTS
+        JMP MATCHKW
 
 KW_OR:   .asciiz "OR"
 KW_AND:  .asciiz "AND"
@@ -168,10 +151,8 @@ EXPR_OR:
 EXPR_OR_LOOP:
         JSR SKIPSP
         LDA #<KW_OR
-        STA ZP_PTR2
-        LDA #>KW_OR
-        STA ZP_PTR2+1
-        JSR KEYMATCH
+        LDY #>KW_OR
+        JSR TRY
         BCC EXPR_OR_DONE
         JSR PUSHNUM
         JSR EXPR_AND
@@ -203,10 +184,8 @@ EXPR_AND:
 EXPR_AND_LOOP:
         JSR SKIPSP
         LDA #<KW_AND
-        STA ZP_PTR2
-        LDA #>KW_AND
-        STA ZP_PTR2+1
-        JSR KEYMATCH
+        LDY #>KW_AND
+        JSR TRY
         BCC EXPR_AND_DONE
         JSR PUSHNUM
         JSR EXPR_NOT
@@ -234,15 +213,9 @@ EXPR_AND_DONE:
 
 EXPR_NOT:
         JSR SKIPSP
-        LDA B_IPTR
-        STA B_TMPP
-        LDA B_IPTR+1
-        STA B_TMPP+1
         LDA #<KW_NOT
-        STA ZP_PTR2
-        LDA #>KW_NOT
-        STA ZP_PTR2+1
-        JSR KEYMATCH
+        LDY #>KW_NOT
+        JSR TRY
         BCC EXPR_NOT_PLAIN
         JSR EXPR_NOT
         LDA B_FAC
@@ -257,10 +230,6 @@ EXPR_NOT_TRUE:
         JSR FTRUE
         RTS
 EXPR_NOT_PLAIN:
-        LDA B_TMPP
-        STA B_IPTR
-        LDA B_TMPP+1
-        STA B_IPTR+1
         JMP EXPR_REL
 
 ; FTRUE / FZERO into FAC as true (-1) and false (0).

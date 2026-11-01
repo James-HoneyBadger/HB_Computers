@@ -829,6 +829,11 @@ int Cpu65816::step() {
     case Op::Sei: setFlag(kIrqDisable, true); break;
     case Op::Clv: setFlag(kOverflow, false); break;
     case Op::Jmp:
+        // JMP stays in the program bank: the bank of the effective address is
+        // DBR, which has nothing to do with where the jump lands. Taking it
+        // from the address sent a jump in a bank-1 ROM to bank zero.
+        pc_ = static_cast<std::uint16_t>(ea & 0xFFFF);
+        break;
     case Op::Jml:
         pbr_ = static_cast<std::uint8_t>(ea >> 16);
         pc_ = static_cast<std::uint16_t>(ea & 0xFFFF);

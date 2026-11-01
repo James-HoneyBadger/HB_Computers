@@ -64,13 +64,29 @@ BASIC_DIRECT:
         STA B_MODE
         JSR RESET_STACKS
 BASIC_DIRECT_STMT:
-        JSR EXEC_STMT
         JSR SKIPSP
         JSR CURCHAR
+        BEQ BASIC_WARM          ; the end of the line
         CMP #':'
-        BNE BASIC_WARM
+        BNE BASIC_DIRECT_EXEC
         JSR ADV
         JMP BASIC_DIRECT_STMT
+BASIC_DIRECT_EXEC:
+        JSR EXEC_STMT
+        BCS BASIC_DIRECT_CONTROL
+        JMP BASIC_DIRECT_STMT
+; GOTO and GOSUB typed at the prompt start the program running, as they did on
+; the machines this one remembers: the variables stay, the program runs from the
+; line that was named.
+BASIC_DIRECT_CONTROL:
+        LDA B_FLAGS
+        AND #1
+        BEQ BASIC_DIRECT_STMT
+        LDA #0
+        STA B_FLAGS
+        LDA #1
+        STA B_MODE
+        JMP RUN_LOOP
 
 ; RESET_STACKS: an empty value stack, no loops, no subroutines pending.
 RESET_STACKS:
@@ -1079,10 +1095,12 @@ DO_IF:
         ORA B_FAC+3
         ORA B_FAC+4
         BEQ IF_FALSE
-        ; The THEN is optional, as it was on machines of the period.
+        ; THEN is part of the statement: the error table has a reason for its
+        ; absence, and a line number or a statement has to follow it.
         LDA #<KW_THEN
         LDY #>KW_THEN
         JSR TRY
+        BCC ERR_IF_WITHOUT_THEN
         JSR SKIPSP
         JSR CURCHAR
         CMP #'0'
@@ -1833,6 +1851,9 @@ ERR_UNDEF_LINE:
 ERR_RETURN:
         LDA #E_RETURN_WITHOUT_GOSUB
         JMP ERROR
+ERR_IF_WITHOUT_THEN:
+        LDA #E_IF_WITHOUT_THEN
+        JMP ERROR
 ERR_NEXT_WITHOUT_FOR:
         LDA #E_NEXT_WITHOUT_FOR
         JMP ERROR
@@ -2141,7 +2162,9 @@ ON_JUMP:
 ON_JUMP_OK:
         LDA B_ONFLAG
         BEQ ON_JUMP_GO
-        ; a subroutine returns to the statement after this one
+        ; A subroutine returns to the statement after this one, so the rest of
+        ; the list is stepped over first: a comma is not where a line resumes.
+        JSR ON_SKIP
         LDX B_GOSUBSP
         CPX #GOSUB_MAX
         BCS ERR_OUT_OF_MEMORY

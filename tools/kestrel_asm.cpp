@@ -1209,6 +1209,14 @@ private:
                 emitByte(current, stmt, emit, op->code);
                 emitByte(current, stmt, emit,
                          static_cast<std::uint8_t>(offset & 0xFF));
+            } else if (op->code == 0x80) {
+                // BRA is the one branch with no inverse: $80 ^ $20 is $A0,
+                // which is LDY, not a branch. A BRA that cannot reach is a JMP.
+                emitByte(current, stmt, emit, 0x4C);
+                emitByte(current, stmt, emit,
+                         static_cast<std::uint8_t>(value & 0xFF));
+                emitByte(current, stmt, emit,
+                         static_cast<std::uint8_t>((value >> 8) & 0xFF));
             } else {
                 emitByte(current, stmt, emit,
                          static_cast<std::uint8_t>(op->code ^ 0x20));

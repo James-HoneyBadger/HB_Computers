@@ -30,6 +30,7 @@ ZP_CH           = $41           ; the character under the pointer
 ZP_FLAG         = $42           ; PRINT's separator state
 ZP_VAR          = $43           ; which variable an assignment is writing
 ZP_BAD          = $44           ; an expression held something unreadable
+ZP_SGN          = $45           ; 16-bit: 1 when the quotient's sign is negative
 
 VARS            = $0007C0       ; twenty-six words, A to Z
 
@@ -485,12 +486,56 @@ TERM_DIV:
         PLY
         REP #$20
         TXA
-        STA ZP_B
+        STA ZP_B                ; the divisor
         TYA
-        STA ZP_A
-        JSR UDIV16
-        REP #$20
+        STA ZP_A                ; the dividend
+        ; UDIV16 divides magnitudes, so the signs come off first and go back on
+        ; afterwards: a negative dividend or divisor would otherwise be read as a
+        ; number near $FFxx, and -8/2 would come back as 32764.
+        LDA.W #0
+        STA ZP_SGN
         LDA ZP_A
+        BPL DIV_A_POSITIVE
+        LDA.W #0
+        SEC
+        SBC ZP_A
+        STA ZP_A
+        INC ZP_SGN
+DIV_A_POSITIVE:
+        LDA ZP_B
+        BPL DIV_B_POSITIVE
+        LDA.W #0
+        SEC
+        SBC ZP_B
+        STA ZP_B
+        INC ZP_SGN
+DIV_B_POSITIVE:
+        LDA ZP_B
+        BEQ DIV_BY_ZERO
+        JSR UDIV16              ; comes back with an eight-bit accumulator
+        REP #$20
+        LDA ZP_SGN
+        AND.W #1                ; a word immediate: the accumulator is wide here
+        BEQ DIV_QUOTIENT
+        LDA.W #0
+        SEC
+        SBC ZP_A
+        STA ZP_A
+DIV_QUOTIENT:
+        LDA ZP_A
+        TAX
+        SEP #$20
+        PHX
+        BRA TERM_LOOP
+DIV_BY_ZERO:
+        ; The machine has one way of saying a value is not one: ZP_BAD, which
+        ; PRINT reads before it prints anything, so the line stops here.
+        SEP #$20
+        LDA #1
+        STA ZP_BAD
+        JSR SAY_WHAT
+        REP #$20
+        LDA.W #0
         TAX
         SEP #$20
         PHX

@@ -189,6 +189,14 @@ void test_labels_and_branches(const fs::path& tool) {
         expected.push_back(0x60);
         expect(tool, "  BNE far\n  .fill 200, $EA\nfar:\n  RTS", expected);
     }
+    // BRA has no inverse, so a BRA that cannot reach becomes a plain JMP: the
+    // inverse-branch expansion would have emitted LDY here.
+    {
+        std::vector<std::uint8_t> expected{0x4C, 0xCB, 0x80};
+        expected.insert(expected.end(), 200, 0xEA);
+        expected.push_back(0x60);
+        expect(tool, "  BRA far\n  .fill 200, $EA\nfar:\n  RTS", expected);
+    }
     // A forward reference that has to settle on the wide form still converges.
     expect(tool, "  .word later\n  NOP\nlater:\n  RTS",
            {0x03, 0x80, 0xEA, 0x60});

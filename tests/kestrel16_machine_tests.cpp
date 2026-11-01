@@ -261,6 +261,35 @@ void test_the_screen_is_the_roms() {
     TW_CHECK_EQ(booted.machine().video().cellAt(0, 0), std::uint8_t{'X'});
 }
 
+
+void test_signed_division() {
+    // Division is on signed sixteen-bit values: the sign comes off before the
+    // divide and goes back on afterwards, and the quotient rounds towards zero.
+    Booted booted;
+    booted.run("PRINT 8/2");
+    TW_CHECK_EQ(booted.answer(), std::string{"4"});
+    booted.run("PRINT -8/2");
+    TW_CHECK_EQ(booted.answer(), std::string{"-4"});
+    booted.run("PRINT 8/-2");
+    TW_CHECK_EQ(booted.answer(), std::string{"-4"});
+    booted.run("PRINT -7/2");
+    TW_CHECK_EQ(booted.answer(), std::string{"-3"});
+    booted.run("PRINT 8/-2");
+    TW_CHECK_EQ(booted.answer(), std::string{"-4"});
+    booted.run("PRINT -7/4");
+    TW_CHECK_EQ(booted.answer(), std::string{"-1"});
+    booted.run("PRINT 100/-3");
+    TW_CHECK_EQ(booted.answer(), std::string{"-33"});
+    booted.run("PRINT -32768/2");
+    TW_CHECK_EQ(booted.answer(), std::string{"-16384"});
+    booted.run("PRINT 0/5");
+    TW_CHECK_EQ(booted.answer(), std::string{"0"});
+    // A divisor of zero is not a number this machine can give.
+    Booted byZero;
+    byZero.run("PRINT 1/0");
+    TW_CHECK(byZero.shows("?WHAT?"));
+}
+
 }  // namespace
 
 int main() {
@@ -278,5 +307,6 @@ int main() {
     test_the_disk_is_a_sector_store();
     test_the_frame_and_the_keyboard();
     test_the_screen_is_the_roms();
+    test_signed_division();
     return tw::test::summary("kestrel16_machine_tests");
 }

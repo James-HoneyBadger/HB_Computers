@@ -885,6 +885,84 @@ void test_string_arrays() {
     TW_CHECK((answerAfter(read, "RUN")) == "ABBCCC");
 }
 
+/// A fresh machine that has typed one line, and the line the machine printed
+/// under it.
+std::string asked(std::string_view line) {
+    Machine machine{Model::Kestrel};
+    machine.runFrames(20);
+    typeOut(machine, line);
+    return answerAfter(machine, line);
+}
+
+/// The same, for the checks that need the whole screen as well as the answer.
+std::string screenAfter(std::string_view line) {
+    Machine machine{Model::Kestrel};
+    machine.runFrames(20);
+    typeOut(machine, line);
+    return screenText(machine);
+}
+
+void test_logical_operators() {
+    // AND, OR and NOT are the documented way to combine comparisons, and each
+    // one read its keyword a character at a time until it did not.
+    TW_CHECK_EQ(asked("PRINT 1 AND 0"), std::string{"0"});
+    TW_CHECK_EQ(asked("PRINT 1 AND 1"), std::string{"-1"});
+    TW_CHECK_EQ(asked("PRINT 0 OR 1"), std::string{"-1"});
+    TW_CHECK_EQ(asked("PRINT 0 OR 0"), std::string{"0"});
+    TW_CHECK_EQ(asked("PRINT NOT 0"), std::string{"-1"});
+    TW_CHECK_EQ(asked("PRINT NOT 1"), std::string{"0"});
+    TW_CHECK_EQ(asked("PRINT (1<2) AND (3>2)"), std::string{"-1"});
+    TW_CHECK_EQ(asked("PRINT (1<2) AND (3<2)"), std::string{"0"});
+    TW_CHECK_EQ(asked("PRINT (1<2) OR (3>2)"), std::string{"-1"});
+}
+
+void test_a_direct_line_runs_its_statements() {
+    // A line typed at the prompt runs the way the same line would in a program:
+    // IF runs what follows THEN, and a colon moves on to the next statement.
+    TW_CHECK_EQ(asked("IF 1 THEN PRINT 5"), std::string{"5"});
+    TW_CHECK_EQ(asked("IF 0 THEN PRINT 5"), std::string{"READY."});
+    TW_CHECK_EQ(asked("IF 1 THEN PRINT 5:PRINT 6"), std::string{"5"});
+    TW_CHECK_EQ(asked("PRINT 1:PRINT 2"), std::string{"1"});
+}
+
+void test_on_gosub_returns_to_the_next_statement() {
+    Machine machine{Model::Kestrel};
+    machine.runFrames(20);
+    typeOut(machine, "10 ON 1 GOSUB 100,200");
+    typeOut(machine, "20 PRINT \"BACK\":END");
+    typeOut(machine, "100 PRINT \"A\":RETURN");
+    typeOut(machine, "200 PRINT \"B\":RETURN");
+    typeOut(machine, "RUN");
+    const std::string screen = screenText(machine);
+    TW_CHECK(screen.find("A") != std::string::npos);
+    TW_CHECK(screen.find("BACK") != std::string::npos);
+    TW_CHECK(screen.find("UNDEF'D STATEMENT") == std::string::npos);
+}
+
+void test_if_needs_its_then() {
+    // The error table has a reason for a missing THEN, and the machine gives it.
+    Machine machine{Model::Kestrel};
+    machine.runFrames(20);
+    typeOut(machine, "10 IF 1 PRINT 5");
+    typeOut(machine, "RUN");
+    TW_CHECK(screenText(machine).find("?IF WITHOUT THEN ERROR IN 10") !=
+             std::string::npos);
+}
+
+void test_junk_after_a_statement_is_an_error() {
+    // The rest of the line is a statement, and a word that is not one is named
+    // as an undefined statement rather than quietly dropped.
+    const std::string screen = screenAfter("PRINT 1 GARBAGE");
+    TW_CHECK(screen.find("?UNDEF'D STATEMENT ERROR") != std::string::npos);
+}
+
+void test_mid_takes_a_position_from_one() {
+    TW_CHECK_EQ(asked("PRINT MID$(" "\"HELLO\"" ",2,3)"), std::string{"ELL"});
+    TW_CHECK_EQ(asked("PRINT LEN(MID$(" "\"HELLO\"" ",9))"), std::string{"0"});
+    const std::string zero = screenAfter("PRINT MID$(" "\"HELLO\"" ",0)");
+    TW_CHECK(zero.find("?ILLEGAL QUANTITY ERROR") != std::string::npos);
+}
+
 }  // namespace
 
 int main() {
@@ -921,5 +999,11 @@ int main() {
     test_stop_and_continue();
     test_defined_functions();
     test_string_arrays();
+    test_logical_operators();
+    test_a_direct_line_runs_its_statements();
+    test_on_gosub_returns_to_the_next_statement();
+    test_if_needs_its_then();
+    test_junk_after_a_statement_is_an_error();
+    test_mid_takes_a_position_from_one();
     return tw::test::summary("kestrel_machine_tests");
 }

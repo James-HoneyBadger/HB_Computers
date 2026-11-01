@@ -115,6 +115,41 @@ void test_register_widths() {
     }
 }
 
+void test_jumps_stay_in_their_bank() {
+    // JMP is a jump inside the program bank: the address is sixteen bits and
+    // the bank does not move, whatever the data bank holds.
+    {
+        Run run{0x018000, {0x4C, 0x34, 0x12}};  // JMP $1234
+        run.cpu.setRegisters([&] {
+            auto registers = run.regs();
+            registers.dbr = 0x07;
+            return registers;
+        }());
+        run.step();
+        TW_CHECK_EQ(run.regs().pc, 0x1234);
+        TW_CHECK_EQ(run.regs().pbr, 0x01);
+    }
+    // JML is the long form, and the bank is part of the address.
+    {
+        Run run{0x008000, {0x5C, 0x34, 0x12, 0x03}};  // JML $031234
+        run.step();
+        TW_CHECK_EQ(run.regs().pc, 0x1234);
+        TW_CHECK_EQ(run.regs().pbr, 0x03);
+    }
+    // JSR and JSL follow the same rule as their jumps.
+    {
+        Run run{0x018000, {0x20, 0x34, 0x12}};  // JSR $1234
+        run.cpu.setRegisters([&] {
+            auto registers = run.regs();
+            registers.dbr = 0x07;
+            return registers;
+        }());
+        run.step();
+        TW_CHECK_EQ(run.regs().pc, 0x1234);
+        TW_CHECK_EQ(run.regs().pbr, 0x01);
+    }
+}
+
 void test_emulation() {
     // Emulation mode is the 6502: the registers are eight bits, the stack is in
     // page one, and the direct page is zero however it was set.
@@ -472,6 +507,7 @@ void test_irq() {
 
 int main() {
     test_register_widths();
+    test_jumps_stay_in_their_bank();
     test_emulation();
     test_banks();
     test_direct_page();
