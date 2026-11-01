@@ -79,26 +79,29 @@ void test_poking_the_sound_latch_reaches_the_voice() {
                                                       HbMemory::kSoundLatch)), 0);
 }
 
-// A self-test that prints "OK" without testing anything is the same lie as a
-// hardcoded MEM line. This one walks the RAM and sums the ROM table, and says what
-// it found.
+// The boot screen is the machine's flash: a title, the memory it has, who made
+// it, then the prompt. The memory figure is checked before it is printed, so it is
+// a reading rather than a label.
 
-void test_the_self_test_counts_the_memory_it_has() {
+void test_the_boot_flash_states_the_memory_it_has() {
     clearMachineSettings();
     RetroComputerWindow machine;
     const QString boot = machine.consoleView()->toPlainText();
-    TW_CHECK(boot.contains(QStringLiteral("HB-1 SELF TEST")));
-    TW_CHECK(boot.contains(QStringLiteral("BYTES FREE")));
-    TW_CHECK(boot.contains(QStringLiteral("RAM CHECK OK")));
-    TW_CHECK(boot.contains(QStringLiteral("ROM CHECK OK (11 ROMS")));
+    TW_CHECK(boot.contains(QStringLiteral("**** HB-1 BASIC V2.0 ROM ****")));
+    TW_CHECK(boot.contains(QStringLiteral("64K RAM SYSTEM")));
+    TW_CHECK(boot.contains(QStringLiteral("32768 BYTES FREE")));
+    TW_CHECK(boot.contains(QStringLiteral("(C) 1982 HB SYSTEMS")));
+    TW_CHECK(boot.trimmed().endsWith(QStringLiteral("READY.")));
 
-    // Short and Off are promises about how much the machine says: neither can print a
-    // self-test and still keep them.
+    // Short is a promise about how much the machine says: the title and the
+    // memory, and none of the small print.
     RetroComputerSettings short_banner = machine.settings();
     short_banner.banner = BootBanner::Short;
     machine.setSettings(short_banner);
     machine.reboot();
-    TW_CHECK(!machine.consoleView()->toPlainText().contains(QStringLiteral("SELF TEST")));
+    const QString short_boot = machine.consoleView()->toPlainText();
+    TW_CHECK(short_boot.contains(QStringLiteral("HB-1 BASIC V2.0 ROM")));
+    TW_CHECK(!short_boot.contains(QStringLiteral("1982")));
 }
 
 
@@ -123,7 +126,7 @@ void test_the_power_switch_turns_the_machine_off_and_on() {
     TW_CHECK(machine.clock()->running());
     // Powering on is a cold boot, and a cold boot chirps.
     TW_CHECK_EQ(machine.voice()->count(MachineVoice::Event::Boot), boots + 1);
-    TW_CHECK(machine.consoleView()->toPlainText().contains(QStringLiteral("SELF TEST")));
+    TW_CHECK(machine.consoleView()->toPlainText().contains(QStringLiteral("HB-1 BASIC V2.0 ROM")));
 }
 
 // The clock is the machine's, and the frame register is how a program reads it.

@@ -213,9 +213,9 @@ Eight listings in [Examples/hb2](../../Examples/hb2), each gated by `hb2_tests` 
 ## The window
 
 `./build/hb_computers --hb2`, or the launcher's **HB-2** button. It powers on into
-**HB-OS**: the two demo processes from `Examples/hb2/` are started on the desktop,
-each printing into its own window, and the listing that painted the desktop is in
-the Program page. A machine with nothing in its RAM would run forty kilobytes of
+**HB-OS** at 640 × 480: the two demo processes from `Examples/hb2/` are started
+on the desktop, each in a framed window with a title bar and a menu bar, and the
+listing that painted the desktop is in the Program page. A machine with nothing in its RAM would run forty kilobytes of
 zeroes and fault by the second frame, which is not a 1992 computer anyone would
 have bought.
 

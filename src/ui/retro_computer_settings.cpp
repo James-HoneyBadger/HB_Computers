@@ -95,7 +95,7 @@ void RetroComputerWindow::restoreSettings() {
     const Language saved =
         languageFromKey(settings.value(QStringLiteral("language")).toString());
     const int saved_mode =
-        settings.value(QStringLiteral("mode"), static_cast<int>(ScreenMode::Split)).toInt();
+        settings.value(QStringLiteral("mode"), static_cast<int>(ScreenMode::Text)).toInt();
     if (settings_.remember_programs) {
         for (const Language language : allLanguages()) {
             const QString source =
@@ -235,43 +235,72 @@ bool RetroComputerWindow::eventFilter(QObject* watched, QEvent* event) {
     // types gets nothing, which is not what the machine they are looking at did.
     const bool face = watched == tube_ || watched == canvas_;
     if (face && event->type() == QEvent::MouseButtonPress) {
-        if (input_ != nullptr && input_->isEnabled()) {
-            input_->setFocus(Qt::MouseFocusReason);
+        if (tube_ != nullptr) {
+            tube_->setFocus(Qt::MouseFocusReason);
         }
         return false;
     }
     if (face && event->type() == QEvent::KeyPress) {
-        auto* key = static_cast<QKeyEvent*>(event);
-        const int pressed = key->key();
-        const bool typing = !key->text().isEmpty() || pressed == Qt::Key_Backspace ||
-                            pressed == Qt::Key_Return || pressed == Qt::Key_Enter ||
-                            pressed == Qt::Key_Up || pressed == Qt::Key_Down ||
-                            pressed == Qt::Key_Left || pressed == Qt::Key_Right ||
-                            pressed == Qt::Key_Home || pressed == Qt::Key_End;
-        if (typing && input_ != nullptr && input_->isEnabled()) {
-            input_->setFocus(Qt::OtherFocusReason);
-            QCoreApplication::sendEvent(input_, key);
-            return true;
-        }
-    }
-    if (watched == input_ && event->type() == QEvent::KeyPress) {
-        auto* key = static_cast<QKeyEvent*>(event);
-        if (key->key() == Qt::Key_Up && !history_.isEmpty()) {
-            history_index_ = std::max(0, history_index_ - 1);
-            input_->setText(history_.at(history_index_));
-            input_->setCursorPosition(input_->text().size());
-            return true;
-        }
-        if (key->key() == Qt::Key_Down) {
-            history_index_ = std::min(static_cast<int>(history_.size()), history_index_ + 1);
-            input_->setText(history_index_ >= history_.size()
-                                ? QString{}
-                                : history_.at(history_index_));
-            input_->setCursorPosition(input_->text().size());
-            return true;
-        }
+        return handleTypedKey(static_cast<QKeyEvent*>(event));
     }
     return QMainWindow::eventFilter(watched, event);
+}
+
+void RetroComputerWindow::keyPressEvent(QKeyEvent* event) {
+    if (handleTypedKey(event)) {
+        return;
+    }
+    QMainWindow::keyPressEvent(event);
+}
+
+bool RetroComputerWindow::handleTypedKey(QKeyEvent* key) {
+    if (!powered_ || input_ == nullptr || !input_->isEnabled() || tube_ == nullptr) {
+        return false;
+    }
+    switch (key->key()) {
+        case Qt::Key_Return:
+        case Qt::Key_Enter:
+            handlePromptLine();
+            return true;
+        case Qt::Key_Backspace:
+            input_->backspace();
+            tube_->setFocus(Qt::OtherFocusReason);
+            return true;
+        case Qt::Key_Up:
+            if (!history_.isEmpty()) {
+                history_index_ = std::max(0, history_index_ - 1);
+                const QSignalBlocker blocker{input_};
+                input_->setText(history_.at(history_index_));
+                input_->setCursorPosition(input_->text().size());
+                paintTypedLine();
+            }
+            tube_->setFocus(Qt::OtherFocusReason);
+            return true;
+        case Qt::Key_Down:
+            history_index_ = std::min(static_cast<int>(history_.size()), history_index_ + 1);
+            {
+                const QSignalBlocker blocker{input_};
+                input_->setText(history_index_ >= history_.size()
+                                    ? QString{}
+                                    : history_.at(history_index_));
+                input_->setCursorPosition(input_->text().size());
+                paintTypedLine();
+            }
+            tube_->setFocus(Qt::OtherFocusReason);
+            return true;
+        default:
+            break;
+    }
+    const QString text = key->text();
+    if (text.isEmpty() || text.front().unicode() < 0x20) {
+        return false;
+    }
+    // The line is the model the machine already had; the glass is its only view.
+    // Inserting rather than replaying the key event is what keeps the platform's
+    // input method out of the loop.
+    input_->insert(text);
+    tube_->setFocus(Qt::OtherFocusReason);
+    return true;
 }
 
 void RetroComputerWindow::closeEvent(QCloseEvent* event) {

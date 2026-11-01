@@ -218,6 +218,9 @@ signals:
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
+    /// Anything typed in the machine's window that no other widget claimed is
+    /// the machine's: it goes to the line on the glass.
+    void keyPressEvent(QKeyEvent* event) override;
     void closeEvent(QCloseEvent* event) override;
 
 private:
@@ -348,7 +351,7 @@ private:
     void restoreSettings();
 
     Language language_ = Language::Basic;
-    ScreenMode mode_ = ScreenMode::Split;
+    ScreenMode mode_ = ScreenMode::Text;
     RetroComputerSettings settings_;
     /// What the machine looked like before the settings dialog opened, so Cancel
     /// can put it back after a live preview.
@@ -379,6 +382,28 @@ private:
     QPushButton* run_button_ = nullptr;
     QPushButton* stop_button_ = nullptr;
     QLabel* status_label_ = nullptr;
+
+    // -- the face of the machine ------------------------------------------
+    //
+    // A machine of 1982 had one glass and no window under it: the line being
+    // typed is written into the same memory the rest of the screen is, at the
+    // cursor, and `input_` is the model behind it rather than a visible field.
+    /// Repaints the line being typed at the cursor, erasing the one before it.
+    void paintTypedLine();
+    /// One key for the machine's keyboard: text is inserted into the line, the
+    /// editing keys edit it, and Return hands it to the ROM. Consumed is true when
+    /// the key belonged to the machine.
+    bool handleTypedKey(QKeyEvent* key);
+    /// Puts the cells the typed line used back to spaces and parks the cursor.
+    void clearTypedLine();
+    /// Puts `LOAD "` or `SAVE "` on the line, caret after the quote, the way the
+    /// function keys of the period did.
+    void beginLoad();
+    void beginSave();
+    /// Row the typed line starts on, or -1 when nothing is being typed.
+    int typed_row_ = -1;
+    int typed_column_ = 0;
+    int typed_length_ = 0;
 
     HbDos dos_;
     /// The machine's address space. One 64K, cleared by a cold boot: a machine of

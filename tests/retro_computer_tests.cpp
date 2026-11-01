@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
     test_the_machine_sounds_like_a_machine();
     test_a_muted_machine_is_silent_but_still_counts();
     test_poking_the_sound_latch_reaches_the_voice();
-    test_the_self_test_counts_the_memory_it_has();
+    test_the_boot_flash_states_the_memory_it_has();
     test_the_power_switch_turns_the_machine_off_and_on();
     test_the_frame_register_counts_the_clock();
     test_a_poked_character_is_on_the_screen();

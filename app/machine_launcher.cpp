@@ -107,9 +107,12 @@ timewarp::ui::RetroComputerWindow* MachineLauncher::openHb1() {
     hb1_->show();
     hb1_->raise();
     hb1_->activateWindow();
-    // The ROM selector is first in the tab order, so a new window would otherwise
-    // leave the keyboard there and the first keystroke would go to a combo box.
-    hb1_->promptInput()->setFocus(Qt::OtherFocusReason);
+    // The prompt field is not on the machine's face; the glass is. Without this a
+    // new window would leave the keyboard on the front panel, and the first thing
+    // a person typed would change cartridge instead of reaching the machine.
+    if (hb1_->consoleView() != nullptr) {
+        hb1_->consoleView()->setFocus(Qt::OtherFocusReason);
+    }
     statusBar()->showMessage(QStringLiteral("HB-1 powered on."));
     return hb1_;
 }

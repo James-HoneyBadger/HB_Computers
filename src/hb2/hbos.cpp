@@ -13,12 +13,65 @@ namespace timewarp::hb2 {
 
 namespace {
 
-constexpr std::uint8_t kTitleInk = 15;
-constexpr std::uint8_t kBodyInk = 7;
-constexpr std::uint8_t kShadow = 0;
-constexpr int kTitleHeight = 10;
+// A 1992 workstation ran 640 x 480, and its text was twice the height of the
+// 1982 tube's. `kScale` is that: every glyph is drawn two pixels wide and two
+// tall, which is what makes this look like a GUI of the period rather than a
+// small bitmap blown up.
+constexpr int kScale = 2;
+constexpr int kCellWidth = kGlyphWidth * kScale;
+constexpr int kCellHeight = kGlyphHeight * kScale;
 constexpr int kBorder = 1;
-constexpr int kTaskBarHeight = 14;
+constexpr int kTitleHeight = kCellHeight + 6;
+constexpr int kMenuHeight = kCellHeight + 4;
+constexpr int kTaskBarHeight = kCellHeight + 10;
+
+constexpr std::uint8_t kTitleInk = 15;
+constexpr std::uint8_t kTitleIdleInk = 0;
+constexpr std::uint8_t kTitleFocused = 1;   // the blue of the period
+constexpr std::uint8_t kTitleIdle = 7;
+constexpr std::uint8_t kBodyInk = 7;
+constexpr std::uint8_t kBodyText = 0;
+constexpr std::uint8_t kShadow = 0;
+constexpr std::uint8_t kDesktop = 3;        // teal, the 1992 default
+constexpr std::uint8_t kBarInk = 7;
+constexpr std::uint8_t kBarText = 0;
+constexpr std::uint8_t kBarButton = 1;
+
+/// Text at the desktop's cell size: runs of set bits are filled a stretch at a
+/// time rather than a pixel at a time, because this runs on every frame.
+void drawTextScaled(Video& video, int x, int y, std::string_view text,
+                    std::uint8_t colour) {
+    int pen = x;
+    for (const char character : text) {
+        if (character == '\n') {
+            pen = x;
+            y += kCellHeight;
+            continue;
+        }
+        const auto& glyph =
+            glyphFor(static_cast<std::uint8_t>(static_cast<unsigned char>(character)));
+        for (int row = 0; row < kGlyphHeight; ++row) {
+            const std::uint8_t bits = glyph[static_cast<std::size_t>(row)];
+            if (bits == 0) {
+                continue;
+            }
+            int column = 0;
+            while (column < kGlyphWidth) {
+                if ((bits & (0x80U >> column)) == 0) {
+                    ++column;
+                    continue;
+                }
+                const int run_start = column;
+                while (column < kGlyphWidth && (bits & (0x80U >> column)) != 0) {
+                    ++column;
+                }
+                video.fill(pen + run_start * kScale, y + row * kScale,
+                           (column - run_start) * kScale, kScale, colour);
+            }
+        }
+        pen += kCellWidth;
+    }
+}
 
 std::string padded(std::string text, std::size_t width) {
     if (text.size() > width) {
@@ -253,15 +306,26 @@ void Desktop::drawWindow(Video& video, const Window& window, const Task& task, b
     const Rect r = window.frame;
     // Shadow, body, title bar: three rectangles, and the overlap only looks right
     // because the framebuffer composes rather than the character grid.
-    video.fill(r.x + 2, r.y + 2, r.w, r.h, kShadow);
+    video.fill(r.x + 3, r.y + 3, r.w, r.h, kShadow);
     video.fill(r.x, r.y, r.w, r.h, kBodyInk);
-    video.fill(r.x, r.y, r.w, kTitleHeight, focused ? 13 : 8);
-    video.drawText(r.x + 3, r.y + 1, padded(window.title, static_cast<std::size_t>(r.w / kGlyphWidth)),
-                   kTitleInk);
+    // A one-pixel frame round the client area, the raised edge every window of the
+    // period had.
+    video.fill(r.x, r.y, 1, r.h, 15);
+    video.fill(r.x, r.y, r.w, 1, 15);
+    video.fill(r.x + r.w - 1, r.y, 1, r.h, 8);
+    video.fill(r.x, r.y + r.h - 1, r.w, 1, 8);
+    video.fill(r.x, r.y, r.w, kTitleHeight, focused ? kTitleFocused : kTitleIdle);
+    drawTextScaled(video, r.x + 5, r.y + 3,
+                   padded(window.title, static_cast<std::size_t>((r.w - 10) / kCellWidth)),
+                   focused ? kTitleInk : kTitleIdleInk);
+    // A menu bar, because a 1992 application window without one is a terminal
+    // with a title. The words do what the prompt's words do; this is their face.
+    video.fill(r.x + 1, r.y + kTitleHeight, r.w - 2, 1, 8);
+    drawTextScaled(video, r.x + 6, r.y + kTitleHeight + 2, "File Edit View Help", kBodyText);
     // The task's own output, last lines that fit, which is the whole of what a
     // process's window is for on this machine.
-    const int columns = std::max(1, (r.w - 6) / kGlyphWidth);
-    const int rows = std::max(1, (r.h - kTitleHeight - 4) / kGlyphHeight);
+    const int columns = std::max(1, (r.w - 10) / kCellWidth);
+    const int rows = std::max(1, (r.h - kTitleHeight - kMenuHeight - 4) / kCellHeight);
     std::vector<std::string> lines;
     std::string current;
     for (const char character : task.console) {
@@ -281,16 +345,25 @@ void Desktop::drawWindow(Video& video, const Window& window, const Task& task, b
     }
     const int first = std::max(0, static_cast<int>(lines.size()) - rows);
     for (int row = first; row < static_cast<int>(lines.size()); ++row) {
-        video.drawText(r.x + 3, r.y + kTitleHeight + 2 + (row - first) * kGlyphHeight,
-                       lines[static_cast<std::size_t>(row)], 15);
+        drawTextScaled(video, r.x + 5,
+                       r.y + kTitleHeight + kMenuHeight + 2 + (row - first) * kCellHeight,
+                       lines[static_cast<std::size_t>(row)], kBodyText);
     }
     if (!task.finished) {
-        // A cursor block, because a process with a window should look alive.
-        const int caret_row = std::min(rows - 1, static_cast<int>(lines.size()) - first);
-        const int caret_column = std::min(columns - 1, static_cast<int>(current.size()));
-        video.fill(r.x + 3 + caret_column * kGlyphWidth,
-                   r.y + kTitleHeight + 2 + caret_row * kGlyphHeight, kGlyphWidth - 2,
-                   kGlyphHeight - 2, 15);
+        // A cursor block, because a process with a window should look alive. It
+        // sits where the next character will land: after the partial line when it
+        // is on screen, and at the end of the last visible line when the window is
+        // full, rather than over the first character of it.
+        int caret_row = static_cast<int>(lines.size()) - first;
+        int caret_column = static_cast<int>(current.size());
+        if (caret_row >= rows) {
+            caret_row = rows - 1;
+            const std::string& last = lines[static_cast<std::size_t>(first + caret_row)];
+            caret_column = static_cast<int>(last.size());
+        }
+        video.fill(r.x + 5 + std::min(columns - 1, caret_column) * kCellWidth,
+                   r.y + kTitleHeight + kMenuHeight + 2 + caret_row * kCellHeight,
+                   kCellWidth - 3, kCellHeight - 3, kBodyText);
     }
 }
 
@@ -302,9 +375,9 @@ void Desktop::draw(Video& video, const Scheduler& scheduler) {
     const int height = video.height();
     // The wallpaper, then the bar, then the windows bottom to top: a 1992 desktop
     // is a painter's algorithm and nothing here pretends otherwise.
-    video.fill(0, 0, width, height, 3);
-    video.fill(0, height - kTaskBarHeight, width, kTaskBarHeight, 8);
-    video.drawText(2, height - kTaskBarHeight + 3, "HB-OS", 15);
+    video.fill(0, 0, width, height, kDesktop);
+    video.fill(0, height - kTaskBarHeight, width, kTaskBarHeight, kBarInk);
+    drawTextScaled(video, 8, height - kTaskBarHeight + 4, "HB-OS", kBarText);
 
     std::vector<const Window*> ordered;
     for (const Window& window : windows_) {
@@ -313,18 +386,20 @@ void Desktop::draw(Video& video, const Scheduler& scheduler) {
     std::sort(ordered.begin(), ordered.end(),
               [](const Window* left, const Window* right) { return left->z < right->z; });
 
-    int button = 6 * kGlyphWidth;
+    int button = 6 * kCellWidth;
     for (const Window* window : ordered) {
         const Task* task = scheduler.byId(window->task);
         if (task != nullptr) {
             drawWindow(video, *window, *task, window->task == focused_);
         }
-        // One button a process, which is what a task bar is.
-        video.fill(button, height - kTaskBarHeight + 2, 9 * kGlyphWidth, kTaskBarHeight - 4,
-                   window->task == focused_ ? 7 : 8);
-        video.drawText(button + 2, height - kTaskBarHeight + 3,
-                       padded(window->title, 9), window->task == focused_ ? 0 : 15);
-        button += 9 * kGlyphWidth + 2;
+        // One button a process, which is what an icon bar is.
+        const int button_width = 10 * kCellWidth;
+        video.fill(button, height - kTaskBarHeight + 4, button_width, kTaskBarHeight - 8,
+                   window->task == focused_ ? kBarButton : kBarInk);
+        drawTextScaled(video, button + 4, height - kTaskBarHeight + 4,
+                       padded(window->title, 9),
+                       window->task == focused_ ? kTitleInk : kBarText);
+        button += button_width + 4;
     }
 
     // The pointer: four pixels wide and eight tall, drawn as two lines so it is

@@ -5,6 +5,7 @@
 #include "retro_computer_internal.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <optional>
 
 #include <QCloseEvent>
@@ -74,11 +75,14 @@ bool RetroComputerWindow::handleMachineCommand(const QString& command) {
         if (source.trimmed().isEmpty()) {
             appendConsole(QStringLiteral("?NO PROGRAM"));
         } else {
+            appendConsole(QString());
             const QStringList lines = source.split(QLatin1Char('\n'));
             for (const QString& line : lines) {
                 appendConsole(line);
             }
+            appendConsole(QString());
         }
+        appendConsole(QString::fromUtf8(romFor(language_).prompt));
         return true;
     }
     if (word == QStringLiteral("NEW")) {
@@ -127,7 +131,7 @@ bool RetroComputerWindow::handleMachineCommand(const QString& command) {
         program_->setFocus(Qt::ShortcutFocusReason);
         return true;
     }
-    if (word == QStringLiteral("ROMS")) {
+    if (word == QStringLiteral("ROMS") || word == QStringLiteral("CART")) {
         text_tabs_->setCurrentWidget(tube_);
         for (const Language language : allLanguages()) {
             appendConsole(QStringLiteral("%1 %2")
@@ -135,14 +139,17 @@ bool RetroComputerWindow::handleMachineCommand(const QString& command) {
                                                          : QLatin1Char(' '))
                               .arg(displayName(language)));
         }
+        appendConsole(QString::fromUtf8(romFor(language_).prompt));
         return true;
     }
     if (word == QStringLiteral("CATALOG") || word == QStringLiteral("CAT")) {
         listDisk();
+        appendConsole(QString::fromUtf8(romFor(language_).prompt));
         return true;
     }
     if (word == QStringLiteral("STATUS")) {
         showDiskStatus();
+        appendConsole(QString::fromUtf8(romFor(language_).prompt));
         return true;
     }
     // `SAVE MACHINE "N` and `LOAD MACHINE "N` are checked before `SAVE`/`LOAD`,
@@ -379,7 +386,9 @@ void RetroComputerWindow::ensureRepl() {
                     appendConsole(QStringLiteral("?%1").arg(error));
                 }
                 updateStatus();
-                // A prompt command has returned, so the next one can be typed.
+                // A prompt command has returned, so the machine prints its prompt
+                // again and the next line can be typed under it.
+                appendConsole(QString::fromUtf8(romFor(language_).prompt));
                 emit commandFinished();
             });
 }
@@ -505,7 +514,7 @@ void RetroComputerWindow::runProgram() {
                 runner->deleteLater();
                 if (canvas_ != nullptr && canvas_->frameCount() > 0 &&
                     mode_ == ScreenMode::Text && settings_.switch_to_split) {
-                    setScreenMode(ScreenMode::Split);
+                    setScreenMode(ScreenMode::Graphics);
                 }
                 updateStatus();
                 emit runFinished();

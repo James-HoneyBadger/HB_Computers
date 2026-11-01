@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <optional>
 
+#include <QApplication>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QFileInfo>
@@ -26,6 +27,7 @@
 #include <QShortcut>
 #include <QSignalBlocker>
 #include <QSplitter>
+#include <QTabBar>
 #include <QTabWidget>
 #include <QTextCursor>
 #include <QVBoxLayout>
@@ -97,6 +99,10 @@ RetroComputerWindow::RetroComputerWindow(QWidget* parent) : QMainWindow(parent) 
     if (!disk_ok) {
         appendConsole(QStringLiteral("?HB DOS: %1").arg(disk_error));
     }
+    // The machine is ready to be typed at the moment it is switched on.
+    if (tube_ != nullptr) {
+        tube_->setFocus(Qt::OtherFocusReason);
+    }
 }
 
 RetroComputerWindow::~RetroComputerWindow() {
@@ -135,10 +141,35 @@ void RetroComputerWindow::buildUi() {
     auto* cls = new QShortcut{timewarp::core::keySequence(Qt::CTRL, Qt::Key_L), this};
     cls->setContext(Qt::WindowShortcut);
     connect(cls, &QShortcut::activated, this, &RetroComputerWindow::clearScreenAndCanvas);
+    // A command returns the machine to its prompt, and the keyboard with it: a
+    // machine that forgets where you were typing after every line is not usable.
+    connect(this, &RetroComputerWindow::commandFinished, this, [this] {
+        if (tube_ != nullptr && QApplication::activeModalWidget() == nullptr) {
+            tube_->setFocus(Qt::OtherFocusReason);
+        }
+    });
+
     auto* configure = new QShortcut{timewarp::core::keySequence(Qt::CTRL, Qt::Key_Comma), this};
     configure->setContext(Qt::WindowShortcut);
     connect(configure, &QShortcut::activated, this,
             [this] { openSettings(); });
+
+    // The rest of the key row, on the keys themselves. F9 and Shift+F9 are the
+    // ROM's; F1-F8 are the machine's own words, as they were on the machines this
+    // one is trying to be.
+    const auto shortcut = [this](int key, auto action) {
+        auto* cut = new QShortcut{QKeySequence{key}, this};
+        cut->setContext(Qt::WindowShortcut);
+        connect(cut, &QShortcut::activated, this, action);
+    };
+    shortcut(Qt::Key_F1, [this] { submitCommand(QStringLiteral("LIST")); });
+    shortcut(Qt::Key_F2, [this] { submitCommand(QStringLiteral("NEW")); });
+    shortcut(Qt::Key_F3, [this] { submitCommand(QStringLiteral("CATALOG")); });
+    shortcut(Qt::Key_F4, [this] { beginLoad(); });
+    shortcut(Qt::Key_F5, [this] { beginSave(); });
+    shortcut(Qt::Key_F6, [this] { setScreenMode(ScreenMode::Graphics); });
+    shortcut(Qt::Key_F7, [this] { setScreenMode(ScreenMode::Text); });
+    shortcut(Qt::Key_F8, [this] { openSettings(); });
 }
 
 void RetroComputerWindow::buildHeader(QVBoxLayout* column) {
@@ -154,7 +185,7 @@ void RetroComputerWindow::buildHeader(QVBoxLayout* column) {
     machine_label_ = new QLabel{QStringLiteral("HB-1"), header};
     machine_label_->setObjectName(QStringLiteral("retroMachineLabel"));
     identity->addWidget(machine_label_);
-    tagline_label_ = new QLabel{QStringLiteral("PERSONAL COMPUTER SYSTEM  \u00b7  64K RAM"),
+    tagline_label_ = new QLabel{QStringLiteral("PERSONAL COMPUTER  \u00b7  1982  \u00b7  64K RAM"),
                                 header};
     tagline_label_->setObjectName(QStringLiteral("retroTaglineLabel"));
     identity->addWidget(tagline_label_);
@@ -163,12 +194,15 @@ void RetroComputerWindow::buildHeader(QVBoxLayout* column) {
 
     auto* rom_box = new QVBoxLayout;
     rom_box->setSpacing(1);
-    auto* rom_caption = new QLabel{QStringLiteral("ROM"), header};
+    auto* rom_caption = new QLabel{QStringLiteral("CARTRIDGE"), header};
     rom_caption->setObjectName(QStringLiteral("retroCaption"));
     rom_box->addWidget(rom_caption);
     language_selector_ = new QComboBox{header};
     language_selector_->setObjectName(QStringLiteral("retroLanguageSelector"));
-    language_selector_->setAccessibleName(tr("Language ROM"));
+    language_selector_->setAccessibleName(tr("Cartridge"));
+    // A switch on the front panel, not a text field: it is clicked, never typed
+    // at, and it must never take the keyboard from the glass.
+    language_selector_->setFocusPolicy(Qt::NoFocus);
     for (const Language language : allLanguages()) {
         language_selector_->addItem(displayName(language), static_cast<int>(language));
     }
@@ -177,12 +211,13 @@ void RetroComputerWindow::buildHeader(QVBoxLayout* column) {
 
     auto* mode_box = new QVBoxLayout;
     mode_box->setSpacing(1);
-    auto* mode_caption = new QLabel{QStringLiteral("SCREEN"), header};
+    auto* mode_caption = new QLabel{QStringLiteral("DISPLAY"), header};
     mode_caption->setObjectName(QStringLiteral("retroCaption"));
     mode_box->addWidget(mode_caption);
     mode_selector_ = new QComboBox{header};
     mode_selector_->setObjectName(QStringLiteral("retroModeSelector"));
     mode_selector_->setAccessibleName(tr("Screen mode"));
+    mode_selector_->setFocusPolicy(Qt::NoFocus);
     mode_selector_->addItem(QStringLiteral("TEXT"),
                             static_cast<int>(ScreenMode::Text));
     mode_selector_->addItem(QStringLiteral("SPLIT"),
@@ -201,6 +236,7 @@ void RetroComputerWindow::buildHeader(QVBoxLayout* column) {
 
     config_button_ = new QPushButton{QStringLiteral("CONFIG"), header};
     config_button_->setObjectName(QStringLiteral("retroConfigButton"));
+    config_button_->setFocusPolicy(Qt::NoFocus);
     config_button_->setToolTip(tr("Change what the machine boots into and how it "
                                   "looks (Ctrl+,)"));
     connect(config_button_, &QPushButton::clicked, this, [this] { openSettings(); });
@@ -252,6 +288,10 @@ void RetroComputerWindow::buildScreen(QVBoxLayout* column) {
     text_tabs_->setObjectName(QStringLiteral("retroTextTabs"));
     text_tabs_->setDocumentMode(true);
     text_tabs_->setTabPosition(QTabWidget::South);
+    // No tab bar: a 1982 machine had one screen, and DISPLAY on the front panel
+    // is the switch that changes what it shows. The tabs still exist underneath,
+    // because the PROGRAM page is where a listing is edited.
+    text_tabs_->tabBar()->hide();
 
     program_ = new CodeEditor{text_tabs_};
     program_->setObjectName(QStringLiteral("retroProgramEditor"));
@@ -264,6 +304,8 @@ void RetroComputerWindow::buildScreen(QVBoxLayout* column) {
     tube_ = new HbTube{text_tabs_};
     tube_->setObjectName(QStringLiteral("retroConsole"));
     tube_->setMemory(&memory_);
+    // The glass is where this machine is typed at.
+    tube_->setFocusPolicy(Qt::StrongFocus);
     text_tabs_->addTab(tube_, QStringLiteral("SCREEN"));
     screen_splitter_->addWidget(text_tabs_);
     screen_splitter_->setStretchFactor(0, kScreenTextStretch);
@@ -311,7 +353,7 @@ void RetroComputerWindow::buildScreen(QVBoxLayout* column) {
         if (canvas_->frameCount() > 0 && mode_ == ScreenMode::Text &&
             !auto_shown_graphics_ && settings_.switch_to_split) {
             auto_shown_graphics_ = true;
-            setScreenMode(ScreenMode::Split);
+            setScreenMode(ScreenMode::Graphics);
         }
         updateStatus();
     });
@@ -328,12 +370,15 @@ void RetroComputerWindow::buildPrompt(QVBoxLayout* column) {
     bar->setFrameShape(QFrame::NoFrame);
     auto* row = new QHBoxLayout{bar};
     row->setContentsMargins(8, 5, 8, 5);
-    row->setSpacing(8);
+    row->setSpacing(4);
 
+    // The prompt is the screen, not a field under it: `input_` stays as the
+    // model behind the line the tube paints, and is never shown.
     prompt_label_ = new QLabel{QStringLiteral("READY."), bar};
     prompt_label_->setObjectName(QStringLiteral("retroPromptLabel"));
     prompt_label_->setMinimumWidth(70);
     prompt_label_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    prompt_label_->hide();
     row->addWidget(prompt_label_);
 
     input_ = new QLineEdit{bar};
@@ -343,35 +388,90 @@ void RetroComputerWindow::buildPrompt(QVBoxLayout* column) {
     input_->installEventFilter(this);
     connect(input_, &QLineEdit::returnPressed, this,
             &RetroComputerWindow::handlePromptLine);
-    row->addWidget(input_, 1);
+    connect(input_, &QLineEdit::textChanged, this,
+            [this] { paintTypedLine(); });
+    input_->hide();
+    row->addWidget(input_);
 
-    run_button_ = new QPushButton{QStringLiteral("RUN"), bar};
+    // The machine's function keys, in a row along the bottom of the case. Each
+    // one does what the word on it says; F9 and Shift+F9 are the ROM's own.
+    const auto addKey = [&](const QString& key, const QString& word, const QString& name,
+                            const QString& tooltip, auto action) -> QPushButton* {
+        auto* button = new QPushButton{QStringLiteral("%1\n%2").arg(key, word), bar};
+        button->setObjectName(name);
+        button->setToolTip(tooltip);
+        button->setFocusPolicy(Qt::NoFocus);
+        connect(button, &QPushButton::clicked, this, action);
+        row->addWidget(button, 1);
+        return button;
+    };
+
+    addKey(QStringLiteral("F1"), QStringLiteral("LIST"), QStringLiteral("retroKeyList"),
+           tr("List the program (F1)"), [this] { submitCommand(QStringLiteral("LIST")); });
+    addKey(QStringLiteral("F2"), QStringLiteral("NEW"), QStringLiteral("retroKeyNew"),
+           tr("Erase the program (F2)"), [this] { submitCommand(QStringLiteral("NEW")); });
+    addKey(QStringLiteral("F3"), QStringLiteral("CATALOG"), QStringLiteral("retroKeyCatalog"),
+           tr("List the disk (F3)"), [this] { submitCommand(QStringLiteral("CATALOG")); });
+    addKey(QStringLiteral("F4"), QStringLiteral("LOAD"), QStringLiteral("retroKeyLoad"),
+           tr("Load a program from the disk (F4)"),
+           [this] { beginLoad(); });
+    addKey(QStringLiteral("F5"), QStringLiteral("SAVE"), QStringLiteral("retroKeySave"),
+           tr("Save the program to the disk (F5)"),
+           [this] { beginSave(); });
+    addKey(QStringLiteral("F6"), QStringLiteral("GRAPHICS"), QStringLiteral("retroKeyGraphics"),
+           tr("Show the drawing (F6)"),
+           [this] { setScreenMode(ScreenMode::Graphics); });
+    addKey(QStringLiteral("F7"), QStringLiteral("TEXT"), QStringLiteral("retroKeyText"),
+           tr("Show the tube (F7)"),
+           [this] { setScreenMode(ScreenMode::Text); });
+    addKey(QStringLiteral("F8"), QStringLiteral("SETUP"), QStringLiteral("retroKeySetup"),
+           tr("The machine's settings (F8)"), [this] { openSettings(); });
+
+    run_button_ = new QPushButton{QStringLiteral("F9\nRUN"), bar};
     run_button_->setObjectName(QStringLiteral("retroRunButton"));
-    run_button_->setToolTip(tr("Run the program in the editor (F9)"));
+    run_button_->setToolTip(tr("Run the program (F9)"));
+    run_button_->setFocusPolicy(Qt::NoFocus);
     connect(run_button_, &QPushButton::clicked, this, &RetroComputerWindow::runProgram);
-    row->addWidget(run_button_);
+    row->addWidget(run_button_, 1);
 
     stop_button_ = new QPushButton{QStringLiteral("STOP"), bar};
     stop_button_->setObjectName(QStringLiteral("retroStopButton"));
     stop_button_->setToolTip(tr("Stop a running program (Shift+F9)"));
+    stop_button_->setFocusPolicy(Qt::NoFocus);
     connect(stop_button_, &QPushButton::clicked, this,
             &RetroComputerWindow::stopProgram);
-    row->addWidget(stop_button_);
-
-    auto* clear = new QPushButton{QStringLiteral("CLS"), bar};
-    clear->setObjectName(QStringLiteral("retroClearButton"));
-    clear->setToolTip(tr("Clear the screen and the drawing (Ctrl+L)"));
-    connect(clear, &QPushButton::clicked, this,
-            &RetroComputerWindow::clearScreenAndCanvas);
-    row->addWidget(clear);
+    row->addWidget(stop_button_, 1);
 
     column->addWidget(bar);
+}
+
+void RetroComputerWindow::beginLoad() {
+    if (!powered_ || input_ == nullptr) {
+        return;
+    }
+    input_->setText(QStringLiteral("LOAD \""));
+    if (tube_ != nullptr) {
+        tube_->setFocus(Qt::OtherFocusReason);
+    }
+}
+
+void RetroComputerWindow::beginSave() {
+    if (!powered_ || input_ == nullptr) {
+        return;
+    }
+    input_->setText(QStringLiteral("SAVE \""));
+    if (tube_ != nullptr) {
+        tube_->setFocus(Qt::OtherFocusReason);
+    }
 }
 
 void RetroComputerWindow::buildStatus(QVBoxLayout* column) {
     status_label_ = new QLabel{this};
     status_label_->setObjectName(QStringLiteral("retroStatusLabel"));
     status_label_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    // The status line is the window's, not the machine's: it is kept and kept up
+    // to date for the window's owner, and hidden from the machine's face.
+    status_label_->hide();
     column->addWidget(status_label_);
 }
 
@@ -455,24 +555,26 @@ void RetroComputerWindow::appendBootBanner() {
         return;
     }
     const RomInfo rom = romFor(language_);
-    appendConsole(QStringLiteral("*** HB-1 ***"));
-    appendConsole(QStringLiteral("%1 %2 ROM  \u00b7  64K RAM SYSTEM")
-                      .arg(displayName(language_), QString::fromUtf8(rom.version)));
+    const auto centre = [](const QString& text) {
+        const int pad = std::max(0, (HbMemory::kColumns - static_cast<int>(text.size())) / 2);
+        return QString(pad, QLatin1Char(' ')) + text;
+    };
+
+    // The flash: a title line, how much memory the machine has, and who made it,
+    // all at the top of the glass at once -- then the prompt. This is what a
+    // machine of the period showed, and it is all it showed.
+    appendConsole(QString());
+    appendConsole(centre(QStringLiteral("**** HB-1 %1 %2 ROM ****")
+                             .arg(displayName(language_),
+                                  QString::fromUtf8(rom.version))));
+    appendConsole(centre(QStringLiteral("64K RAM SYSTEM   %1 BYTES FREE")
+                             .arg(HbMemory::kUserRamSize)));
     if (settings_.banner == BootBanner::Full) {
-        appendConsole(QStringLiteral("%1  \u00b7  %2")
-                          .arg(QString::fromUtf8(kBootCopyright),
-                               QString::fromUtf8(rom.note)));
-        QString volume = dos_.volumeName();
-        if (!dos_.files().isEmpty()) {
-            volume += QStringLiteral("  \u00b7  %1 FILES").arg(dos_.files().size());
+        appendConsole(centre(QString::fromUtf8(kBootCopyright)));
+        if (!dos_.imagePath().isEmpty()) {
+            appendConsole(centre(QStringLiteral("HB DOS 1.0  %1").arg(dos_.volumeName())));
         }
-        appendConsole(QStringLiteral("HB DOS 1.0  \u00b7  VOLUME %1").arg(volume));
-        if (!dos_.files().isEmpty()) {
-            // The disk is the one thing a 1982 machine cannot explain by itself,
-            // and a full one that is never listed looks exactly like an empty one.
-            appendConsole(QStringLiteral("TYPE CATALOG TO LIST THEM"));
-        }
-        appendConsole(QStringLiteral("SYSTEM READY"));
+        appendConsole(QString());
     }
     appendConsole(QStringLiteral("READY."));
 }

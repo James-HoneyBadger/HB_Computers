@@ -53,8 +53,8 @@ controls.
 
 | Choice | What the screen shows at boot |
 | --- | --- |
-| Full | `*** HB-1 ***`, the ROM line, the copyright line, the disk line, `SYSTEM READY`, then the prompt |
-| Short | `*** HB-1 ***` and the ROM line, then the prompt |
+| Full | The title line, the memory line, the copyright and the disk, then the prompt |
+| Short | The title line and the memory line, then the prompt |
 | Off | Nothing at all — the machine boots to an empty screen, as a quiet ROM would |
 
 **Remember each ROM's program** is what makes switching ROMs feel like a machine

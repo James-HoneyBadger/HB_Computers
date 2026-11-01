@@ -397,7 +397,7 @@ void RetroComputerSettingsDialog::buildUi() {
     remember_programs_->setObjectName(QStringLiteral("retroRememberPrograms"));
     machine_form->addRow(QString(), remember_programs_);
 
-    switch_to_split_ = new QCheckBox{tr("Switch to SPLIT when a program draws"), machine};
+    switch_to_split_ = new QCheckBox{tr("Switch to the drawing when a program draws"), machine};
     switch_to_split_->setObjectName(QStringLiteral("retroSwitchToSplit"));
     machine_form->addRow(QString(), switch_to_split_);
 

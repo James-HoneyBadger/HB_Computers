@@ -272,7 +272,7 @@ void Hb2Screen::focusOutEvent(QFocusEvent* event) {
 Hb2Window::Hb2Window(QWidget* parent)
     : QMainWindow(parent), monitor_(machine_), shell_(machine_) {
     setObjectName(QStringLiteral("hb2Window"));
-    setWindowTitle(tr("\U0001F5A5 HB-2 Model 92"));
+    setWindowTitle(tr("HB-2 Model 92"));
     resize(880, 640);
 
     // The machine keeps its disk, its cassette and its bay beside the Studio's other
@@ -581,13 +581,19 @@ bool Hb2Window::bootDesktop(QString* error) {
         }
         return false;
     }
-    // Side by side rather than one over the other: the point of the desktop is
-    // that both processes are visible at once, and a window hidden behind its
-    // neighbour demonstrates the opposite.
-    machine_.desktop().move(task_a, 8, 4);
-    machine_.desktop().resize(task_a, 240, 82);
-    machine_.desktop().move(task_b, 66, 88);
-    machine_.desktop().resize(task_b, 240, 82);
+    // A 1992 workstation, not the 1982 tube blown up: 640 x 480, which is the
+    // VGA mode the period actually had and what makes the desktop's own text
+    // crisp instead of chunky.
+    machine_.video().setMode(timewarp::hb2::Video::Mode::High);
+    machine_.bus().setCompat(false);
+
+    // Cascaded rather than stacked at the same corner: the point of the desktop
+    // is that both processes are visible at once.
+    machine_.desktop().move(task_a, 24, 36);
+    machine_.desktop().resize(task_a, 340, 190);
+    machine_.desktop().move(task_b, 280, 232);
+    machine_.desktop().resize(task_b, 340, 190);
+    machine_.desktop().movePointer(340, 300);
 
     // The Program page holds a real listing rather than an empty page: the desktop
     // the two processes are drawn on, which `RUN` assembles by itself.

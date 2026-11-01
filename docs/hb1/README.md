@@ -1,13 +1,16 @@
 # HB-1 Owner's Manual
 
 ```text
-*** HB-1 ***
-BASIC V2.0 ROM  ·  64K RAM SYSTEM
-(C) 1982 HB SYSTEMS  ·  BASIC INTERPRETER
-HB DOS 1.0  ·  VOLUME HBWARP
-SYSTEM READY
-READY.
+     **** HB-1 BASIC V2.0 ROM ****
+  64K RAM SYSTEM   32768 BYTES FREE
+          (C) 1982 HB SYSTEMS
+             HB DOS 1.0  HBWARP
+READY.▉
 ```
+
+The line under `READY.` is the prompt: it is on the glass, not in a field below
+it. You type straight at the machine — the characters appear where the block
+cursor is — and `Return` hands the line to the ROM.
 
 This is the manual for the machine this repository carries: a home computer from a
 1982 that never happened, where one socket accepted eleven language ROMs and the
@@ -45,19 +48,11 @@ with a very good costume on: see [Inside the HB-1](inside.md).
 ## First boot
 
 When the machine opens it cold-boots into a ROM — BASIC, unless CONFIG says
-otherwise — and prints its **self-test** and then the banner above:
+otherwise — checks the RAM it is about to claim, and flashes the banner above at
+the top of the glass. That is the whole boot screen: a title, the memory, the
+copyright line and the disk, and then the prompt.
 
-```text
-HB-1 SELF TEST
-32768 BYTES FREE
-RAM CHECK OK (128 CELLS)
-ROM CHECK OK (11 ROMS, 3352561743)
-HB DOS 1.0  HBWARP
-*** HB-1 ***
-…
-```
-
-The self-test is a test, not a decoration: it writes a pattern into the free RAM it
+The check is a test, not a decoration: it writes a pattern into the free RAM it
 claims to have and reads it back, and it sums the bytes of every ROM's version and
 banner note. A failure says which address failed and stops the boot. It appears when
 CONFIG's start-up message is **Full**, because Short and Off are promises about how
@@ -201,11 +196,20 @@ would be on a machine whose keyboard was the computer.
 
 | Key | Action |
 | --- | --- |
+| `F1` | `LIST` — print the program on the glass |
+| `F2` | `NEW` — erase the program |
+| `F3` | `CATALOG` — list the disk |
+| `F4` | Put `LOAD "` on the line, caret after the quote |
+| `F5` | Put `SAVE "` on the line |
+| `F6` | The graphics screen |
+| `F7` | The text screen |
+| `F8` | The machine's settings |
 | `F9` | Run the program |
 | `Shift+F9` | Stop |
 | `Ctrl+L` | Clear the screen and the canvas |
-| `Ctrl+,` | CONFIG |
 | `Up` / `Down` | Previous and next prompt line, up to the history depth CONFIG sets |
+
+The row of keys along the bottom of the case clicks the same words.
 
 ---
 

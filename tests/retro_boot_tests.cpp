@@ -17,7 +17,7 @@ void test_boots_into_basic() {
                 timewarp::ui::allLanguages().size());
     TW_CHECK_EQ(machine.languageSelector()->currentData().toInt(),
                 static_cast<int>(Language::Basic));
-    TW_CHECK_EQ(machine.screenMode(), ScreenMode::Split);
+    TW_CHECK_EQ(machine.screenMode(), ScreenMode::Text);
     TW_CHECK(machine.programEditor() != nullptr);
     TW_CHECK(machine.consoleView() != nullptr);
     TW_CHECK(machine.graphicsCanvas() != nullptr);
@@ -25,7 +25,7 @@ void test_boots_into_basic() {
     TW_CHECK(machine.windowTitle().contains(QStringLiteral("HB-1")));
 
     const QString boot = machine.consoleView()->toPlainText();
-    TW_CHECK(boot.contains(QStringLiteral("*** HB-1 ***")));
+    TW_CHECK(boot.contains(QStringLiteral("HB-1 BASIC V2.0 ROM")));
     TW_CHECK(boot.contains(QStringLiteral("BASIC V2.0")));
     TW_CHECK(boot.contains(QStringLiteral("64K RAM")));
     TW_CHECK(boot.contains(QStringLiteral("HB DOS 1.0")));
@@ -231,7 +231,9 @@ void test_run_prints_draws_and_switches_text_to_split() {
     machine.runProgram();
     TW_CHECK(spin_until([&finished] { return finished; }));
     TW_CHECK(machine.graphicsCanvas()->strokeCount() >= 2);
-    TW_CHECK_EQ(machine.screenMode(), ScreenMode::Split);
+    // The drawing replaces the tube, the way a 1982 machine's graphics mode did,
+    // rather than sitting beside it in a modern split view.
+    TW_CHECK_EQ(machine.screenMode(), ScreenMode::Graphics);
     TW_CHECK(machine.consoleView()->toPlainText().contains(QStringLiteral("* RUN *")));
     TW_CHECK(machine.consoleView()->toPlainText().contains(QStringLiteral("READY.")));
 }

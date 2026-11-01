@@ -55,9 +55,73 @@ void RetroComputerWindow::handlePromptLine() {
         return;
     }
     const QString command = input_->text();
-    input_->clear();
-    input_->setFocus(Qt::ShortcutFocusReason);
+    {
+        // Cleared without a repaint: the line is about to be erased from the
+        // glass anyway, and `submitCommand` echoes it back in the machine's own
+        // words.
+        const QSignalBlocker blocker{input_};
+        input_->clear();
+    }
+    clearTypedLine();
+    if (tube_ != nullptr) {
+        tube_->setFocus(Qt::OtherFocusReason);
+    }
     submitCommand(command);
+}
+
+void RetroComputerWindow::paintTypedLine() {
+    if (tube_ == nullptr || input_ == nullptr || !powered_) {
+        return;
+    }
+    if (typed_row_ < 0) {
+        typed_row_ = std::clamp(memory_.cursorRow(), 0, HbMemory::kRows - 1);
+        typed_column_ = std::clamp(memory_.cursorColumn(), 0, HbMemory::kColumns - 1);
+        typed_length_ = 0;
+    }
+    const auto advance = [](int& row, int& column) {
+        if (++column >= HbMemory::kColumns) {
+            column = 0;
+            row = std::min(row + 1, HbMemory::kRows - 1);
+        }
+    };
+    int row = typed_row_;
+    int column = typed_column_;
+    for (int index = 0; index < typed_length_; ++index) {
+        memory_.setCell(row, column, ' ');
+        advance(row, column);
+    }
+    row = typed_row_;
+    column = typed_column_;
+    const QString text = input_->text();
+    for (const QChar character : text) {
+        memory_.setCell(row, column, static_cast<std::uint8_t>(character.toLatin1()));
+        advance(row, column);
+    }
+    typed_length_ = text.size();
+    memory_.setCursor(row, column);
+    tube_->update();
+}
+
+void RetroComputerWindow::clearTypedLine() {
+    if (tube_ == nullptr || typed_row_ < 0) {
+        return;
+    }
+    int row = typed_row_;
+    int column = typed_column_;
+    for (int index = 0; index < typed_length_; ++index) {
+        memory_.setCell(row, column, ' ');
+        if (++column >= HbMemory::kColumns) {
+            column = 0;
+            if (++row >= HbMemory::kRows) {
+                break;
+            }
+        }
+    }
+    memory_.setCursor(typed_row_, typed_column_);
+    typed_row_ = -1;
+    typed_column_ = 0;
+    typed_length_ = 0;
+    tube_->update();
 }
 
 void RetroComputerWindow::submitCommand(const QString& command) {
@@ -99,9 +163,10 @@ void RetroComputerWindow::submitCommand(const QString& command) {
     if (voice_ != nullptr) {
         voice_->play(MachineVoice::Event::Key);
     }
-    const RomInfo rom = romFor(language_);
-    appendConsole(QStringLiteral("%1 %2")
-                      .arg(QString::fromUtf8(rom.prompt), trimmed));
+    // The line is already on the glass -- the tube painted it as it was typed --
+    // so the echo is the line itself, without the prompt in front of it. A
+    // machine of 1982 printed READY once and then let you type.
+    appendConsole(trimmed);
 
     if (language_ == Language::Basic && handleBasicLine(trimmed)) {
         emit commandFinished();
@@ -171,7 +236,6 @@ bool RetroComputerWindow::handleBasicLine(const QString& command) {
         lines.removeAt(existing);
         program_->setPlainText(lines.join(QLatin1Char('\n')));
         program_->document()->setModified(true);
-        text_tabs_->setCurrentWidget(program_);
         status_label_->setText(tr("LINE %1 DELETED").arg(number));
         return true;
     }
@@ -196,10 +260,13 @@ bool RetroComputerWindow::handleBasicLine(const QString& command) {
     QTextCursor cursor{program_->document()};
     cursor.movePosition(QTextCursor::Start);
     for (int line = 0; line < insert_at; ++line) {
-        cursor.movePosition(QTextCursor::Down);
+        if (!cursor.movePosition(QTextCursor::Down)) {
+            break;
+        }
     }
     program_->setTextCursor(cursor);
-    text_tabs_->setCurrentWidget(program_);
+    // A stored line does not open an editor: the machine stays at its prompt,
+    // which is where the next line is typed. `LIST` is how the program is read.
     status_label_->setText(tr("LINE %1 STORED").arg(number));
     if (auto_active_) {
         advanceAuto(wanted);

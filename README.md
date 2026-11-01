@@ -46,17 +46,21 @@ ctest --test-dir build --output-on-failure
 ./build/hb_computers --listing prog.s --hb2 # load a listing into the HB-2
 ```
 
-The HB-1 boots into BASIC with a `READY.` prompt and a disk with the machine's
-nine programs already on it — `CATALOG` lists them, `LOAD "TUBE WRITER"` puts one
-in memory, `RUN` sets it going. Typing works where you would type on the machine:
-click the tube (or the drawing beside it) and the keystrokes go to the prompt line
-under it. The ROM selector in the header exchanges BASIC for any of the other ten
-languages; each keeps its own program when you switch away.
+The HB-1 flashes its banner at the top of the glass and leaves you at `READY.`
+with a block cursor — you type straight at the machine, not into a field below it.
+The disk has the machine's nine programs on it: `CATALOG` lists them,
+`LOAD "TUBE WRITER"` puts one in memory, `RUN` sets it going. `F1`–`F9` are the
+machine's function keys (`LIST`, `NEW`, `CATALOG`, `LOAD`, `SAVE`, graphics, text,
+setup, run), and the key row along the bottom of the case clicks the same words.
+A program that draws switches the display to the graphics screen; `F7` brings the
+text back.
 
-The HB-2 powers on into **HB-OS**: two processes on a desktop, each with a window,
-taking turns on the machine's own 60 Hz clock. The **Program** page holds the
-listing that drew that desktop, and **Run** assembles and runs whatever is there.
-The programs it ships with are in [`Examples/hb2/`](Examples/hb2/).
+The HB-2 powers on into **HB-OS** at 640 × 480: two processes, each in a framed
+window with a title bar and a menu bar, cascaded on a teal desktop with an icon
+bar along the bottom, taking turns on the machine's own 60 Hz clock. The
+**Program** page holds the listing that drew that desktop, and **Run** assembles
+and runs whatever is there. The programs it ships with are in
+[`Examples/hb2/`](Examples/hb2/).
 
 The HB-2 alone runs on a shell, which is how the manual's examples are checked:
 

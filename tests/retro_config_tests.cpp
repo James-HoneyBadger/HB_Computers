@@ -160,8 +160,7 @@ void test_boot_settings_decide_the_next_power_on() {
         TW_CHECK_EQ(machine.language(), Language::Logo);
         TW_CHECK_EQ(machine.screenMode(), ScreenMode::Text);
         const QString boot = machine.consoleView()->toPlainText();
-        TW_CHECK(boot.contains(QStringLiteral("*** HB-1 ***")));
-        TW_CHECK(boot.contains(QStringLiteral("Logo")));
+        TW_CHECK(boot.contains(QStringLiteral("HB-1 Logo V1.0 ROM")));
         TW_CHECK(!boot.contains(QStringLiteral("1982")));
         TW_CHECK(boot.contains(QStringLiteral("READY.")));
     }

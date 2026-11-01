@@ -109,53 +109,21 @@ bool RetroComputerWindow::runSelfTest() {
     if (!powered_) {
         return false;
     }
-    // A self-test that prints "OK" without testing anything is the same lie as a
-    // hardcoded `MEM 64K`. This one walks the memory it claims to have and sums the
-    // bytes of the table the banner is built from -- and it does the walking *before*
-    // it prints, because the first draft cleared the memory afterwards and wiped the
-    // two lines it had just written.
-    int passed = 0;
+    // The machine checks the RAM it claims to have, before the banner says how
+    // much there is. It says nothing when it passes: a 1982 machine that printed
+    // a page of diagnostics before every prompt is not a 1982 machine.
     for (int address = 0; address < HbMemory::kUserRamSize; address += 257) {
         const auto pattern = static_cast<std::uint8_t>((address * 7 + 1) & 0xFF);
         if (!memory_.poke(address, pattern) || memory_.peek(address) != pattern) {
             appendConsole(QStringLiteral("?RAM FAILED AT %1").arg(address));
             return false;
         }
-        ++passed;
     }
-    // The RAM goes back the way the machine found it: a self-test that leaves its
-    // pattern behind is a test with a side effect.
+    // The RAM goes back the way the machine found it: a check that leaves its
+    // pattern behind is a check with a side effect.
     for (int address = 0; address < HbMemory::kUserRamSize; ++address) {
         memory_.poke(address, 0);
     }
-    appendConsole(QStringLiteral("HB-1 SELF TEST"));
-    appendConsole(QStringLiteral("%1 BYTES FREE").arg(HbMemory::kUserRamSize));
-    appendConsole(QStringLiteral("RAM CHECK OK (%1 CELLS)").arg(passed));
-
-    // The ROM check: a sum of every ROM's version string and banner note, which is
-    // the only ROM there is.
-    std::uint32_t rom_sum = 0;
-    int roms = 0;
-    for (const Language language : allLanguages()) {
-        const RomInfo rom = romFor(language);
-        const std::string text = std::string{rom.version} + std::string{rom.prompt} +
-                                 std::string{rom.note};
-        for (const char byte : text) {
-            rom_sum = rom_sum * 31 + static_cast<unsigned char>(byte);
-        }
-        ++roms;
-    }
-    const int sockets = static_cast<int>(allLanguages().size());
-    if (roms != sockets) {
-        appendConsole(QStringLiteral("?ROM CHECK: %1 OF %2 SOCKETS").arg(roms).arg(sockets));
-        return false;
-    }
-    appendConsole(QStringLiteral("ROM CHECK OK (%1 ROMS, %2)").arg(roms).arg(rom_sum));
-    QString disk = dos_.imagePath().isEmpty() ? QStringLiteral("NO DISK") : dos_.volumeName();
-    if (!dos_.files().isEmpty()) {
-        disk += QStringLiteral("  \u00b7  %1 FILES").arg(dos_.files().size());
-    }
-    appendConsole(QStringLiteral("HB DOS 1.0  %1").arg(disk));
     return true;
 }
 
@@ -169,9 +137,9 @@ void RetroComputerWindow::setPowered(bool on) {
     }
     if (input_ != nullptr) {
         input_->setEnabled(on);
-        if (on) {
-            input_->setFocus();
-        }
+    }
+    if (on && tube_ != nullptr) {
+        tube_->setFocus(Qt::OtherFocusReason);
     }
     run_button_->setEnabled(on);
     stop_button_->setEnabled(on);
