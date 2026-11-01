@@ -3,10 +3,10 @@
 Two home computers from a 1982 that never happened, and the one emulator that
 runs both.
 
-- the **Kestrel** — a 6502 at 1 MHz, 64K, a 40 x 25 tube, a disk measured in
+- the **Kestrel** — a 6502 at 1 MHz, 64K, a 40 × 25 tube, a disk measured in
   256-byte sectors, an 8 KiB KERNAL and a 16 KiB language socket; and
 - the **Kestrel 16** — its 1992 successor: a 65816 at 8 MHz, a megabyte of banked
-  memory, an 80 x 50 tube, and Kestrel 16 BASIC in a 64 KiB bank of its own.
+  memory, an 80 × 50 tube, and Kestrel 16 BASIC in a 64 KiB bank of its own.
 
 Both are real machines, not pictures of machines. The host supplies a processor, a
 bus, a tube, a keyboard and a disk; everything on the glass is machine code
@@ -41,20 +41,24 @@ processors are the parts the machines really had, and each is used whole.
 | --- | --- | --- |
 | Processor | MOS 6502, 1 MHz | WDC 65C816, 8 MHz |
 | Memory | 64 KiB | 16 MiB of address space, 1 MiB of RAM |
-| Screen | 40 x 25 cells | 80 x 50 cells |
-| Language | 16 KiB socket ROM | 64 KiB bank of its own |
+| Screen | 40 × 25 cells | 80 × 50 cells |
+| Language | a 16 KiB socket ROM | a 64 KiB bank of its own |
 | Disk | 512 sectors of 256 bytes | 4096 sectors of 512 bytes |
+| Numbers | five-byte floating point | sixteen-bit integers |
 
 ## Building
 
 A C++20 compiler and CMake 3.20. The window needs Qt 6 Widgets; without it the
-engine, the tools and the tests still build.
+machine, the tools and the tests still build.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
+
+Six suites: the two assemblers, the two processors, and the two machines booting
+their ROMs and answering at the keyboard.
 
 ## Running
 
@@ -75,16 +79,14 @@ tools/                    kestrel_asm, kestrel16_asm and the command line
 roms/kestrel/             the Kestrel's 6502 machine code
 roms/kestrel16/           the Kestrel 16's 65816 machine code
 tests/                    one executable per suite, no external test framework
-docs/                     the two machines' manuals
+docs/                     the manuals
 ```
-
-The libraries, their dependencies and the parts of each machine are described in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## The manuals
 
 | Book | What it covers |
 | --- | --- |
-| [Kestrel Owner's Manual](docs/kestrel/README.md) | The 6502, the map, the two ROMs, the language, the limits |
-| [Kestrel 16 Owner's Manual](docs/kestrel16/README.md) | The 65816, the banks, the KERNAL's services, the dialect, the limits |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the code is put together |
+| [Kestrel Owner's Manual](docs/kestrel/README.md) | The 6502, the map, the I/O page, the KERNAL, Kestrel DOS, the language, the errors, the limits |
+| [Kestrel 16 Owner's Manual](docs/kestrel16/README.md) | The 65816, the banks, the KERNAL's two tables, the language, the limits |
+| [The tools](docs/TOOLS.md) | Both assemblers and their dialect, the command line, the window, the build |
+| [Architecture](docs/ARCHITECTURE.md) | How the code is put together, for people changing it |

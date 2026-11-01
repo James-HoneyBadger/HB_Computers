@@ -8,6 +8,8 @@
 
 #include "kestrel/machine.hpp"
 
+using kestrel::SpecialKey;
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -96,10 +98,19 @@ int main(int argc, char** argv) {
     machine.reset();
     machine.runFrames(options.frames);
 
+    // A person types at the speed of the emulated machine, not the host's: the
+    // keyboard controller holds sixteen keys, and a line pasted in at once
+    // would overflow it and lose characters.
     for (const std::string& line : options.lines) {
-        machine.typeLine(line);
+        for (const char ch : line) {
+            machine.type(static_cast<std::uint8_t>(ch));
+            machine.runFrames(2);
+        }
+        machine.type(static_cast<std::uint8_t>(SpecialKey::Return));
         machine.runFrames(20);
     }
+    // A program worth watching takes longer than the typing did.
+    machine.runFrames(options.frames);
 
     if (options.screen) {
         std::printf("%s\n", machine.screenText().c_str());
