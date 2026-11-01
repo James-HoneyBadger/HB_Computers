@@ -2,6 +2,7 @@
 build/
 build-*/
 cmake-build-*/
+rust/target/
 
 # CMake
 CMakeCache.txt
