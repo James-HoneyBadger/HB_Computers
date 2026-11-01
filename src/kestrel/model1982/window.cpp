@@ -1,4 +1,18 @@
 // SPDX-License-Identifier: MIT
+//
+// The window: a tube to look at, a keyboard to type on, and the menus a host
+// needs to put media in a machine.
+//
+// The split this file keeps is the same one the whole emulator keeps. The window
+// does not draw the machine's screen and it does not decide what a key does: it
+// paints whatever cells the ROM has left in the tube, and it hands keystrokes to
+// the machine's controller. The only drawing it owns is the cursor, the border
+// and the choice of colours -- all of which are the host's business because they
+// are what a monitor did with the signals.
+//
+// Time is a timer, not a thread: tick() runs one frame's worth of cycles and
+// paints, so the machine advances only as fast as the host asks it to and never
+// behind the window's back.
 
 #include "kestrel/model1982/window.hpp"
 
@@ -78,6 +92,9 @@ QSize KestrelTube::minimumSizeHint() const {
             machine_.video().rows() * 12 + 2 * kBorderPixels};
 }
 
+// The tube, cell by cell. The font is the system's fixed font and the cells are
+// sized from the widget, so a bigger window is a bigger tube showing the same
+// forty columns -- never more of them.
 void KestrelTube::paintEvent(QPaintEvent*) {
     QPainter painter(this);
     painter.fillRect(rect(), colourOf(machine_.border()));
@@ -219,13 +236,13 @@ void KestrelWindow::buildMenus() {
         connect(action, &QAction::triggered, this, [this, id] { applySocketRom(id); });
     }
 
-    QMenu* cartridge = machine_.model() == kestrel::Model::Kestrel
-                           ? machine->addMenu(tr("&Cartridge"))
-                           : nullptr;
-    if (cartridge == nullptr) {
-        return;
-    }
-    QAction* fit = cartridge->addAction(tr("&Fit 4K image..."));
+    // Both machines take an expansion, and they are different sizes: the menu
+    // says which one this machine wants rather than making the file dialogue
+    // the first place a person finds out.
+    QMenu* cartridge = machine->addMenu(tr("&Cartridge"));
+    const int cartridgeK =
+        static_cast<int>(machine_.profile().cartridgeSize) / 1024;
+    QAction* fit = cartridge->addAction(tr("&Fit %1K image...").arg(cartridgeK));
     connect(fit, &QAction::triggered, this, &KestrelWindow::chooseCartridge);
     QAction* eject = cartridge->addAction(tr("&Eject"));
     connect(eject, &QAction::triggered, this, [this] { machine_.ejectCartridge(); });
@@ -307,10 +324,14 @@ void KestrelWindow::chooseCartridge() {
                                           std::istreambuf_iterator<char>()};
     if (!machine_.mountCartridge(bytes, QFileInfo(path).baseName().toStdString())) {
         QMessageBox::warning(this, tr("Kestrel"),
-                             tr("A cartridge is 4096 bytes; that file is not."));
+                             tr("A cartridge is %1 bytes; that file is not.")
+                                 .arg(machine_.profile().cartridgeSize));
         return;
     }
-    statusBar()->showMessage(tr("Cartridge fitted at $9000"), 4000);
+    statusBar()->showMessage(
+        tr("Cartridge fitted at $%1")
+            .arg(QString::number(machine_.profile().cartridgeBase, 16).toUpper()),
+        4000);
 }
 
 void KestrelWindow::mountDisk() {
@@ -409,6 +430,9 @@ void KestrelWindow::loadSettings() {
 
 KestrelWindow::~KestrelWindow() = default;
 
+// One frame: run the machine for the profile's cycles, then repaint. Painting is
+// asked for rather than done, so Qt can coalesce it with the rest of the window's
+// work; the machine has already moved on either way.
 void KestrelWindow::tick() {
     machine_.runCycles(machine_.profile().cyclesPerFrame);
     ++framesRun_;
@@ -421,6 +445,9 @@ void KestrelWindow::tick() {
     }
 }
 
+// Keys the machine has a number for are sent as that number; anything printable
+// is sent as itself. A key with no meaning here is offered to the base class
+// rather than swallowed, so a shortcut the shell or Qt owns still works.
 void KestrelWindow::keyPressEvent(QKeyEvent* event) {
     switch (event->key()) {
         case Qt::Key_Return:
