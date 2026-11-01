@@ -3,9 +3,9 @@
 One emulator, two models, and two assemblers. Everything else is a ROM image.
 
 ```
-                kestrel (CLI)      kestrel_computers (window)
-                      \                    /
-                       \                  /
+          kestrel (CLI)   kestrel_emu (session)   kestrel_computers (window)
+                 \               |                     /
+                  \              |                    /
                         kestrel_machine
                         /             \
               devices (shared)      the two processors
@@ -23,6 +23,7 @@ One emulator, two models, and two assemblers. Everything else is a ROM image.
 | --- | --- | --- |
 | `kestrel_machine` | The machine: both processors, the bus, the tube, the keyboard, the disk, the tape | no |
 | `kestrel` | The command line: `--model kestrel\|kestrel16`, type at it, print the screen | no |
+| `kestrel_emu` | The interactive emulator: choose a machine, type at it, `/model` to switch | no |
 | `kestrel_computers` | The window | Qt 6 Widgets |
 
 Apart from Qt for the window, there are no other dependencies: the machine, the
@@ -81,5 +82,6 @@ back.
 | `kestrel16_cpu_tests` | The 65816: widths, banks, the direct page, arithmetic, cycles |
 | `kestrel16_machine_tests` | The Kestrel 16: its ROMs boot, and typing at it works |
 | `kestrel_samples_tests` | Every program in `samples/` runs, and prints what its `.expected` file says |
+| `kestrel_emu_tests` | The emulator's front end: the model flag, switching models in a session, and the refusals |
 
 `ctest --test-dir build` runs all of them.

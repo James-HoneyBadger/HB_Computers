@@ -225,6 +225,7 @@ register layouts.
 | `kestrel16_cpu_tests` | the 65816: widths, banks, the direct page, jumps, arithmetic, cycles |
 | `kestrel16_machine_tests` | the Kestrel 16: its ROMs boot, and typing at it works |
 | `kestrel_samples_tests` | every program in `samples/`, against its `.expected` file |
+| `kestrel_emu_tests` | the emulator's front end: the model flag chooses the machine, a session switches models, and a command that is not one is refused |
 
 ```bash
 ctest --test-dir build --output-on-failure      # all of them
@@ -247,9 +248,10 @@ routine runs, not that the machine works.
 | `kestrel_roms`, `kestrel16_roms` | The ROM images, as headers of bytes |
 | `kestrel_machine` | The machine, both models, no Qt |
 | `kestrel` | The command line |
+| `kestrel_emu` | The interactive emulator, either machine |
 | `kestrel_computers` | The window, if Qt 6 Widgets is found |
 | `kestrel_asm`, `kestrel16_asm` | The assemblers the ROMs are built with |
-| `kestrel_*_tests` | The seven suites |
+| `kestrel_*_tests` | The eight suites |
 
 Each ROM is a custom command: `kestrel_asm` or `kestrel16_asm` writes a header
 into `build/generated/` and the machine includes it. A change to a `.s` file

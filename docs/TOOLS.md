@@ -155,6 +155,71 @@ $ ./build/kestrel --model kestrel16 --file samples/kestrel16/03-division.bas
 
 ---
 
+## `kestrel_emu` — the interactive emulator
+
+The same two machines as the command line, with a session around them: pick a
+model, type at it, watch the tube, and change your mind about which machine you
+are sitting at.
+
+```bash
+./start.sh emu                    # asks which machine when there is a keyboard
+./build/kestrel_emu --model kestrel16
+```
+
+```text
+Which machine?
+  1  Kestrel      (6502, 1982)
+  2  Kestrel 16   (65816, 1992)
+> 2
+Kestrel 16 powered on. /help lists the commands; a line without a
+leading / is typed at the machine.
++--------------------------------------------------------------------------------+
+|KESTREL 16 BASIC 2.0|
+|READY>|
++--------------------------------------------------------------------------------+
+/> PRINT -7/2
++--------------------------------------------------------------------------------+
+|KESTREL 16 BASIC 2.0|
+|READY> PRINT -7/2|
+|-3|
+||
+|READY>|
++--------------------------------------------------------------------------------+
+/> /quit
+kestrel_emu: Kestrel 16 off.
+```
+
+A line beginning with `/` is a command for the program; anything else is typed at
+the machine, a key at a time and at the speed the machine could be typed at.
+
+| Command | Does |
+| --- | --- |
+| `/model kestrel\|kestrel16` | power that machine on. A different model is a different machine, so it is a cold boot |
+| `/speed 1\|2\|4\|8\|turbo` | how fast the host clocks it |
+| `/frames N` | frames to run after each line typed (default 20) |
+| `/run [N]` | run N frames (default 50) |
+| `/break` | the BREAK key |
+| `/rom basic\|monitor` | which ROM is in the Kestrel's socket |
+| `/screen` | draw the tube |
+| `/status` | clock, frame, cycles |
+| `/quit` | leave |
+
+The tube is drawn without its blank tail, since a terminal is not a 40 × 25
+monitor. When the input is a pipe — a script — screens are drawn only where
+`/screen` asks for one and once at the end, because a screen after every line is
+noise when nobody is watching.
+
+| Option | Meaning |
+| --- | --- |
+| `--model` | which machine; asked for when there is a keyboard and no flag |
+| `--speed` | as above |
+| `--frames` | as above |
+| `--rom` | as above |
+| `--type "LINE"` | type a line before the prompt appears; may be repeated |
+| `--file FILE` | type every line of a file, in order |
+
+---
+
 ## `kestrel_computers` — the window
 
 The same machines with a tube you can watch and a keyboard you can use.
@@ -186,7 +251,7 @@ ctest --test-dir build --output-on-failure
 | `kestrel_machine` | The machine, both models |
 | `kestrel` | The command line |
 | `kestrel_computers` | The window, if Qt 6 Widgets is found |
-| `kestrel_*_tests` | The seven suites |
+| `kestrel_*_tests` | The eight suites |
 
 Each ROM is assembled by a custom command into `build/generated/`, with a header
 of the bytes and a listing beside it. A change to a `.s` file rebuilds the image,

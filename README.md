@@ -58,15 +58,16 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Seven suites: the two assemblers, the two processors, the two machines booting
-their ROMs and answering at the keyboard, and every sample program in
-[samples/](samples).
+Eight suites: the two assemblers, the two processors, the two machines booting
+their ROMs and answering at the keyboard, every sample program in
+[samples/](samples), and the emulator's own front end.
 
 `./start.sh` does the same three steps and then starts a machine:
 
 ```bash
 ./start.sh            # build, then the Kestrel's window
 ./start.sh kestrel16  # build, then the Kestrel 16's window
+./start.sh emu        # the interactive emulator
 ./start.sh test       # build, then every suite
 ```
 
@@ -87,6 +88,7 @@ vagrant ssh     # the tree is at /vagrant
 ./build/kestrel --model kestrel16 --frames 20        # the 1992 machine
 ./build/kestrel_computers                            # the window
 ./build/kestrel_computers --model kestrel16          # the 1992 machine's window
+./build/kestrel_emu                                  # either machine, interactively
 ./build/kestrel --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
 ```
 
@@ -96,7 +98,7 @@ vagrant ssh     # the tree is at /vagrant
 include/kestrel/          the machine, its devices, and the two models
 src/kestrel/              their implementations
 app/                      the window's main()
-tools/                    kestrel_asm, kestrel16_asm and the command line
+tools/                    kestrel_asm, kestrel16_asm, the command line and the interactive emulator
 roms/kestrel/             the Kestrel's 6502 machine code
 roms/kestrel16/           the Kestrel 16's 65816 machine code
 samples/                  programs to type, run and learn from, and their expected output

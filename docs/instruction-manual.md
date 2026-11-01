@@ -63,7 +63,7 @@ fails, and its log is in `build/start.log`.
 22.04 build machine, installs the tools, and builds and tests everything:
 
 ```bash
-vagrant up     # provision, build, run the seven suites
+vagrant up     # provision, build, run the eight suites
 vagrant ssh    # the tree is at /vagrant
 ```
 
@@ -77,6 +77,14 @@ given one, and the suites do not need it.
 ```bash
 ./build/kestrel_computers                    # the Kestrel
 ./build/kestrel_computers --model kestrel16  # the Kestrel 16
+```
+
+**Interactively** — either machine, chosen at the prompt, with a session around
+it; `/model` changes machine without leaving:
+
+```bash
+./start.sh emu                 # asks: 1 the Kestrel, 2 the Kestrel 16
+./start.sh emu --model kestrel16
 ```
 
 **On a shell** — the same machines with no window, which is how the tests and

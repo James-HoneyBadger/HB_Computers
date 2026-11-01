@@ -51,6 +51,7 @@ kestrel_warnings(kestrel_asm)
 add_executable(kestrel16_asm tools/kestrel16_asm.cpp)
 kestrel_warnings(kestrel16_asm)
 
+
 # ---------------------------------------------------------------------------
 # The ROMs
 # ---------------------------------------------------------------------------
@@ -140,6 +141,13 @@ if(KESTREL_BUILD_TOOLS)
     target_link_libraries(kestrel PRIVATE kestrel::machine)
     kestrel_warnings(kestrel)
     install(TARGETS kestrel RUNTIME DESTINATION bin)
+
+    # The interactive emulator: one program, either machine, chosen at the start
+    # and switchable in the middle of a session.
+    add_executable(kestrel_emu tools/kestrel_emu.cpp)
+    target_link_libraries(kestrel_emu PRIVATE kestrel::machine)
+    kestrel_warnings(kestrel_emu)
+    install(TARGETS kestrel_emu RUNTIME DESTINATION bin)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -188,6 +196,7 @@ if(KESTREL_BUILD_TESTS)
     kestrel_suite(kestrel16_cpu_tests)
     kestrel_suite(kestrel16_machine_tests)
     kestrel_suite(kestrel_samples_tests)
+    kestrel_suite(kestrel_emu_tests)
 
     # Both assemblers are run as the programs the build uses, so their tests
     # check the bytes that end up in the ROMs.
@@ -200,5 +209,10 @@ if(KESTREL_BUILD_TESTS)
     # rather than copied into the build.
     target_compile_definitions(kestrel_samples_tests PRIVATE
         KESTREL_SAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/samples")
+    # The emulator's front end is run as the program a person runs, so what is
+    # checked is that the model flag and the session commands do what they say.
+    target_compile_definitions(kestrel_emu_tests PRIVATE
+        KESTREL_EMU_PATH="$<TARGET_FILE:kestrel_emu>")
+    add_dependencies(kestrel_emu_tests kestrel_emu)
     add_dependencies(kestrel16_asm_tests kestrel16_asm)
 endif()
