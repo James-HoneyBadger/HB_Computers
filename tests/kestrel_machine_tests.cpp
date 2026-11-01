@@ -635,6 +635,32 @@ void test_arrays() {
 }
 
 
+/// BREAK is the machine's non-maskable interrupt: it abandons a running program
+/// and leaves it in memory, ready to be looked at.
+void test_break_stops_the_program() {
+    Machine machine{Model::Kestrel};
+    machine.runFrames(20);
+    typeOut(machine, "10 PRINT \"TICK\"");
+    typeOut(machine, "20 GOTO 10");
+    typeOut(machine, "CLS");
+    typeOut(machine, "RUN");
+    machine.runFrames(2);
+    machine.pressBreak();
+    machine.runFrames(20);
+    // The program has gone back to its prompt, not to the program.
+    typeOut(machine, "CLS");
+    typeOut(machine, "LIST");
+    const std::string all = screenText(machine);
+    TW_CHECK(all.find("10 PRINT") != std::string::npos);
+    TW_CHECK(all.find("20 GOTO 10") != std::string::npos);
+    // And it can be run again.
+    typeOut(machine, "RUN");
+    machine.runFrames(2);
+    TW_CHECK(screenText(machine).find("TICK") != std::string::npos);
+    machine.pressBreak();
+    machine.runFrames(10);
+}
+
 /// INPUT asks again when the line cannot be read, and remembers which variable
 /// it was asking for.
 void test_input_asks_again_after_junk() {
@@ -885,6 +911,7 @@ int main() {
     test_strings_in_a_program();
     test_get_takes_one_key();
     test_arrays();
+    test_break_stops_the_program();
     test_input_asks_again_after_junk();
     test_a_for_past_its_limit_is_empty();
     test_a_big_array_stays_in_its_own_memory();

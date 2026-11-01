@@ -149,7 +149,8 @@ IRQ_DONE:
 
 ; BREAK is a warm start: clear the line and start the language again.
 NMI:
-        JSR NEWLINE
+        CLI                     ; interrupts were masked on the way in; the machine
+        JSR NEWLINE             ; needs them back to see its keyboard
         JML BASIC
 
 BRK_HANDLER:

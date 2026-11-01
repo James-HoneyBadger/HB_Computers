@@ -152,7 +152,6 @@ K_PEEK          = KERNAL+$0048
 K_POKE          = KERNAL+$004B
 K_GETKEY        = KERNAL+$004E
 K_NEWLINE       = KERNAL+$0051
-K_STRLEN        = KERNAL+$0054
 
 ; The long-call table, for the language in bank one: each entry is four
 ; bytes, JSR and RTL, so a caller reaches the same routines with JSL.

@@ -293,11 +293,33 @@ std::vector<Tok> lex(const std::string& line, const std::string& file,
                 if (i == digits) {
                     throw Error(file, lineNumber, "empty binary number");
                 }
+            } else if (ch == '0' && i + 1 < line.size() &&
+                       (line[i + 1] == 'x' || line[i + 1] == 'X')) {
+                i += 2;                 // 0x: the other way of writing hex
+                const std::size_t digits = i;
+                while (i < line.size() &&
+                       std::isxdigit(static_cast<unsigned char>(line[i])) != 0) {
+                    value = value * 16 +
+                            (std::isdigit(static_cast<unsigned char>(line[i]))
+                                 ? line[i] - '0'
+                                 : (std::toupper(static_cast<unsigned char>(
+                                        line[i])) -
+                                    'A' + 10));
+                    ++i;
+                }
+                if (i == digits) {
+                    throw Error(file, lineNumber, "empty hexadecimal number");
+                }
             } else {
                 while (i < line.size() &&
                        std::isdigit(static_cast<unsigned char>(line[i])) != 0) {
                     value = value * 10 + (line[i] - '0');
                     ++i;
+                }
+                if (i < line.size() && identChar(line[i])) {
+                    throw Error(file, lineNumber,
+                                "a number cannot run into a letter: " +
+                                    line.substr(start, i - start + 1));
                 }
             }
             (void)start;

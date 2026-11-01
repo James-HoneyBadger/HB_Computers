@@ -109,7 +109,8 @@ IRQ_DONE:
 
 ; BREAK: a warm start. The ROM in the socket decides what that means.
 NMI:
-        JMP WARM_START
+        CLI                     ; the interrupt that got us here masked the rest,
+        JMP WARM_START          ; and a machine that cannot read its keyboard is dead
 
 ; ---------------------------------------------------------------------------
 ; The keyboard

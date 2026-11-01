@@ -1,6 +1,7 @@
 # The Kestrel Owner's Manual
 
-A home computer from 1982, from HoneyBadger Systems. It has a 6502, 64K, a
+A home computer from 1982, from HoneyBadger Systems. It has a 6502, 32 KiB of RAM
+— the banner says 64K, and every machine of the year said something like it — a
 40 × 25 tube, a disk drive seen one sector at a time, an 8 KiB KERNAL and a 16 KiB
 socket for the language. The languages are machine code in ROM: nothing on the
 screen is drawn by the host, and `READY.` is a string in a ROM image that the
@@ -23,10 +24,10 @@ READY.
 | --- | --- |
 | Processor | MOS 6502 at 1 MHz, cycle-counted |
 | Frame | 50 Hz, so 20 000 cycles a frame |
-| RAM | 32 KiB, `$0000`–`$7FFF` |
+| RAM | 32 KiB, `$0000`–`$7FFF` — the banner says `64K RAM SYSTEM`, as banners did |
 | Tube | 40 × 25 characters, an ASCII code each, plus one colour byte each |
 | Keyboard | a 16-key controller buffer, drained by the frame interrupt |
-| Sound | one latch byte: the note the host plays |
+| Sound | one latch byte; writing it is a note, and the window answers with a beep |
 | Disk | 512 sectors of 256 bytes, a sector-level controller |
 | ROM | 16 KiB socket at `$A000`, 8 KiB KERNAL at `$E000` |
 | Cassette | a byte stream; the monitor ROM reads and writes blocks |
@@ -40,8 +41,12 @@ READY.
 | `$0200`–`$02FF` | The input line |
 | `$0300`–`$06FF` | Kestrel DOS buffers: the directory, the volume header, one data sector |
 | `$0700`–`$070F` | The keyboard buffer the interrupt handler fills |
+| `$0710`–`$073F` | Workspace: the name a disk call is looking for, the SAVE's counters, the four `DEF FN` definitions |
+| `$0740`–`$07FF` | The digits of a number on its way to the screen, and room to grow |
 | `$0801`–`$7EFF` | Program, variables and free memory |
-| `$7F00`–`$7FFF` | The stacks and the top of free RAM |
+| `$7F00`–`$7F47` | BASIC's value stack: twelve levels of six bytes |
+| `$7F50`–`$7FBF` | Seven `FOR` frames of sixteen bytes |
+| `$7FC0`–`$7FFF` | Sixteen `GOSUB` frames of four bytes |
 | `$8000`–`$83E7` | The tube: 1000 character cells, row-major |
 | `$8400`–`$87E7` | One colour byte per cell: ink in the high nibble, paper in the low |
 | `$8800`–`$88FF` | The I/O page |
@@ -86,9 +91,19 @@ storage.
 
 ### Colours
 
-Sixteen, packed into the attribute byte: the low three bits are the guns, bit 3 is
-brightness. `0` black, `1` blue, `2` red, `3` magenta, `4` green, `5` cyan,
-`6` yellow, `7` light grey, and `8`–`15` the same again at full brightness.
+Sixteen codes, and the attribute byte of a cell holds two of them: ink in the high
+nibble, paper in the low. A write to `$05` or `$06` chooses the ink and the paper
+for everything printed after it, and four bits is the whole of the choice.
+
+| Code | | Code | | Code | | Code | |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `0` | black | `4` | purple | `8` | orange | `12` | grey |
+| `1` | white | `5` | green | `9` | brown | `13` | light green |
+| `2` | red | `6` | blue | `10` | light red | `14` | light blue |
+| `3` | cyan | `7` | yellow | `11` | dark grey | `15` | light grey |
+
+The two halves of the byte are the machine's; which red, and how bright, is the
+tube's business, and the window draws a muted set that suits a 1982 monitor.
 
 ---
 
@@ -96,8 +111,12 @@ brightness. `0` black, `1` blue, `2` red, `3` magenta, `4` green, `5` cyan,
 
 The processor resets through `$FFFC`, finds the KERNAL's reset routine, clears the
 screen, prints the banner and hands the machine to the ROM in the socket. The
-socket ROM prints `READY.` and waits for a line. `Ctrl+Q` leaves the machine on;
-the BREAK key is a non-maskable interrupt that warm-starts it.
+socket ROM prints `READY.` and waits for a line. `Ctrl+Q` leaves the machine on.
+
+**BREAK** is a non-maskable interrupt that warm-starts the machine: it abandons a
+running program, prints `READY.` and leaves the program in memory, ready to be
+`LIST`ed or `RUN` again. The window presses it from **Machine ▸ BREAK**, or with
+the `Pause` key.
 
 ### The keyboard
 
@@ -109,6 +128,10 @@ the BREAK key is a non-maskable interrupt that warm-starts it.
 | Escape | 27 |
 | Arrows | 28–31 |
 | Delete | 127 |
+
+The letters reach the screen as typed, upper or lower: the machine is case-blind
+about what it reads and matches `print` to `PRINT`, so a program can be typed the
+way a person writes.
 
 ---
 
@@ -124,20 +147,23 @@ fixed addresses, which is how the socket ROM reaches the machine:
 | `$E006` | `CHRIN` — the next key, waiting for one |
 | `$E009` | `CLS` |
 | `$E00C` | `HOME` |
-| `$E00F` | `PRINT` — a pointer in `$10`, a length in X |
+| `$E00F` | `PRINT` — the zero-terminated string at `$0A`/`$0B` |
 | `$E012` | `SCROLL` |
 | `$E015` | `LOCATE` — X = column, Y = row |
-| `$E018` | `GETLINE` — read into the buffer at `$10`, length in X |
-| `$E01B` | `READSECT` — X = sector, buffer at `$10` |
-| `$E01E` | `WRITESECT` |
-| `$E021` | `CURSORON` |
-| `$E024` | `DOSCATALOG` |
-| `$E027` | `DOSFIND` |
-| `$E02A` | `DOSLOAD` |
-| `$E02D` | `DOSSAVE` |
-| `$E030` | `DOSDELETE` |
-| `$E033` | `DOSSTATUS` |
-| `$E036` | `DOSFORMAT` |
+| `$E018` | `GETLINE` — a line into the buffer at `$0200`, its length in `$15` |
+| `$E01B` | `READSECT` — A/X = sector low/high, the buffer at `$06`/`$07` |
+| `$E01E` | `WRITESECT` — the same three, the other way round |
+| `$E021` | `CURSORON` — A = `1` for a solid cursor, `0` for none |
+| `$E024` | `DOSCATALOG` — list the volume |
+| `$E027` | `DOSFIND` — the name at `$0710`; A = its entry, or `$FF` |
+| `$E02A` | `DOSLOAD` — load to `$18`/`$19`, which comes back holding the end |
+| `$E02D` | `DOSSAVE` — save from `$18`/`$19` to `$1B`/`$1C` |
+| `$E030` | `DOSDELETE` — remove the name at `$0710` |
+| `$E033` | `DOSSTATUS` — A = `0`, or the error code below |
+| `$E036` | `DOSFORMAT` — a blank volume |
+
+Each of the disk words returns its reason in A: `0` fine, `1` no disk, `2` no
+such file, `3` no room, `4` the disk itself failed.
 
 ### The frame
 
@@ -159,7 +185,9 @@ time (see `$0C`–`$11` above). Everything above that is Kestrel DOS, in the KER
   length, and the file's type.
 - **Sector 3 onwards** hold files: 252 bytes of data, a pointer to the next
   sector, and how much of this one is used.
-- A freshly formatted volume is named `KESWARP`.
+- A freshly formatted volume is named `KESWARP`. BASIC has no `FORMAT`; the disk
+  arrives formatted and is formatted again from the window's **Media ▸ Format
+  disk**.
 
 From BASIC: `SAVE "NAME"`, `LOAD "NAME"`, `CATALOG`, and `DELETE` removes a line
 rather than a file. `CATALOG` lists the volume; a file that will not load reports
@@ -234,8 +262,9 @@ dimensions. `DIM` twice is an error worth having: `?REDIMENSIONED ARRAY`.
 
 ### Errors
 
-The machine prints the reason and where it happened: `SYNTAX ERROR IN 40`, or
-`BREAK ERROR IN 120` after `STOP`. The reasons it has:
+An error prints its reason and the line it happened in — `?SYNTAX ERROR IN 40` —
+and a `STOP` prints `BREAK IN 120` and leaves the program where it was. The
+reasons the table has:
 
 | | | |
 | --- | --- | --- |
@@ -301,7 +330,7 @@ how the cassette is used at all: BASIC has no tape words.
 `S aaaa bbbb` takes the block from `aaaa` to `bbbb` *inclusive*, so
 `S 0900 0902` writes three bytes behind a four-byte header — the load address and
 the length — and `L` puts them back where they came from. Both words need a
-cassette in the deck: the window inserts one with **Tape**, and `kestrel --tape`
+cassette in the deck: the window inserts one with **Media ▸ Insert tape…**, and `kestrel --tape`
 takes an image, or hands the machine a blank one. With the drawer empty, `S` and
 `L` both say `no tape`.
 

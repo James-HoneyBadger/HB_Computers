@@ -231,6 +231,10 @@ void KestrelWindow::buildMenus() {
     connect(eject, &QAction::triggered, this, [this] { machine_.ejectCartridge(); });
 
     machine->addSeparator();
+    QAction* warmStart = machine->addAction(tr("&BREAK"));
+    warmStart->setShortcut(QKeySequence(Qt::Key_Pause));
+    connect(warmStart, &QAction::triggered, this,
+            [this] { machine_.pressBreak(); });
     QAction* sound = machine->addAction(tr("&Sound"));
     sound->setCheckable(true);
     sound->setChecked(machine_.soundEnabled());
@@ -431,6 +435,9 @@ void KestrelWindow::keyPressEvent(QKeyEvent* event) {
             return;
         case Qt::Key_Delete:
             machine_.type(static_cast<std::uint8_t>(127));
+            return;
+        case Qt::Key_Pause:
+            machine_.pressBreak();
             return;
         case Qt::Key_Left:
             machine_.type(static_cast<std::uint8_t>(28));

@@ -189,6 +189,19 @@ void test_an_item_that_names_nothing_is_refused() {
     TW_CHECK_EQ(booted.answer(), std::string{"3"});
 }
 
+/// BREAK is a warm start here too, and the keyboard works afterwards: the
+/// interrupt that carried it in masks the rest, and the KERNAL puts them back.
+void test_break_warm_starts_the_language() {
+    Booted booted;
+    booted.run("PRINT 1+1");
+    TW_CHECK_EQ(booted.answer(), std::string{"2"});
+    booted.machine().pressBreak();
+    booted.runFrames(10);
+    TW_CHECK(booted.shows("KESTREL 16 BASIC 2.0"));
+    booted.run("PRINT 2+2");
+    TW_CHECK_EQ(booted.answer(), std::string{"4"});
+}
+
 void test_the_keyboard_reaches_the_screen() {
     Booted booted;
     booted.machine().typeText("HELLO");
@@ -258,6 +271,7 @@ int main() {
     test_sixteen_bit_numbers();
     test_cls_and_unknown_statements();
     test_an_item_that_names_nothing_is_refused();
+    test_break_warm_starts_the_language();
     test_the_keyboard_reaches_the_screen();
     test_a_line_is_collected();
     test_a_wrong_sized_rom_is_refused();

@@ -10,7 +10,6 @@ no longer shares a socket with the kernel.
 KESTREL 16 BASIC 2.0
 READY> PRINT 2+2
 4
-
 READY>
 ```
 
@@ -22,7 +21,7 @@ READY>
 | --- | --- |
 | Processor | WDC 65C816 at 8 MHz, emulation and native modes |
 | Frame | 50 Hz, so 160 000 cycles a frame |
-| RAM | 1 MiB: bank zero and banks 8–15 |
+| RAM | 1 MiB, spread over banks `$00`–`$0F` under the ROM and I/O windows |
 | ROM | an 8 KiB KERNAL at the top of bank zero; a 64 KiB language ROM in bank one |
 | Tube | 80 × 50 cells, sixteen colours for ink and sixteen for paper |
 | Keyboard | a 32-key controller buffer |
@@ -39,8 +38,8 @@ rather than one page. Bank zero keeps the shape the Kestrel had.
 | --- | --- | --- |
 | `$00` | `$0000`–`$00FF` | Zero page |
 | `$00` | `$0100`–`$01FF` | The processor's stack |
-| `$00` | `$0200`–`$07FF` | System RAM: the keyboard buffer, the line buffer, workspace |
-| `$00` | `$0800`–`$7FFF` | Program, variables and free RAM (30 KiB) |
+| `$00` | `$0200`–`$07FF` | System RAM: the keyboard buffer at `$0300`, the input line at `$0400`, the line buffer at `$0500`, and the language's variables |
+| `$00` | `$0800`–`$7EFF` | Free RAM, nearly 30 KiB; `MEMTOP` answers `$7F00` |
 | `$00` | `$8000`–`$8F9F` | The tube: 4000 character cells, row-major |
 | `$00` | `$8FA0`–`$9F3F` | One attribute byte per cell |
 | `$00` | `$A000`–`$A0FF` | The I/O page |
@@ -49,7 +48,11 @@ rather than one page. Bank zero keeps the shape the Kestrel had.
 | `$00` | `$E000`–`$FFFF` | The KERNAL |
 | `$01` | `$0000`–`$FFFF` | The language ROM |
 | `$04`–`$07` | | A cartridge, 256 KiB |
-| `$00`, `$08`–`$0F` | | RAM |
+| `$02`–`$03`, `$08`–`$0F` | | RAM |
+| `$04`–`$07` | | RAM too, when no cartridge is fitted |
+
+A megabyte is all sixteen banks; what the table above lists as ROM, cartridge and
+I/O is what stands in front of it.
 
 The map is written twice — `include/kestrel/model1992/map.hpp` for the emulator
 and `roms/kestrel16/kestrel16.inc` for the ROMs — and the two are changed
@@ -66,10 +69,10 @@ together.
 | `$05` / `$06` / `$07` | Ink / paper / border |
 | `$08` | The sound latch |
 | `$09` / `$0A` | The frame counter, low byte first |
-| `$0B` | Set every frame; write anything to clear it |
+| `$0B` | Bit 7 set when a frame has passed; write `0` to clear it |
 | `$0C` / `$0D` | Disk sector |
 | `$0E` | Disk command: `1` read, `2` write, `3` format, `4` query |
-| `$0F` | Disk status: busy, error, present, done |
+| `$0F` | Disk status: bit 7 done, bit 2 present, bit 1 error. A command runs inside the write that starts it, so there is no busy bit to see |
 | `$10`–`$12` | The disk's buffer address: a full 24-bit pointer, low byte first |
 | `$13` / `$14` | How many sectors to move |
 | `$15` | The noise generator |
@@ -92,7 +95,7 @@ at zero and a data bank at zero. From there it clears the screen, prints its
 banner and starts the language in bank one with `JML`.
 
 `BREAK` is a warm start: a non-maskable interrupt, a newline and the language
-again.
+again. The window presses it from **Machine ▸ BREAK**, or with the `Pause` key.
 
 ---
 
@@ -111,7 +114,7 @@ a table at `$00:E000`, which is what a caller in bank zero uses:
 | `$E00F` | `PRINT` — `$10` points at the text, X = its length |
 | `$E012` | `SCROLL` |
 | `$E015` | `LOCATE` — X = column, Y = row |
-| `$E018` | `GETLINE` — read into the buffer at `$10`, length in X |
+| `$E018` | `GETLINE` — keys into the buffer `$10` points at; the length comes back in `$1A` |
 | `$E01B` | `READSECT` — X = sector, buffer at `$10` |
 | `$E01E` | `WRITESECT` |
 | `$E021` | `CURSORON` |
@@ -120,7 +123,7 @@ a table at `$00:E000`, which is what a caller in bank zero uses:
 | `$E03C` | `SETPAPER` |
 | `$E03F` | `SOUND` |
 | `$E042` | `FRAMES` — the frame counter |
-| `$E045` | `MEMTOP` — X = the top of free RAM |
+| `$E045` | `MEMTOP` — X = `$7F00`, the first byte above the free RAM |
 | `$E048` | `PEEKBYTE` — A = bank, X = address |
 | `$E04B` | `POKEBYTE` — A = bank, X = address, Y = value |
 | `$E04E` | `GETKEY` |
@@ -147,8 +150,8 @@ inherited: type a line, press Return, read the answer.
 ```
 READY> PRINT 2+2
 4
-> LET A=41
-> PRINT "THE ANSWER IS ";A+1
+READY> LET A=41
+READY> PRINT "THE ANSWER IS ";A+1
 THE ANSWER IS 42
 ```
 

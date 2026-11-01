@@ -3,8 +3,9 @@
 Two home computers from a 1982 that never happened, and the one emulator that
 runs both.
 
-- the **Kestrel** — a 6502 at 1 MHz, 64K, a 40 × 25 tube, a disk measured in
-  256-byte sectors, an 8 KiB KERNAL and a 16 KiB language socket; and
+- the **Kestrel** — a 6502 at 1 MHz, 32 KiB of RAM behind a banner that claims
+  64K, a 40 × 25 tube, a disk measured in 256-byte sectors, an 8 KiB KERNAL and a
+  16 KiB language socket; and
 - the **Kestrel 16** — its 1992 successor: a 65816 at 8 MHz, a megabyte of banked
   memory, an 80 × 50 tube, and Kestrel 16 BASIC in a 64 KiB bank of its own.
 

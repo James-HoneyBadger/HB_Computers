@@ -188,8 +188,11 @@ if(KESTREL_BUILD_TESTS)
     kestrel_suite(kestrel16_cpu_tests)
     kestrel_suite(kestrel16_machine_tests)
 
-    # The 65816 assembler is run as the program the build uses, so its test
-    # checks the bytes in the ROM.
+    # Both assemblers are run as the programs the build uses, so their tests
+    # check the bytes that end up in the ROMs.
+    target_compile_definitions(kestrel_asm_tests PRIVATE
+        KESTREL_ASM_PATH="$<TARGET_FILE:kestrel_asm>")
+    add_dependencies(kestrel_asm_tests kestrel_asm)
     target_compile_definitions(kestrel16_asm_tests PRIVATE
         KESTREL16_ASM_PATH="$<TARGET_FILE:kestrel16_asm>")
     add_dependencies(kestrel16_asm_tests kestrel16_asm)

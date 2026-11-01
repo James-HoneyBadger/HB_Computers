@@ -25,7 +25,8 @@ One emulator, two models, and two assemblers. Everything else is a ROM image.
 | `kestrel` | The command line: `--model kestrel\|kestrel16`, type at it, print the screen | no |
 | `kestrel_computers` | The window | Qt 6 Widgets |
 
-There are no other libraries and no other dependencies.
+Apart from Qt for the window, there are no other dependencies: the machine, the
+tools and the tests are C++20 and the standard library.
 
 ## The machine
 
@@ -42,8 +43,9 @@ it: RAM, the ROM windows, the cartridge, the tube's two arrays and the I/O page.
 | `src/kestrel/model1982/roms.cpp` | The table of ROMs the 1982 machine can be given |
 
 The two processors are not interchangeable and the machine never substitutes one
-for the other: `cpu6502()` and `cpu65816()` are separate accessors, so asking a
-machine for the processor it does not have is a compile error.
+for the other: `cpu6502()` and `cpu65816()` are separate accessors over separate
+classes, and only the one the model has is stepped, so a fault in one cannot
+show up as a fault in the other.
 
 ### The two models
 

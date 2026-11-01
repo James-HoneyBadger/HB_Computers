@@ -11,9 +11,13 @@ Assembles the Kestrel's ROMs. It is a 6502 assembler with the directives a ROM
 needs and nothing else.
 
 ```bash
-kestrel_asm roms/kestrel/basic.s --name basic --origin $A000 --size 16384 \
-             --bin basic.bin --listing basic.lst --symbols basic.sym
+cd roms/kestrel                 # .include is resolved from the working directory
+kestrel_asm basic.s --name basic --origin $A000 --size 16384 \
+             --bin ../../build/basic.bin --listing basic.lst --symbols basic.sym
 ```
+
+The origin may be written in hex with `$`, in hex with `0x`, or in decimal, and
+the same goes for every number in the source.
 
 | Option | Meaning |
 | --- | --- |
@@ -42,8 +46,10 @@ kestrel_asm roms/kestrel/basic.s --name basic --origin $A000 --size 16384 \
 
 Labels are `NAME:` or in column zero; `NAME = expr` is a constant. Identifiers are
 uppercased, so `Loop` and `LOOP` are the same label. Expressions may be decimal,
-`$hex`, `%binary`, character literals, `+ - * / % & | ^ << >>`, `<` (low byte) and
-`>` (high byte) of a value, and the current address `.`.
+`$hex` or `0x` hex, `%binary`, character literals, `+ - * / % & | ^ << >>`, `<`
+(low byte) and `>` (high byte) of a value, and the current address `.`. A number
+that runs straight into a letter is an error rather than a zero — `12AB` is
+rejected, because it means `$12AB` often enough to be worth saying so.
 
 A 6502 branch that cannot reach its target is assembled as the inverse branch over
 `JMP`, so a long branch is written as if it were short and the assembler makes it
@@ -56,8 +62,9 @@ work.
 `kestrel_asm` with the 65816 added: everything above, plus the wider machine.
 
 ```bash
-kestrel16_asm roms/kestrel16/basic.s --name basic --origin 65536 --size 65536 \
-               --bin basic.bin
+cd roms/kestrel16
+kestrel16_asm basic.s --name basic --origin 0x10000 --size 65536 \
+               --bin ../../build/basic16.bin
 ```
 
 An origin may be twenty-four bits, so a ROM can be a bank of its own.
