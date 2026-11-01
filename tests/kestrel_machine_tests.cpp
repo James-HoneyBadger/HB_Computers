@@ -559,7 +559,7 @@ void test_strings_in_a_program() {
     typeOut(machine, "RUN");
     const std::string all = screenText(machine);
     TW_CHECK(all.find("CAT 3 CA") != std::string::npos);
-    TW_CHECK(all.find("A\nB\nC") != std::string::npos);
+    TW_CHECK(all.find("ABC") != std::string::npos);   // a trailing ';' holds the line
 }
 
 /// GET takes one key without waiting for Return.
@@ -663,7 +663,7 @@ void test_a_for_past_its_limit_is_empty() {
     typeOut(runs, "FOR I=5 TO 3 STEP -1: PRINT I;: NEXT I");
     typeOut(runs, "CLS");
     typeOut(runs, "FOR I=5 TO 3 STEP -1: PRINT I;: NEXT I");
-    TW_CHECK(screenText(runs).find("5\n4\n3\n") != std::string::npos);
+    TW_CHECK(screenText(runs).find("543") != std::string::npos);
 }
 
 /// A big array is a big block of heap: 101 numbers, not the 8-bit remainder of

@@ -262,18 +262,18 @@ A sieve of Eratosthenes, the program every 1982 magazine carried:
 
 ```
 RUN
-2
-3
-5
-7
-11
-...
-97
+2357111317192329313741434753596167717379
+838997
 ```
 
 Line 60 is the interesting one: when `I` passes ten, `I*I` is past the end of the
 array, and the loop runs no times at all rather than once with a subscript out of
 range — which is what `FOR` is for.
+
+The prime line is one line because line 50 says `PRINT I;` and not `PRINT I`: a
+trailing `;` leaves the cursor where it is, so the next number follows the last.
+That works at the prompt too, which is why `PRINT 5;` shows `5READY.` — the
+machine's prompt does not tidy up after you.
 
 ---
 

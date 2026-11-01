@@ -935,10 +935,13 @@ PRINT_SEMI:
 PRINT_NEXT:
         JSR SKIPSP
         JSR CURCHAR
-        BEQ PRINT_NL
-        CMP #':'
-        BEQ PRINT_NL
+        BEQ PRINT_STAY          ; a trailing ';' leaves the cursor where it is,
+        CMP #':'                ; which is the whole point of typing one
+        BEQ PRINT_STAY
         JMP PRINT_ITEMS
+PRINT_STAY:
+        CLC
+        RTS
 PRINT_NL:
         LDA #CC_RETURN
         JMP K_CHROUT
