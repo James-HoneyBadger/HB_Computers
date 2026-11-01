@@ -1,5 +1,22 @@
 // SPDX-License-Identifier: MIT
 //
+// The machine: the profile, the decode, the I/O page, the frame and the disk
+// commands -- everything that is the same for both models once the numbers are
+// different.
+//
+// Three things in here are worth reading before changing anything:
+//
+//   * the profile. makeProfile is the only place a model's clock, memory sizes,
+//     screen geometry, ROM windows and disk geometry are written down. A new
+//     difference between the machines belongs there, not in a `if (model)`.
+//   * the decode. read() and write() answer in a fixed order, and the order is
+//     significant where regions abut: on the Kestrel, RAM is checked before the
+//     screen because they are neighbours; on the Kestrel 16 the KERNAL is checked
+//     before RAM because it stands at the top of bank zero.
+//   * the registers. layOutRegisters maps an offset in the I/O page to a device,
+//     and readRegister/writeRegister are the only code that knows what a device
+//     does. A read is an input and a write is an output; the page is not storage.
+//
 // The machine's bus. Every address the processor puts on the wire is decoded here
 // against the profile of the model the machine was built as: RAM, the two ROM
 // windows, the cartridge, the tube's two arrays and the I/O page.
@@ -119,6 +136,9 @@ void Machine::layOutRegisters() {
     at(0x1B, Reg::TapeControl);
 }
 
+// Power-on's ROMs: the pair the build assembled for this model. They are mounted
+// as images rather than linked into the machine's code, so the same `Machine`
+// class runs whichever ROMs a host hands it.
 void Machine::mountShippedRoms() {
     if (profile_.model == Model::Kestrel) {
         mountKernal(std::vector<std::uint8_t>(std::begin(kestrel::model1982::rom::kKERNALImage),
@@ -185,6 +205,9 @@ void Machine::ejectCartridge() noexcept {
     cartridgeMounted_ = false;
 }
 
+// A cold boot: RAM and the tube cleared, the devices idle, the clock at zero. The
+// ROMs are not touched -- they are read-only and the machine is powered on with
+// them already in.
 void Machine::reset() {
     std::fill(ram_.begin(), ram_.end(), 0);
     video_.powerOn(ink_, paper_);
@@ -612,11 +635,18 @@ std::uint8_t Machine::randomByte() {
     return static_cast<std::uint8_t>(randomState_ & 0xFF);
 }
 
+// One frame of the machine's own time. The counter and the flag are all the
+// machine does: the interrupt is the line the ROM sees, and the work -- blinking
+// the cursor, draining the keyboard -- is the KERNAL's handler.
 void Machine::tickFrame() {
     ++frameCounter_;
     frameFlag_ = true;
 }
 
+// Run the processor, and count frames as its cycles pass. The interrupt line is
+// recomputed before every instruction because it is level-triggered: it is high
+// while a key waits or a frame has passed, and it drops when the ROM has dealt
+// with both.
 void Machine::runCycles(long cycles) {
     long done = 0;
     while (done < cycles) {

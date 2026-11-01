@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: MIT
+//
+// The Kestrel's ROM socket: which images the machine can be given, and what each
+// one is.
+//
+// The images are the ones this build assembled -- the headers in
+// `build/generated/` are included above, so a change to a `.s` file reaches this
+// table without anybody editing it. The list is what `kestrel --rom` offers and
+// what the window's ROM menu shows; adding a socket ROM means adding a
+// `kestrel_rom(...)` line in the build and a `RomInfo` here.
 
 #include "kestrel/model1982/rom.hpp"
 

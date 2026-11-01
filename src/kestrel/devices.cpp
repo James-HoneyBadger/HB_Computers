@@ -1,4 +1,19 @@
 // SPDX-License-Identifier: MIT
+//
+// The four devices both machines have: the tube, the keyboard controller, the
+// disk and the cassette.
+//
+// None of them knows an address. The machine's decode decides what a read or a
+// write means and calls one of these, which is why the same cassette can serve
+// two machines that put its registers at different offsets. What each one keeps
+// is state and nothing else:
+//
+//   * the tube, cells and attributes as two separate arrays, because both
+//     machines put them at separate addresses;
+//   * the keyboard, a fixed-capacity queue: a full queue refuses the key rather
+//     than growing, which is the behaviour a person typing too fast meets;
+//   * the disk, sectors and nothing more -- the filesystem is in the ROMs;
+//   * the tape, bytes and a play head, with no notion of a block.
 
 #include "kestrel/devices.hpp"
 
@@ -16,6 +31,9 @@ constexpr std::size_t kVolumeNameLength = 16;
 // The tube
 // ---------------------------------------------------------------------------
 
+// A fresh tube: spaces in the machine's ink and paper, which is the screen a
+// machine comes up with. The attributes are set once here rather than per cell,
+// because a cell and its colour are separate arrays.
 Video::Video(int columns, int rows)
     : columns_(columns),
       rows_(rows),
@@ -97,6 +115,9 @@ std::string Video::text() const {
 
 Keyboard::Keyboard(int capacity) : capacity_(capacity) {}
 
+// A full queue refuses the key. Growing it instead would be kinder to a pasted
+// line and would not be the machine: the controller holds sixteen keys on the
+// Kestrel and thirty-two on the Kestrel 16, and a person can type past that.
 bool Keyboard::push(std::uint8_t key) {
     if (static_cast<int>(buffer_.size()) >= capacity_) {
         return false;
@@ -137,6 +158,9 @@ void Disk::eject() noexcept {
     present_ = false;
 }
 
+// A blank volume: every sector zero, then the name written where the DOS looks
+// for it. The DOS itself is in the ROM, so this is a photograph of a formatted
+// disk rather than a filesystem.
 void Disk::format(std::string_view volume) {
     bytes_.assign(static_cast<std::size_t>(sectors_) * static_cast<std::size_t>(sectorSize_), 0);
     const std::string name{volume};
@@ -220,6 +244,9 @@ void Tape::load(const std::vector<std::uint8_t>& bytes) {
     mode_ = Mode::Stopped;
 }
 
+// Recording writes through the play head: over what is there and past the end
+// when the tape runs out. A tape that is not recording swallows the byte, which
+// is the same as a machine with the motor off.
 void Tape::writeByte(std::uint8_t value) {
     if (mode_ != Mode::Recording) {
         return;
@@ -239,6 +266,9 @@ std::uint8_t Tape::readByte() {
     return bytes_[position_++];
 }
 
+// The status byte the ROM reads: present, playing, recording, and whether there
+// is more to read. The bits are the machines' own contract (see the technical
+// reference); the tape has no other way of saying anything.
 std::uint8_t Tape::status() const noexcept {
     std::uint8_t status = 0;
     if (present_) {

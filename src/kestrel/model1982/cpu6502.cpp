@@ -1,7 +1,24 @@
 // SPDX-License-Identifier: MIT
 //
-// The 6502 core. The instruction table below is the documented set in
-// opcode order, one group per kind of work.
+// The 6502 core: the documented instruction set, cycle-counted.
+//
+// The switch in step() is written in opcode order, one case per instruction, so
+// the table can be read against a datasheet line by line. Three things are worth
+// knowing before reading it:
+//
+//   * cycles. kBaseCycles holds the table's figure for each documented opcode.
+//     Everything that depends on the operands is added where it happens: a page
+//     crossing on an indexed read, a branch that is taken, a branch that is taken
+//     across a page.
+//   * flags. setZeroNegative is the only place Z and N are set from a result, and
+//     the arithmetic helpers set C and V themselves, because their rules are not
+//     the same for every instruction that touches them.
+//   * decimal mode. ADC and SBC adjust a nibble at a time, and they report the
+//     flags the chip reported: C from the decimal result, V from the binary one.
+//
+// An opcode the table does not have is counted and skipped rather than executed.
+// The machine's ROMs never use one, and a test that finds a non-zero count has
+// found a runaway rather than an instruction.
 
 #include "kestrel/model1982/cpu6502.hpp"
 
@@ -10,7 +27,8 @@ namespace kestrel::model1982 {
 namespace {
 
 // Documented cycle counts, before the page-crossing and branch-taken
-// penalties that depend on where the operands happen to be.
+// penalties that depend on where the operands happen to be. A zero is an opcode
+// this processor does not have: step() counts those and steps over one byte.
 constexpr std::uint8_t kBaseCycles[256] = {
      7,  6,   0,   0,   0,  3,  5,   0,  3,  2,  2,   0,   0,  4,  6,   0,
      2,  5,   0,   0,   0,  4,  6,   0,  2,  4,   0,   0,   0,  4,  7,   0,
@@ -32,6 +50,9 @@ constexpr std::uint8_t kBaseCycles[256] = {
 
 }  // namespace
 
+// The state a real chip presents after a reset: the stack pointer has counted
+// down by three, interrupts are masked, and decimal mode is off. Everything else
+// is zero, which is why a ROM cannot rely on any register.
 void Cpu6502::reset() {
     a_ = 0;
     x_ = 0;
@@ -66,6 +87,9 @@ std::uint16_t Cpu6502::readWord(std::uint16_t address) {
     return static_cast<std::uint16_t>(low | (high << 8));
 }
 
+// The indirect jump's famous fault: both halves of the pointer come from the same
+// page, so JMP ($02FF) reads its high byte from $0200. It is a bug on the chip,
+// and a machine that emulated it away would not run the code written around it.
 std::uint16_t Cpu6502::readWordBug(std::uint16_t address) {
     const std::uint16_t low = bus_.read(address);
     const std::uint16_t high =
@@ -122,6 +146,8 @@ Cpu6502::Effective Cpu6502::addressIndirectIndexed() {
     return {address, (base & 0xFF00) != (address & 0xFF00)};
 }
 
+// The stack lives in page one and wraps inside it: sixteen bits would be a memory
+// the chip does not have.
 void Cpu6502::push(std::uint8_t value) {
     bus_.write(static_cast<std::uint16_t>(0x0100 | sp_), value);
     --sp_;
@@ -132,12 +158,19 @@ std::uint8_t Cpu6502::pull() {
     return bus_.read(static_cast<std::uint16_t>(0x0100 | sp_));
 }
 
+// CMP, CPX and CPY: the subtraction that is only kept in the flags. Carry is set
+// when the register is at least the operand, which is the borrow inverted.
 void Cpu6502::compare(std::uint8_t reg, std::uint8_t value) {
     const int result = static_cast<int>(reg) - static_cast<int>(value);
     setFlag(kCarry, reg >= value);
     setZeroNegative(static_cast<std::uint8_t>(result & 0xFF));
 }
 
+// ADC. In binary the flags are the ones every reader expects. In decimal mode the
+// two nibbles are adjusted separately, and the result is not the binary sum: Z is
+// taken from the binary sum, N from the decimal digit that came out, and V from
+// the binary signs, which is what the chip does and what a program that uses
+// decimal mode twice in a row will notice.
 void Cpu6502::adc(std::uint8_t value) {
     const int carry = flag(kCarry) ? 1 : 0;
     if (flag(kDecimal)) {
@@ -165,6 +198,9 @@ void Cpu6502::adc(std::uint8_t value) {
     setZeroNegative(a_);
 }
 
+// SBC, which is ADC with the operand inverted, but is written out rather than
+// composed: in decimal mode the borrow runs between the nibbles and a composed
+// version gets the high digit wrong whenever the low one borrowed.
 void Cpu6502::sbc(std::uint8_t value) {
     const int borrow = flag(kCarry) ? 0 : 1;
     if (flag(kDecimal)) {
@@ -237,6 +273,9 @@ void Cpu6502::jam(std::uint8_t opcode) {
     lastIllegalOpcode_ = opcode;
 }
 
+// One instruction, or one interrupt if one is pending. An interrupt is taken
+// before the opcode is fetched, which is the order the chip resolves them in, and
+// costs the seven cycles of a BRK.
 int Cpu6502::step() {
     if (nmiPending_) {
         nmiPending_ = false;
