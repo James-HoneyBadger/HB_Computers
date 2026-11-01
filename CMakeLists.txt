@@ -217,6 +217,47 @@ target_link_libraries(hb_canvas PUBLIC Threads::Threads)
 hb_enable_warnings(hb_canvas)
 
 # ---------------------------------------------------------------------------
+# The HB-2's ROMs
+# ---------------------------------------------------------------------------
+#
+# The KERNAL sits at the top of bank zero, where the processor's reset vector
+# points; the language has a bank of its own, which is what a decade bought.
+
+set(HB2_ROM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/roms/hb2)
+set(HB2_GENERATED ${CMAKE_BINARY_DIR}/generated/hb2)
+file(GLOB HB2_ROM_SOURCES CONFIGURE_DEPENDS
+    ${HB2_ROM_DIR}/*.s
+    ${HB2_ROM_DIR}/*.inc
+)
+
+# hb2_rom(<name> <origin> <size>)
+function(hb2_rom name origin size)
+    set(header ${HB2_GENERATED}/${name}_rom.hpp)
+    add_custom_command(
+        OUTPUT ${header}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${HB2_GENERATED}
+        COMMAND hb2asm ${HB2_ROM_DIR}/${name}.s
+                --name ${name}
+                --origin ${origin}
+                --size ${size}
+                --fill 0xFF
+                --header ${header}
+                --symbols ${HB2_GENERATED}/${name}.sym
+                --listing ${HB2_GENERATED}/${name}.lst
+        WORKING_DIRECTORY ${HB2_ROM_DIR}
+        DEPENDS hb2asm ${HB2_ROM_SOURCES}
+        COMMENT "Assembling the HB-2 ${name} ROM"
+        VERBATIM
+    )
+    set(HB2_ROM_HEADERS ${HB2_ROM_HEADERS} ${header} PARENT_SCOPE)
+endfunction()
+
+hb2_rom(kernal 57344 8192)
+hb2_rom(basic 65536 65536)
+
+add_custom_target(hb2_roms DEPENDS ${HB2_ROM_HEADERS})
+
+# ---------------------------------------------------------------------------
 # HB-2, the machine
 # ---------------------------------------------------------------------------
 #
@@ -228,9 +269,11 @@ file(GLOB HB_HB2_SOURCES CONFIGURE_DEPENDS src/hb2/*.cpp)
 add_library(hb_hb2 ${HB_HB2_SOURCES})
 add_library(hb::hb2 ALIAS hb_hb2)
 target_include_directories(hb_hb2 PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated>)
 target_compile_features(hb_hb2 PUBLIC cxx_std_20)
 hb_enable_warnings(hb_hb2)
+add_dependencies(hb_hb2 hb2_roms)
 
 # ---------------------------------------------------------------------------
 # Headless tools
@@ -433,6 +476,7 @@ if(HB_BUILD_TESTS)
 
     hb_add_suite(hb1_cpu_tests hb::hb1)
     hb_add_suite(hb2_cpu_tests hb::hb2)
+    hb_add_suite(hb2_machine_tests hb::hb2)
     hb_add_suite(hb1_asm_tests hb::hb1)
     hb_add_suite(hb1_machine_tests hb::hb1)
 

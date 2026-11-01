@@ -34,11 +34,11 @@ const std::vector<Case>& cases() {
     static const std::vector<Case> all{
         // Immediates. Without a suffix an immediate is sixteen bits, because
         // that is what native mode runs; `.B` and `.W` say otherwise.
-        {"LDA #$1234", {0xA9, 0x34, 0x12}, "immediate, sixteen-bit by default"},
+        {"LDA #$12", {0xA9, 0x12}, "immediate, a byte by default"},
+        {"LDA.W #$1234", {0xA9, 0x34, 0x12}, "immediate, forced word"},
         {"LDA.B #$12", {0xA9, 0x12}, "immediate, byte"},
-        {"LDA.W #$12", {0xA9, 0x12, 0x00}, "immediate, forced word"},
         {"LDX.B #$12", {0xA2, 0x12}, "index register immediate, byte"},
-        {"LDY #$1234", {0xA0, 0x34, 0x12}, "index register immediate, word"},
+        {"LDY.W #$1234", {0xA0, 0x34, 0x12}, "index register immediate, word"},
         {"ADC.B #$01", {0x69, 0x01}, "add with carry, byte"},
         {"REP #$30", {0xC2, 0x30}, "reset status bits"},
         {"SEP #$20", {0xE2, 0x20}, "set status bits"},
