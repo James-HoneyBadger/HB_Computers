@@ -78,6 +78,10 @@ struct App {
     last: Instant,
     /// What the window last said, so a message can be read without leaving.
     message: String,
+    /// A PNG to write and then leave, which is what a headless run wants: the
+    /// machine photographs itself once the banner is complete.
+    shot: Option<PathBuf>,
+    frames_run: u32,
 }
 
 impl App {
@@ -93,12 +97,15 @@ impl App {
             speed,
             last: Instant::now(),
             message: String::new(),
+            shot: None,
+            frames_run: 0,
         })
     }
 
     /// Power a machine on. A different model is a different machine, so this is a
     /// cold boot and anything in memory is lost; the same model is a reset.
     fn select_model(&mut self, model: Model) {
+        self.frames_run = 0;
         if model == self.machine.model() {
             self.machine.reset();
             self.message = "cold booted".to_string();
@@ -214,6 +221,7 @@ impl App {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last);
         self.last = now;
+        let before = self.machine.bus.frame_counter;
         match self.speed {
             Speed::Turbo => {
                 let slice = self.machine.bus.profile.cycles_per_frame as i64 * 2;
@@ -226,6 +234,9 @@ impl App {
                 }
             }
         }
+        self.frames_run = self
+            .frames_run
+            .saturating_add(u32::from(self.machine.bus.frame_counter.wrapping_sub(before)));
     }
 
     fn menus(&mut self, ui: &mut egui::Ui) {
@@ -414,6 +425,30 @@ impl eframe::App for App {
             }
         }
 
+        // A second of the machine's own time, then a photograph: the banner has
+        // finished by then, which is what a picture of a machine should show.
+        if let Some(path) = self.shot.take_if(|_| self.frames_run >= 50) {
+            let target = path.clone();
+            ctx.request_screenshot(move |image| {
+                let (width, height) = (image.width(), image.height());
+                let bytes = image.as_raw().to_vec();
+                match image::save_buffer(
+                    &target,
+                    &bytes,
+                    width as u32,
+                    height as u32,
+                    image::ColorType::Rgba8,
+                ) {
+                    Ok(()) => eprintln!("kestrel_computers: wrote {}", target.display()),
+                    Err(error) => {
+                        eprintln!("kestrel_computers: cannot write {}: {error}", target.display())
+                    }
+                }
+                std::process::exit(0);
+            });
+            self.shot = Some(path);
+        }
+
         self.menus(ui);
         egui::Panel::bottom("status").show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -449,6 +484,7 @@ fn main() -> eframe::Result<()> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let mut model = Model::Kestrel;
     let mut images_arg: Option<PathBuf> = None;
+    let mut shot: Option<PathBuf> = None;
     let mut index = 0;
     while index < arguments.len() {
         match arguments[index].as_str() {
@@ -466,6 +502,10 @@ fn main() -> eframe::Result<()> {
             "--roms" => {
                 index += 1;
                 images_arg = arguments.get(index).map(PathBuf::from);
+            }
+            "--shot" => {
+                index += 1;
+                shot = arguments.get(index).map(PathBuf::from);
             }
             "--help" | "-h" => {
                 println!(
@@ -498,13 +538,14 @@ fn main() -> eframe::Result<()> {
             .with_title("Kestrel Computers"),
         ..Default::default()
     };
-    let app = match App::new(model, images, Speed::Mhz1) {
+    let mut app = match App::new(model, images, Speed::Mhz1) {
         Ok(app) => app,
         Err(message) => {
             eprintln!("kestrel_computers: {message}");
             std::process::exit(1);
         }
     };
+    app.shot = shot.clone();
     eframe::run_native(
         "Kestrel Computers",
         options,

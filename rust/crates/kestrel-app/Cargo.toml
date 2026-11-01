@@ -8,6 +8,7 @@ description = "The machines' window, in egui"
 [dependencies]
 kestrel-machine = { path = "../kestrel-machine" }
 eframe = "0.37"
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [[bin]]
 name = "kestrel_computers"

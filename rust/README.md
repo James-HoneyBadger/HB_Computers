@@ -23,10 +23,15 @@ being opened and typed at. It draws the tube from the attribute bytes, takes the
 keys a person presses, and drops files onto the machine -- a cartridge, a socket
 ROM or a tape, decided by the file's size.
 
+`--shot FILE` photographs the window and leaves, as the Qt one did, so a headless
+job can keep a picture of the machine:
+
+```bash
+xvfb-run -a cargo run --offline --bin kestrel_computers -- --shot shot.png
+```
+
 What it has not carried over from the Qt window, and why:
 
-- `--shot`, the PNG a headless CI run would keep: egui's screenshot API and the
-  `image` crate would be another dependency for one flag;
 - menus for the disk and the tape: the file picker was Qt's, and a dropped file
   is a better answer on a modern desktop, so `Tape > Stop` is the whole menu;
 - settings that survive a restart: eframe can persist them, and nothing yet
