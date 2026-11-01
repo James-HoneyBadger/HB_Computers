@@ -16,7 +16,8 @@ include/timewarp/     headers, included as "timewarp/..."
   lang/               the interpreter loop, the value type, one executor per language
   graphics/           the recording host a test draws into
   canvas/             canvas commands and the thread-safe command queue
-  hb2/                the HB-2: the 65816, the bus, the tube, the disk, the tape
+  hb1/                the 6502 and the HB-1's map
+  hb2/                the 65816 and the HB-2's map
   ui/                 the Qt widgets both machines are made of
 src/                  the implementations, mirroring include/
 app/                  the launcher: one window, two machines
@@ -35,21 +36,19 @@ tree is.
 A library is one answer, and the arrows only point one way.
 
 ```
-hb_computers  hb2 (CLI)
-      |         |
-      +----+----+
-           |
-      hb_launcher
-           |
-        hb_ui  ──────────────┐   Qt Widgets
-        /   \                │
- hb_canvas_qt  hb_hb2        │
-      |          |           │
-      |       hb_lang        │
-      |      /   |   \       │
-      |  hb_expr hb_audio hb_io
-      |          |           │
- hb_canvas   hb_scheme ──────┘   (Qt-free)
+hb_computers   hb_computer (CLI)
+      |              |
+      +------+-------+
+             |
+      hb_launcher ── hb_ui  ─────────┐   Qt Widgets
+                       /      \       │
+              hb_canvas_qt   hb_machine
+                     |             │
+                     |       (both processors and both ROM sets)
+                     |
+ hb_canvas       hb_lang        Qt-free
+                   |
+      hb_expr  hb_audio  hb_io  hb_scheme
 ```
 
 | Library | What it owns | Qt |
@@ -60,14 +59,14 @@ hb_computers  hb2 (CLI)
 | `hb_io` | The serial port and the gamepad reader | no |
 | `hb_lang` | The interpreter loop, the value type, dispatch and one executor per language | no |
 | `hb_canvas` | `CanvasCommand` and the thread-safe `CanvasCommandQueue` | no |
-| `hb_hb2` | The HB-2: the 65816, the bus, the tube, the keyboard, the disk, the tape | no |
+| `hb_machine` | One machine, two models: both processors, the bus, the tube, the keyboard, the disk and the tape | no |
 | `hb_canvas_qt` | The bridge that drains the queue on the GUI thread | Core |
 | `hb_ui` | Both machine windows and the widgets they are made of | Widgets |
 | `hb_launcher` | The front door: a window naming both machines | Widgets |
 
-`hb_hb2` links nothing but itself: its languages are machine code in ROM, so it
-needs a processor and a bus rather than an interpreter. `hb_ui` links `hb_lang`
-directly for the HB-1's prompt and PROGRAM page.
+`hb_machine` links nothing but itself: both machines' languages are machine code
+in ROM, so it needs a processor and a bus rather than an interpreter. `hb_ui`
+links `hb_lang` directly for the HB-1's prompt and PROGRAM page.
 
 A build host with no Qt still gets every library above the line, the `hb2` tool and
 seven of the ten test suites. `-DHB_BUILD_GUI=OFF` asks for exactly that.
@@ -109,18 +108,26 @@ the same `CanvasCommandQueue`, which `hb_canvas_qt` drains on the GUI thread int
 ## The HB-2
 
 The machine is one Qt-free library. `Machine` owns the bus, the processor, the
-sections of the map. The address map has exactly one home —
-[`map.hpp`](../include/timewarp/hb2/map.hpp) — and `roms/hb2/hb2.inc` repeats it for
-the ROMs; the two are changed together.
+sections of the map. Each model's map has exactly one home — `hb1/map.hpp` and
+`hb2/map.hpp` — and `roms/hb1/hb1.inc` and `roms/hb2/hb2.inc` repeat them for the
+ROMs; the pairs are changed together.
+
+The two machines are one program. `timewarp::Machine` is built for a `Model`, and
+the profile table in `machine.cpp` says what that model is: its clock, its memory,
+where its screen and its registers are, how big its ROMs are, and how its disk is
+divided. Everything that is the same ten years apart is shared code.
 
 | File | Part |
 | --- | --- |
-| `cpu65816.cpp` | The processor: emulation and native modes, the M and X widths, the banks, the direct page, the cycle counts |
-| `machine.cpp` | The decoded address space, the frame interrupt, the I/O page |
-| `video.cpp` | The 80 x 50 cells and the attribute byte each |
-| `keyboard.cpp` | The key queue the ROM reads |
-| `disk.cpp` | A sector store: 4096 sectors of 512 bytes |
-| `tape.cpp` | A byte stream with a play head |
+| `src/machine.cpp` | The profile table, the decoded address space, the I/O page, the frame, the disk commands |
+| `src/devices.cpp` | The tube, the keyboard, the disk and the tape, parameterised by the profile |
+| `src/hb1/cpu6502.cpp` | The HB-1's processor, whole |
+| `src/hb2/cpu65816.cpp` | The HB-2's processor, whole |
+
+What is *not* shared is the two processors and the two ROM images. Each
+processor is the part its machine really had, and the machine never substitutes
+one for the other: a 6502 machine has no 65816 in it, and asking a `Machine` for
+the processor it does not have is a compile error, not a runtime check.
 
 The KERNAL and the language are not C++ at all: they are `roms/hb2/kernal.s` and
 `roms/hb2/basic.s`, assembled by `hb2asm` at build time and mounted with
@@ -132,7 +139,7 @@ The KERNAL and the language are not C++ at all: they are `roms/hb2/kernal.s` and
 | `audio_tests` | The mixer |
 | `canvas_queue_tests`, `canvas_bridge_tests` | The queue and its Qt bridge |
 | `syntax_highlighter_tests` | The editor's colouring |
-| `hb2_asm_tests`, `hb2_cpu_tests`, `hb2_machine_tests` | The 65816 assembler, the processor, and the machine booting its ROMs |
+| `hb2_asm_tests`, `hb2_cpu_tests`, `hb2_machine_tests` | The 65816 assembler, the processor, and the HB-2 model booting its ROMs |
 | `retro_computer_tests` | The HB-1: ROM socket, screen modes, direct mode, HB DOS, memory, boot, images, configuration |
 
 `ctest --test-dir build` runs all of them. The two window suites need a display or

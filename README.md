@@ -10,7 +10,9 @@ Two complete computers, and the engines they run on.
   memory, an 80 x 50 tube, and HB BASIC 2.0 in a sixty-four kilobyte ROM bank of
   its own, with the KERNAL beside it.
 
-Both are real programs, not screenshots, and both are the same kind of machine:
+Both are real programs, and they are one program: `timewarp::Machine` is built for
+a model, and the profile table says what that model is. They are also the same
+kind of machine:
 the host supplies a processor, memory, a tube, a keyboard and a disk, and the
 languages are machine code in ROM. The interpreter that answers `READY.` on the
 HB-1 is 6502 code in the socket; the one that answers `READY` on the HB-2 is
@@ -59,12 +61,16 @@ setup, run), and the key row along the bottom of the case clicks the same words.
 A program that draws switches the display to the graphics screen; `F7` brings the
 text back.
 
-The HB-2 has no window yet. Its machine boots its own ROMs under `hb2_machine_tests`,
-which types at it and reads the screen back:
+One executable boots either model, which is the point of the merge:
 
 ```bash
-./build/hb2_machine_tests
+./build/hb_computer --model hb1 --type "PRINT 2+2"
+./build/hb_computer --model hb2 --type "PRINT 2+2"
+./build/hb_computer --model hb2 --frames 20 --speed 8
 ```
+
+The HB-2 has no window yet; its model boots its own ROMs under
+`hb2_machine_tests`, which types at it and reads the screen back.
 
 Its ROMs are assembled from `roms/hb2/` by `hb2asm`, which is also a suite of its
 own: `hb2_asm_tests` writes out every encoding the dialect has by hand.

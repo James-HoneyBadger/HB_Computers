@@ -15,7 +15,7 @@
 
 #include <memory>
 
-#include "timewarp/hb1/machine.hpp"
+#include "timewarp/machine.hpp"
 
 class QTimer;
 class QLabel;
@@ -27,7 +27,7 @@ class Hb1Tube final : public QWidget {
     Q_OBJECT
 
 public:
-    explicit Hb1Tube(Hb1Machine& machine, QWidget* parent = nullptr);
+    explicit Hb1Tube(timewarp::Machine& machine, QWidget* parent = nullptr);
 
     [[nodiscard]] QSize sizeHint() const override;
     [[nodiscard]] QSize minimumSizeHint() const override;
@@ -36,7 +36,7 @@ protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
-    Hb1Machine& machine_;
+    timewarp::Machine& machine_;
 };
 
 /// The machine's case: the tube, a status strip, and the keyboard.
@@ -47,7 +47,7 @@ public:
     explicit Hb1Window(QWidget* parent = nullptr);
     ~Hb1Window() override;
 
-    [[nodiscard]] Hb1Machine& machine() noexcept { return machine_; }
+    [[nodiscard]] timewarp::Machine& machine() noexcept { return machine_; }
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
@@ -55,7 +55,7 @@ protected:
 private:
     void tick();
     void buildMenus();
-    void applySpeed(Hb1Machine::Speed speed);
+    void applySpeed(timewarp::Machine::Speed speed);
     void applySocketRom(std::string_view id);
     void chooseCartridge();
     void mountDisk();
@@ -65,7 +65,7 @@ private:
     void saveSettings() const;
     void loadSettings();
 
-    Hb1Machine machine_;
+    timewarp::Machine machine_{timewarp::Model::Hb1};
     Hb1Tube* tube_ = nullptr;
     QTimer* clock_ = nullptr;
     QLabel* status_ = nullptr;

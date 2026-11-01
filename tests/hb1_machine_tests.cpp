@@ -6,7 +6,8 @@
 
 #include "check.hpp"
 
-#include "timewarp/hb1/machine.hpp"
+#include "timewarp/machine.hpp"
+#include "timewarp/hb1/map.hpp"
 #include "timewarp/hb1/rom.hpp"
 
 #include <cstdio>
@@ -15,8 +16,9 @@
 
 namespace {
 
-using timewarp::hb1::Hb1Disk;
-using timewarp::hb1::Hb1Machine;
+using timewarp::Disk;
+using timewarp::Machine;
+using timewarp::Model;
 using timewarp::hb1::RomInfo;
 using timewarp::hb1::findRom;
 using timewarp::hb1::map::kAttributeBase;
@@ -25,7 +27,7 @@ using timewarp::hb1::map::kScreenBase;
 /// Types a line the way a person does: one key at a time, letting the machine
 /// run in between, because the keyboard controller holds sixteen keys and a
 /// fast typist would overflow it.
-void typeOut(Hb1Machine& machine, std::string_view text) {
+void typeOut(Machine& machine, std::string_view text) {
     for (char ch : text) {
         machine.type(static_cast<std::uint8_t>(ch));
         machine.runFrames(1);
@@ -35,7 +37,7 @@ void typeOut(Hb1Machine& machine, std::string_view text) {
 }
 
 /// The line on the screen that follows the one beginning with `after`.
-std::string answerAfter(const Hb1Machine& machine, std::string_view after) {
+std::string answerAfter(const Machine& machine, std::string_view after) {
     for (int row = 0; row + 1 < 25; ++row) {
         if (machine.screenLine(row) == after) {
             return machine.screenLine(row + 1);
@@ -45,7 +47,7 @@ std::string answerAfter(const Hb1Machine& machine, std::string_view after) {
 }
 
 /// Everything on the tube, one line after another.
-std::string screenText(const Hb1Machine& machine) {
+std::string screenText(const Machine& machine) {
     std::string all;
     for (int row = 0; row < 25; ++row) {
         all += machine.screenLine(row);
@@ -55,7 +57,7 @@ std::string screenText(const Hb1Machine& machine) {
 }
 
 void test_the_machine_boots_into_the_rom() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     TW_CHECK((machine.screenLine(0)) == "*** HB-1 BASIC V2.0 ROM ***");
     TW_CHECK((machine.screenLine(1)) == "64K RAM SYSTEM");
@@ -63,12 +65,12 @@ void test_the_machine_boots_into_the_rom() {
     TW_CHECK((machine.screenLine(4)) == "READY.");
     // A real processor ran the ROM: it fetched instructions, and none of them
     // were undocumented.
-    TW_CHECK(machine.cpu().instructionCount() > 10000);
-    TW_CHECK_EQ(static_cast<int>(machine.cpu().illegalOpcodes()), 0);
+    TW_CHECK(machine.cpu6502().instructionCount() > 10000);
+    TW_CHECK_EQ(static_cast<int>(machine.cpu6502().illegalOpcodes()), 0);
 }
 
 void test_the_keyboard_echoes_and_edits() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "HELLO");
     TW_CHECK((machine.screenLine(5)) == "HELLO");
@@ -84,7 +86,7 @@ void test_the_keyboard_echoes_and_edits() {
 }
 
 void test_arithmetic_is_the_roms() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "PRINT 2+2");
     TW_CHECK((answerAfter(machine, "PRINT 2+2")) == "4");
@@ -102,11 +104,11 @@ void test_arithmetic_is_the_roms() {
     TW_CHECK((answerAfter(machine, "PRINT 1/3")) == "0.333333333");
     typeOut(machine, "PRINT 1E3+1");
     TW_CHECK((answerAfter(machine, "PRINT 1E3+1")) == "1001");
-    TW_CHECK_EQ(static_cast<int>(machine.cpu().illegalOpcodes()), 0);
+    TW_CHECK_EQ(static_cast<int>(machine.cpu6502().illegalOpcodes()), 0);
 }
 
 void test_variables_and_statements() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "LET X=6");
     typeOut(machine, "PRINT X*7");
@@ -117,7 +119,7 @@ void test_variables_and_statements() {
 }
 
 void test_strings_and_poke() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "PRINT \"HELLO\"");
     TW_CHECK(machine.screenText().find("HELLO") != std::string::npos);
@@ -134,7 +136,7 @@ void test_strings_and_poke() {
 }
 
 void test_errors_are_reported_by_the_rom() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "PRINT 1/0");
     TW_CHECK(machine.screenText().find("?DIVISION BY ZERO ERROR") != std::string::npos);
@@ -146,7 +148,7 @@ void test_errors_are_reported_by_the_rom() {
 }
 
 void test_the_screen_is_memory() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     // The ROM wrote through the same addresses a program pokes.
     TW_CHECK_EQ(static_cast<char>(machine.read(kScreenBase)), '*');
@@ -163,7 +165,7 @@ void test_the_screen_is_memory() {
 }
 
 void test_the_disk_moves_sectors() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     // Put a pattern in RAM, write it to sector 9 through the controller, clear
     // it, and read it back.
@@ -195,11 +197,11 @@ void test_the_disk_moves_sectors() {
     // The volume the machine came up with is named and has its sector count.
     TW_CHECK(machine.disk().volumeName() == "HBWARP");
     TW_CHECK_EQ(static_cast<int>(machine.read(0x8812)) | (static_cast<int>(machine.read(0x8813)) << 8),
-                Hb1Disk::kSectors);
+                machine.profile().diskSectors);
 }
 
 void test_the_frame_counter_is_a_clock() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(120);
     TW_CHECK(machine.frameCounter() >= 100);
     // The KERNAL reads it; a program can too.
@@ -210,7 +212,7 @@ void test_the_frame_counter_is_a_clock() {
 }
 
 void test_sound_is_a_latch() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     int heard = 0;
     machine.onSound = [&](std::uint8_t) { ++heard; };
@@ -224,17 +226,17 @@ void test_the_machine_is_configurable() {
     // Speed: the 6502 is always the same; what changes is how many of its
     // cycles the host gives it per second.
     {
-        Hb1Machine machine;
+        Machine machine{Model::Hb1};
         TW_CHECK(machine.cyclesPerSecond() == 1'000'000);
-        machine.setSpeed(Hb1Machine::Speed::Mhz4);
+        machine.setSpeed(Machine::Speed::Mhz4);
         TW_CHECK(machine.cyclesPerSecond() == 4'000'000);
-        machine.setSpeed(Hb1Machine::Speed::Turbo);
+        machine.setSpeed(Machine::Speed::Turbo);
         TW_CHECK(machine.cyclesPerSecond() == 0);  // as fast as the host
     }
 
     // Sound is a switch on the host, not on the ROM.
     {
-        Hb1Machine machine;
+        Machine machine{Model::Hb1};
         machine.runFrames(20);
         int heard = 0;
         machine.onSound = [&](std::uint8_t) { ++heard; };
@@ -249,7 +251,7 @@ void test_the_machine_is_configurable() {
 
     // The socket takes another ROM: the monitor boots instead of BASIC.
     {
-        Hb1Machine machine;
+        Machine machine{Model::Hb1};
         const RomInfo* monitor = findRom("monitor");
         TW_CHECK(monitor != nullptr);
         if (monitor != nullptr) {
@@ -257,7 +259,7 @@ void test_the_machine_is_configurable() {
             TW_CHECK(machine.socketRomId() == "monitor");
             machine.runFrames(20);
             TW_CHECK(machine.screenText().find("HB-1 MONITOR V1.0") != std::string::npos);
-            TW_CHECK_EQ(static_cast<int>(machine.cpu().illegalOpcodes()), 0);
+            TW_CHECK_EQ(static_cast<int>(machine.cpu6502().illegalOpcodes()), 0);
             // And back to BASIC without a restart.
             const RomInfo* basic = findRom("basic");
             TW_CHECK(basic != nullptr);
@@ -275,7 +277,7 @@ void test_the_machine_is_configurable() {
 
     // A cartridge appears at $9000 and is read-only.
     {
-        Hb1Machine machine;
+        Machine machine{Model::Hb1};
         std::vector<std::uint8_t> cart(4096, 0);
         cart[0] = 0xA9;  // LDA #
         cart[1] = 0x42;
@@ -294,7 +296,7 @@ void test_the_machine_is_configurable() {
 }
 
 void test_the_cassette_records_and_plays_back() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     machine.tape().insert();
     TW_CHECK((machine.read(0x8819) & 0x80) != 0);  // a tape is present
@@ -320,7 +322,7 @@ void test_the_cassette_records_and_plays_back() {
 /// The program in memory is the program the interpreter runs: lines linked in
 /// number order, each with its own number in its header.
 void test_a_program_is_stored_as_linked_lines() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "20 PRINT \"B\"");
     typeOut(machine, "10 PRINT \"A\"");   // typed out of order on purpose
@@ -349,7 +351,7 @@ void test_a_program_is_stored_as_linked_lines() {
 
 /// Running a program: statements in order, loops, subroutines and jumps.
 void test_a_program_runs() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "10 FOR I=1 TO 3");
     typeOut(machine, "20 PRINT I");
@@ -370,7 +372,7 @@ void test_a_program_runs() {
 
 /// READ takes its values out of the DATA statements, in order, across lines.
 void test_read_takes_values_from_data() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "10 DATA 1,2");
     typeOut(machine, "20 READ A,B");
@@ -383,7 +385,7 @@ void test_read_takes_values_from_data() {
 
 /// DELETE squeezes the lines it is given out of the program.
 void test_delete_removes_lines() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "10 PRINT \"A\"");
     typeOut(machine, "20 PRINT \"B\"");
@@ -424,7 +426,7 @@ void test_the_functions() {
         {"PRINT PEEK(32768) >= 0", "-1"},
     };
     for (const auto& one : cases) {
-        Hb1Machine machine;
+        Machine machine{Model::Hb1};
         machine.runFrames(20);
         typeOut(machine, one.line);
         TW_CHECK((answerAfter(machine, one.line)) == one.answer);
@@ -433,7 +435,7 @@ void test_the_functions() {
 
 /// A program goes out to the disk and comes back, and CATALOG sees it.
 void test_the_disk_holds_a_program() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "10 PRINT \"FROM DISK\"");
     typeOut(machine, "SAVE \"DEMO\"");
@@ -469,7 +471,7 @@ void test_strings() {
         {"PRINT VAL(\"12.5\")*2", "25"},
         {"B$=\"\":PRINT LEN(B$)", "0"},
     };
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     for (const auto& one : cases) {
         typeOut(machine, one.line);
@@ -479,11 +481,11 @@ void test_strings() {
         TW_CHECK((answerAfter(machine, one.line)) == one.answer);
     }
     // A string where a number belongs, and the other way round, are both named.
-    Hb1Machine other;
+    Machine other{Model::Hb1};
     other.runFrames(20);
     typeOut(other, "A$=5");
     TW_CHECK(screenText(other).find("TYPE MISMATCH") != std::string::npos);
-    Hb1Machine third;
+    Machine third{Model::Hb1};
     third.runFrames(20);
     typeOut(third, "X=\"HI\"");
     TW_CHECK(screenText(third).find("TYPE MISMATCH") != std::string::npos);
@@ -491,7 +493,7 @@ void test_strings() {
 
 /// Strings in a program: built, printed and measured as the 1982 listings did.
 void test_strings_in_a_program() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "10 A$=\"CAT\"");
     typeOut(machine, "20 PRINT A$;\" \";LEN(A$);\" \";LEFT$(A$,2)");
@@ -505,7 +507,7 @@ void test_strings_in_a_program() {
 
 /// GET takes one key without waiting for Return.
 void test_get_takes_one_key() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "A$=\"?\"");
     typeOut(machine, "GET A$");
@@ -518,7 +520,7 @@ void test_get_takes_one_key() {
 
 /// Arrays: dimensioned, filled, read back, and refused when out of range.
 void test_arrays() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "DIM A(5)");
     typeOut(machine, "A(0)=10:A(5)=50");
@@ -535,7 +537,7 @@ void test_arrays() {
     TW_CHECK((answerAfter(machine, "PRINT M(0,1);M(1,0);M(2,2)")) == "11022");
 
     // READ fills an element like any other variable.
-    Hb1Machine read;
+    Machine read{Model::Hb1};
     read.runFrames(20);
     typeOut(read, "10 DATA 7,8,9");
     typeOut(read, "20 DIM A(2):FOR I=0 TO 2:READ A(I):NEXT");
@@ -550,13 +552,13 @@ void test_arrays() {
     TW_CHECK((answerAfter(machine, "PRINT B(3)")) == "9");
 
     // And the two ways an array can be wrong are named.
-    Hb1Machine over;
+    Machine over{Model::Hb1};
     over.runFrames(20);
     typeOut(over, "DIM A(5)");
     typeOut(over, "A(6)=1");
     TW_CHECK(screenText(over).find("BAD SUBSCRIPT") != std::string::npos);
 
-    Hb1Machine twice;
+    Machine twice{Model::Hb1};
     twice.runFrames(20);
     typeOut(twice, "DIM A(5)");
     typeOut(twice, "DIM A(7)");
@@ -566,7 +568,7 @@ void test_arrays() {
 
 /// Strings compare and join, which is how 1982 programs were written.
 void test_strings_compare_and_join() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "A$=\"APPLE\"");
     typeOut(machine, "B$=\"BANANA\"");
@@ -595,7 +597,7 @@ void test_strings_compare_and_join() {
     TW_CHECK((answerAfter(machine, "PRINT E$")) == "APPLE-BANANA");
 
     // and a program can branch on a string, which is the point of comparing
-    Hb1Machine program;
+    Machine program{Model::Hb1};
     program.runFrames(20);
     typeOut(program, "10 A$=\"Y\"");
     typeOut(program, "20 IF A$=\"Y\" THEN PRINT \"YES\"");
@@ -609,7 +611,7 @@ void test_strings_compare_and_join() {
 
 /// DATA holds strings as well as numbers, and READ hands them to either kind.
 void test_read_takes_strings_too() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "10 DATA \"APPLE\",\"PEAR\",42");
     typeOut(machine, "20 READ A$,B$,N");
@@ -623,7 +625,7 @@ void test_read_takes_strings_too() {
 
 /// STOP says where it stopped and CONT carries on from there.
 void test_stop_and_continue() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "10 PRINT \"ONE\"");
     typeOut(machine, "20 STOP");
@@ -645,7 +647,7 @@ void test_stop_and_continue() {
 
 /// DEF FN: a definition in a program, called from an expression.
 void test_defined_functions() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "10 DEF FN A(X)=X*X+1");
     typeOut(machine, "20 DEF FN B(Y)=Y/2");
@@ -658,7 +660,7 @@ void test_defined_functions() {
     TW_CHECK((answerAfter(machine, "10")) == "26");
     TW_CHECK((answerAfter(machine, "26")) == "7");
     // a name that was never defined is its own error
-    Hb1Machine missing;
+    Machine missing{Model::Hb1};
     missing.runFrames(20);
     typeOut(missing, "PRINT FN Z(1)");
     TW_CHECK(screenText(missing).find("UNDEF'D FUNCTION") != std::string::npos);
@@ -666,7 +668,7 @@ void test_defined_functions() {
 
 /// Arrays of strings hold strings, and keep clear of the numeric ones.
 void test_string_arrays() {
-    Hb1Machine machine;
+    Machine machine{Model::Hb1};
     machine.runFrames(20);
     typeOut(machine, "DIM A$(3)");
     typeOut(machine, "A$(0)=\"ZERO\":A$(2)=\"TWO\"");
@@ -677,13 +679,13 @@ void test_string_arrays() {
     typeOut(machine, "PRINT A(1);A$(0)");
     TW_CHECK((answerAfter(machine, "PRINT A(1);A$(0)")) == "9ZERO");
     // two dimensions, and READ into a string array
-    Hb1Machine grid;
+    Machine grid{Model::Hb1};
     grid.runFrames(20);
     typeOut(grid, "DIM M$(1,1)");
     typeOut(grid, "M$(0,1)=\"R1C1\":M$(1,0)=\"R2C0\"");
     typeOut(grid, "PRINT M$(0,1);\"|\";M$(1,0)");
     TW_CHECK((answerAfter(grid, "PRINT M$(0,1);\"|\";M$(1,0)")) == "R1C1|R2C0");
-    Hb1Machine read;
+    Machine read{Model::Hb1};
     read.runFrames(20);
     typeOut(read, "10 DATA \"A\",\"BB\",\"CCC\"");
     typeOut(read, "20 DIM N$(2):FOR I=0 TO 2:READ N$(I):NEXT");

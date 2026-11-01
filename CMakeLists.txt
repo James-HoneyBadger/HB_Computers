@@ -115,23 +115,64 @@ hb1_rom(monitor 0xA000 16384)
 add_custom_target(hb1_roms DEPENDS ${HB1_ROM_HEADERS})
 message(STATUS "HB-1 ROMs: ${HB1_ROM_HEADERS}")
 
-add_library(hb1
-    src/hb1/cpu6502.cpp
-    src/hb1/disk.cpp
-    src/hb1/keyboard.cpp
-    src/hb1/machine.cpp
-    src/hb1/roms.cpp
-    src/hb1/tape.cpp
-    src/hb1/video.cpp
+# ---------------------------------------------------------------------------
+# The HB-2's ROMs
+# ---------------------------------------------------------------------------
+#
+# The KERNAL sits at the top of bank zero, where the processor's reset vector
+# points; the language has a bank of its own, which is what a decade bought.
+
+set(HB2_ROM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/roms/hb2)
+set(HB2_GENERATED ${CMAKE_BINARY_DIR}/generated/hb2)
+file(GLOB HB2_ROM_SOURCES CONFIGURE_DEPENDS
+    ${HB2_ROM_DIR}/*.s
+    ${HB2_ROM_DIR}/*.inc
 )
-add_library(hb::hb1 ALIAS hb1)
-target_include_directories(hb1 PUBLIC
+
+# hb2_rom(<name> <origin> <size>)
+function(hb2_rom name origin size)
+    set(header ${HB2_GENERATED}/${name}_rom.hpp)
+    add_custom_command(
+        OUTPUT ${header}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${HB2_GENERATED}
+        COMMAND hb2asm ${HB2_ROM_DIR}/${name}.s
+                --name ${name}
+                --origin ${origin}
+                --size ${size}
+                --fill 0xFF
+                --header ${header}
+                --symbols ${HB2_GENERATED}/${name}.sym
+                --listing ${HB2_GENERATED}/${name}.lst
+        WORKING_DIRECTORY ${HB2_ROM_DIR}
+        DEPENDS hb2asm ${HB2_ROM_SOURCES}
+        COMMENT "Assembling the HB-2 ${name} ROM"
+        VERBATIM
+    )
+    set(HB2_ROM_HEADERS ${HB2_ROM_HEADERS} ${header} PARENT_SCOPE)
+endfunction()
+
+hb2_rom(kernal 57344 8192)
+hb2_rom(basic 65536 65536)
+
+add_custom_target(hb2_roms DEPENDS ${HB2_ROM_HEADERS})
+
+# One machine, two models: the processors are both real parts and both are used
+# whole; everything around them -- the tube, the keyboard, the disk, the tape and
+# the bus -- is shared code that takes its numbers from the model's profile.
+add_library(hb_machine
+    src/devices.cpp
+    src/machine.cpp
+    src/hb1/cpu6502.cpp
+    src/hb1/roms.cpp
+    src/hb2/cpu65816.cpp
+)
+add_library(hb::machine ALIAS hb_machine)
+target_include_directories(hb_machine PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated>)
-target_compile_features(hb1 PUBLIC cxx_std_20)
-hb_enable_warnings(hb1)
-target_compile_options(hb1 PRIVATE ${HB_GNU_WARNING_FLAGS} ${HB_NULL_DEREFERENCE})
-add_dependencies(hb1 hb1_roms)
+target_compile_features(hb_machine PUBLIC cxx_std_20)
+hb_enable_warnings(hb_machine)
+add_dependencies(hb_machine hb1_roms hb2_roms)
 
 # ---------------------------------------------------------------------------
 # The Qt-free engines
@@ -216,46 +257,6 @@ target_compile_features(hb_canvas PUBLIC cxx_std_20)
 target_link_libraries(hb_canvas PUBLIC Threads::Threads)
 hb_enable_warnings(hb_canvas)
 
-# ---------------------------------------------------------------------------
-# The HB-2's ROMs
-# ---------------------------------------------------------------------------
-#
-# The KERNAL sits at the top of bank zero, where the processor's reset vector
-# points; the language has a bank of its own, which is what a decade bought.
-
-set(HB2_ROM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/roms/hb2)
-set(HB2_GENERATED ${CMAKE_BINARY_DIR}/generated/hb2)
-file(GLOB HB2_ROM_SOURCES CONFIGURE_DEPENDS
-    ${HB2_ROM_DIR}/*.s
-    ${HB2_ROM_DIR}/*.inc
-)
-
-# hb2_rom(<name> <origin> <size>)
-function(hb2_rom name origin size)
-    set(header ${HB2_GENERATED}/${name}_rom.hpp)
-    add_custom_command(
-        OUTPUT ${header}
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${HB2_GENERATED}
-        COMMAND hb2asm ${HB2_ROM_DIR}/${name}.s
-                --name ${name}
-                --origin ${origin}
-                --size ${size}
-                --fill 0xFF
-                --header ${header}
-                --symbols ${HB2_GENERATED}/${name}.sym
-                --listing ${HB2_GENERATED}/${name}.lst
-        WORKING_DIRECTORY ${HB2_ROM_DIR}
-        DEPENDS hb2asm ${HB2_ROM_SOURCES}
-        COMMENT "Assembling the HB-2 ${name} ROM"
-        VERBATIM
-    )
-    set(HB2_ROM_HEADERS ${HB2_ROM_HEADERS} ${header} PARENT_SCOPE)
-endfunction()
-
-hb2_rom(kernal 57344 8192)
-hb2_rom(basic 65536 65536)
-
-add_custom_target(hb2_roms DEPENDS ${HB2_ROM_HEADERS})
 
 # ---------------------------------------------------------------------------
 # HB-2, the machine
@@ -265,21 +266,16 @@ add_custom_target(hb2_roms DEPENDS ${HB2_ROM_HEADERS})
 # its KERNAL and its BASIC. The languages are machine code in `roms/hb2/`, the
 # same way the HB-1's are.
 
-file(GLOB HB_HB2_SOURCES CONFIGURE_DEPENDS src/hb2/*.cpp)
-add_library(hb_hb2 ${HB_HB2_SOURCES})
-add_library(hb::hb2 ALIAS hb_hb2)
-target_include_directories(hb_hb2 PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated>)
-target_compile_features(hb_hb2 PUBLIC cxx_std_20)
-hb_enable_warnings(hb_hb2)
-add_dependencies(hb_hb2 hb2_roms)
-
 # ---------------------------------------------------------------------------
 # Headless tools
 # ---------------------------------------------------------------------------
 
 if(HB_BUILD_TOOLS)
+    # One emulator, two models: the same program powers on either machine.
+    add_executable(hb_computer tools/computer.cpp)
+    target_link_libraries(hb_computer PRIVATE hb::machine)
+    hb_enable_warnings(hb_computer)
+    install(TARGETS hb_computer RUNTIME DESTINATION bin)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -407,7 +403,7 @@ if(HB_BUILD_GUI AND HB_QT_FOUND)
         src/hb1/window.cpp
         include/timewarp/hb1/window.hpp
     )
-    target_link_libraries(hb1_computer PRIVATE hb::hb1 ${HB_QT}::Widgets)
+    target_link_libraries(hb1_computer PRIVATE hb::machine ${HB_QT}::Widgets)
     target_include_directories(hb1_computer PRIVATE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
     set_target_properties(hb1_computer PROPERTIES AUTOMOC ON)
@@ -474,11 +470,11 @@ if(HB_BUILD_TESTS)
     hb_enable_warnings(hb2_asm_tests)
     add_test(NAME hb2_asm_tests COMMAND hb2_asm_tests)
 
-    hb_add_suite(hb1_cpu_tests hb::hb1)
-    hb_add_suite(hb2_cpu_tests hb::hb2)
-    hb_add_suite(hb2_machine_tests hb::hb2)
-    hb_add_suite(hb1_asm_tests hb::hb1)
-    hb_add_suite(hb1_machine_tests hb::hb1)
+    hb_add_suite(hb1_cpu_tests hb::machine)
+    hb_add_suite(hb2_cpu_tests hb::machine)
+    hb_add_suite(hb2_machine_tests hb::machine)
+    hb_add_suite(hb1_asm_tests hb::machine)
+    hb_add_suite(hb1_machine_tests hb::machine)
 
     if(TARGET hb::ui)
         hb_add_suite(canvas_bridge_tests hb::canvas_qt)

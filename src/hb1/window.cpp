@@ -61,7 +61,7 @@ QColor colourOf(std::uint8_t code) {
 
 }  // namespace
 
-Hb1Tube::Hb1Tube(Hb1Machine& machine, QWidget* parent)
+Hb1Tube::Hb1Tube(timewarp::Machine& machine, QWidget* parent)
     : QWidget(parent), machine_(machine) {
     setFocusPolicy(Qt::StrongFocus);
     setAttribute(Qt::WA_OpaquePaintEvent);
@@ -69,13 +69,13 @@ Hb1Tube::Hb1Tube(Hb1Machine& machine, QWidget* parent)
 }
 
 QSize Hb1Tube::sizeHint() const {
-    return {Hb1Video::kColumns * kCellWidth + 2 * kBorderPixels,
-            Hb1Video::kRows * kCellHeight + 2 * kBorderPixels};
+    return {machine_.video().columns() * kCellWidth + 2 * kBorderPixels,
+            machine_.video().rows() * kCellHeight + 2 * kBorderPixels};
 }
 
 QSize Hb1Tube::minimumSizeHint() const {
-    return {Hb1Video::kColumns * 8 + 2 * kBorderPixels,
-            Hb1Video::kRows * 12 + 2 * kBorderPixels};
+    return {machine_.video().columns() * 8 + 2 * kBorderPixels,
+            machine_.video().rows() * 12 + 2 * kBorderPixels};
 }
 
 void Hb1Tube::paintEvent(QPaintEvent*) {
@@ -86,8 +86,8 @@ void Hb1Tube::paintEvent(QPaintEvent*) {
     // forty columns.
     const int usableWidth = width() - 2 * kBorderPixels;
     const int usableHeight = height() - 2 * kBorderPixels;
-    const qreal cellWidth = static_cast<qreal>(usableWidth) / Hb1Video::kColumns;
-    const qreal cellHeight = static_cast<qreal>(usableHeight) / Hb1Video::kRows;
+    const qreal cellWidth = static_cast<qreal>(usableWidth) / machine_.video().columns();
+    const qreal cellHeight = static_cast<qreal>(usableHeight) / machine_.video().rows();
     const QRectF glass(kBorderPixels, kBorderPixels, usableWidth, usableHeight);
 
     painter.setRenderHint(QPainter::TextAntialiasing, false);
@@ -98,9 +98,9 @@ void Hb1Tube::paintEvent(QPaintEvent*) {
     const std::uint8_t paper = machine_.paper();
     painter.fillRect(glass, colourOf(paper));
 
-    for (int row = 0; row < Hb1Video::kRows; ++row) {
-        for (int column = 0; column < Hb1Video::kColumns; ++column) {
-            const int index = row * Hb1Video::kColumns + column;
+    for (int row = 0; row < machine_.video().rows(); ++row) {
+        for (int column = 0; column < machine_.video().columns(); ++column) {
+            const int index = row * machine_.video().columns() + column;
             const std::uint8_t code = machine_.video().cell(index);
             const std::uint8_t attribute = machine_.video().attribute(index);
             const std::uint8_t ink = static_cast<std::uint8_t>(attribute >> 4);
@@ -127,7 +127,7 @@ void Hb1Tube::paintEvent(QPaintEvent*) {
                           cellWidth, cellHeight);
         painter.fillRect(cell, colourOf(machine_.ink()));
         const int index =
-            machine_.cursorRow() * Hb1Video::kColumns + machine_.cursorColumn();
+            machine_.cursorRow() * machine_.video().columns() + machine_.cursorColumn();
         const std::uint8_t code = machine_.video().cell(index);
         if (code != ' ' && code != 0) {
             painter.setPen(colourOf(machine_.paper()));
@@ -178,19 +178,19 @@ void Hb1Window::buildMenus() {
     auto* speeds = new QActionGroup(this);
     const struct {
         const char* label;
-        Hb1Machine::Speed speed;
+        timewarp::Machine::Speed speed;
     } speedChoices[] = {
-        {"1 MHz (1982)", Hb1Machine::Speed::Mhz1},
-        {"2 MHz", Hb1Machine::Speed::Mhz2},
-        {"4 MHz", Hb1Machine::Speed::Mhz4},
-        {"As fast as this computer", Hb1Machine::Speed::Turbo},
+        {"1 MHz (1982)", timewarp::Machine::Speed::Mhz1},
+        {"2 MHz", timewarp::Machine::Speed::Mhz2},
+        {"4 MHz", timewarp::Machine::Speed::Mhz4},
+        {"As fast as this computer", timewarp::Machine::Speed::Turbo},
     };
     for (const auto& choice : speedChoices) {
         QAction* action = speed->addAction(tr(choice.label));
         action->setCheckable(true);
         action->setChecked(machine_.speed() == choice.speed);
         speeds->addAction(action);
-        const Hb1Machine::Speed value = choice.speed;
+        const timewarp::Machine::Speed value = choice.speed;
         connect(action, &QAction::triggered, this, [this, value] { applySpeed(value); });
     }
 
@@ -250,7 +250,7 @@ void Hb1Window::buildMenus() {
     });
 }
 
-void Hb1Window::applySpeed(Hb1Machine::Speed speed) {
+void Hb1Window::applySpeed(timewarp::Machine::Speed speed) {
     machine_.setSpeed(speed);
     const int hz = machine_.cyclesPerSecond();
     statusBar()->showMessage(
@@ -376,8 +376,8 @@ void Hb1Window::saveSettings() const {
 
 void Hb1Window::loadSettings() {
     QSettings settings;
-    machine_.setSpeed(static_cast<Hb1Machine::Speed>(
-        settings.value("machine/speed", static_cast<int>(Hb1Machine::Speed::Mhz1)).toInt()));
+    machine_.setSpeed(static_cast<timewarp::Machine::Speed>(
+        settings.value("machine/speed", static_cast<int>(timewarp::Machine::Speed::Mhz1)).toInt()));
     machine_.setSoundEnabled(settings.value("machine/sound", true).toBool());
     const QString rom = settings.value("machine/rom", "basic").toString();
     if (const RomInfo* found = findRom(rom.toStdString()); found != nullptr) {
@@ -390,14 +390,14 @@ void Hb1Window::loadSettings() {
 Hb1Window::~Hb1Window() = default;
 
 void Hb1Window::tick() {
-    machine_.runCycles(Hb1Machine::kCyclesPerFrame);
+    machine_.runCycles(machine_.profile().cyclesPerFrame);
     ++framesRun_;
     tube_->update();
     if (framesRun_ % 25 == 0) {
         status_->setText(tr("frame %1  ·  %2 cycles  ·  %3 opcodes")
                              .arg(machine_.frameCounter())
-                             .arg(machine_.cpu().cycleCount())
-                             .arg(machine_.cpu().instructionCount()));
+                             .arg(machine_.cpu6502().cycleCount())
+                             .arg(machine_.cpu6502().instructionCount()));
     }
 }
 

@@ -7,7 +7,7 @@
 
 #include "check.hpp"
 
-#include "timewarp/hb2/machine.hpp"
+#include "timewarp/machine.hpp"
 #include "timewarp/hb2/map.hpp"
 
 #include "hb2/basic_rom.hpp"
@@ -18,8 +18,9 @@
 
 namespace {
 
-using timewarp::hb2::Hb2Machine;
-using timewarp::hb2::SpecialKey;
+using timewarp::Machine;
+using timewarp::Model;
+using timewarp::SpecialKey;
 
 /// A machine with its two ROMs in place, run until it has settled.
 class Booted {
@@ -37,7 +38,7 @@ public:
         machine_.runFrames(3);
     }
 
-    Hb2Machine& machine() { return machine_; }
+    Machine& machine() { return machine_; }
 
     void typeLine(const std::string& text) {
         machine_.typeText(text);
@@ -88,8 +89,30 @@ public:
     }
 
 private:
-    Hb2Machine machine_;
+    Machine machine_{Model::Hb2};
 };
+
+void test_one_machine_two_models() {
+    // The point of the merge: one class, built for a model, with the profile
+    // saying what differs.
+    const Machine hb1{Model::Hb1};
+    const Machine hb2{Model::Hb2};
+    TW_CHECK_EQ(std::string{hb1.modelName()}, std::string{"HB-1"});
+    TW_CHECK_EQ(std::string{hb2.modelName()}, std::string{"HB-2"});
+    TW_CHECK_EQ(hb1.profile().clockHz, 1'000'000);
+    TW_CHECK_EQ(hb2.profile().clockHz, 8'000'000);
+    TW_CHECK_EQ(hb1.profile().cyclesPerFrame, 20'000);
+    TW_CHECK_EQ(hb2.profile().cyclesPerFrame, 160'000);
+    TW_CHECK_EQ(hb1.profile().columns, 40);
+    TW_CHECK_EQ(hb2.profile().columns, 80);
+    TW_CHECK_EQ(hb1.profile().diskSectors, 512);
+    TW_CHECK_EQ(hb2.profile().diskSectors, 4096);
+    TW_CHECK_EQ(hb1.profile().diskSectorSize, 256);
+    TW_CHECK_EQ(hb2.profile().diskSectorSize, 512);
+    // And each has the processor its machine really had.
+    TW_CHECK_EQ(hb1.cpu6502().cycleCount(), 0u);
+    TW_CHECK_EQ(hb2.cpu65816().cycleCount(), 0u);
+}
 
 void test_the_machine_boots() {
     Booted booted;
@@ -99,9 +122,9 @@ void test_the_machine_boots() {
     TW_CHECK_EQ(booted.machine().basicId(), std::string_view{"basic"});
     // The machine is in native mode with its banks at zero, which is what the
     // KERNAL sets up before it starts the language.
-    TW_CHECK(!booted.machine().cpu().emulation());
-    TW_CHECK_EQ(booted.machine().cpu().cycleCount() > 0, true);
-    TW_CHECK_EQ(booted.machine().cpu().illegalOpcodes(), 0u);
+    TW_CHECK(!booted.machine().cpu65816().emulation());
+    TW_CHECK_EQ(booted.machine().cpu65816().cycleCount() > 0, true);
+    TW_CHECK_EQ(booted.machine().cpu65816().illegalOpcodes(), 0u);
 }
 
 void test_arithmetic_at_the_prompt() {
@@ -173,7 +196,7 @@ void test_a_line_is_collected() {
 }
 
 void test_a_wrong_sized_rom_is_refused() {
-    Hb2Machine machine;
+    Machine machine{Model::Hb2};
     TW_CHECK(!machine.mountKernal(std::vector<std::uint8_t>(100, 0), "short"));
     TW_CHECK(!machine.mountBasic(std::vector<std::uint8_t>(100, 0), "short"));
     TW_CHECK(machine.mountKernal(std::vector<std::uint8_t>(8192, 0), "kernal"));
@@ -181,7 +204,7 @@ void test_a_wrong_sized_rom_is_refused() {
 }
 
 void test_the_disk_is_a_sector_store() {
-    Hb2Machine machine;
+    Machine machine{Model::Hb2};
     machine.disk().format("TESTVOL");
     TW_CHECK_EQ(machine.disk().volumeName(), std::string{"TESTVOL"});
     std::vector<std::uint8_t> sector(512, 0x5A);
@@ -213,6 +236,7 @@ void test_the_screen_is_the_roms() {
 }  // namespace
 
 int main() {
+    test_one_machine_two_models();
     test_the_machine_boots();
     test_arithmetic_at_the_prompt();
     test_variables_and_strings();

@@ -11,10 +11,15 @@ break and come back to.
   megabyte of banked memory, an 80 x 50 tube, and HB BASIC 2.0 in a sixty-four
   kilobyte bank of its own.
 
-Both are real programs, and both are the same kind of thing: the host supplies a
-processor, memory, a tube, a keyboard and a disk, and the languages are machine
-code assembled into a ROM image and executed. Neither machine has an interpreter
-written for it in C++.
+Both are real programs, and they are **one program**: `timewarp::Machine` is built
+for a model, and a profile table says what that model is — its clock, its memory,
+where its screen and its registers are, how big its ROMs are and how its disk is
+divided. `hb_computer --model hb1` and `hb_computer --model hb2` are the same
+executable, and the two test suites boot both models through the same class.
+
+They are also the same kind of thing: the host supplies a processor, memory, a
+tube, a keyboard and a disk, and the languages are machine code assembled into a
+ROM image and executed. Neither machine has an interpreter written for it in C++.
 
 ---
 
