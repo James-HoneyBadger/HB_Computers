@@ -6,8 +6,9 @@ prove it, and the C++ tree kept until the port can do everything it does.
 
 | Crate | Ports | State |
 | --- | --- | --- |
-| `kestrel-machine` | `include/kestrel/`, `src/kestrel/` | **profile, devices and the bus decode done**, with tests |
-| ... | the I/O page's disk commands | next |
+| `kestrel-machine` | `include/kestrel/`, `src/kestrel/` | **profile, devices, the bus decode and the 6502 done** |
+| `kestrel-machine` | `model1982/cpu6502.cpp` | done, `cpu6502.rs` |
+| ... | `model1992/cpu65816.cpp` | next |
 | ... | `cpu6502.cpp` | after that |
 | ... | `cpu65816.cpp` | after that |
 | `kestrel-roms` | the ROM build (`build.rs` calling the assemblers) | after that |

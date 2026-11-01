@@ -2,15 +2,17 @@
 //
 // kestrel-machine -- the port of `kestrel_machine`, crate by crate.
 //
-// What is here: the profile table and the four devices, with the tests that
-// prove them. What is next, in this order: the bus decode and the I/O page, the
-// 6502, the 65816, then the machine that binds them. The C++ tree stays until
+// What is here: the profile table, the four devices, the bus decode with its
+// I/O page, and the 1982 machine's processor -- each with the tests that prove
+// it. What is next, in this order: the 65816, the machine that binds a processor
+// to a bus, the ROMs, the command line, and the window. The C++ tree stays until
 // this one can do everything it does.
 //
 // The port follows the original file by file, so a reader can put the two side by
 // side: `profile.rs` is `makeProfile`, `devices.rs` is `devices.cpp`.
 
 pub mod bus;
+pub mod cpu6502;
 pub mod devices;
 pub mod profile;
 
