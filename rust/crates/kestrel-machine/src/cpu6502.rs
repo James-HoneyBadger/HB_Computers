@@ -546,6 +546,7 @@ impl Cpu6502 {
                 }
                 let value = bus.read(address).wrapping_sub(1);
                 bus.write(address, value);
+                self.set_zn(value);
             }
             Op::Dex => {
                 self.x = self.x.wrapping_sub(1);
@@ -567,6 +568,7 @@ impl Cpu6502 {
                 }
                 let value = bus.read(address).wrapping_add(1);
                 bus.write(address, value);
+                self.set_zn(value);
             }
             Op::Inx => {
                 self.x = self.x.wrapping_add(1);
@@ -1204,6 +1206,22 @@ mod tests {
         assert_eq!(run.ram.peek(0x0010), 0x06);
         run.step();
         assert_eq!(run.ram.peek(0x0010), 0x05);
+
+        // INC and DEC on memory set Z and N from the byte they wrote. A
+        // countdown loop reads Z to know it has finished, so a core that left
+        // the flags alone hangs the ROM on the first count -- which is exactly
+        // what this port did until the differential trace found it.
+        let mut run = Run::new(0x0200, &[0xE6, 0x10]);
+        run.ram.poke(0x0010, 0xFF);
+        run.step();
+        assert_eq!(run.ram.peek(0x0010), 0x00);
+        assert_ne!(run.regs().status & ZERO, 0);
+        let mut negative = Run::new(0x0200, &[0xC6, 0x10]);
+        negative.ram.poke(0x0010, 0x00);
+        negative.step();
+        assert_eq!(negative.ram.peek(0x0010), 0xFF);
+        assert_ne!(negative.regs().status & NEGATIVE, 0);
+        assert_eq!(negative.regs().status & ZERO, 0);
 
         // BIT reads the top two bits of memory into N and V.
         let mut run = Run::new(0x0200, &[0xA9, 0x00, 0x24, 0x10]);

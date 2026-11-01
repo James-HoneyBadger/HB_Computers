@@ -280,6 +280,22 @@ void test_shift_rotate_and_memory() {
         TW_CHECK_EQ(int{run.bus.peek(0x0010)}, 0x05);
     }
     {
+        // INC and DEC on memory set Z and N from the byte they wrote. A
+        // countdown loop reads Z to know it has finished, so a core that left
+        // the flags alone hangs the ROM on the first count.
+        Run run{0x0200, {0xE6, 0x10}};  // INC $10
+        run.bus.poke(0x0010, 0xFF);
+        run.step();
+        TW_CHECK_EQ(int{run.bus.peek(0x0010)}, 0x00);
+        TW_CHECK((run.regs().status & Cpu6502::kZero) != 0);
+        Run negative{0x0200, {0xC6, 0x10}};  // DEC $10
+        negative.bus.poke(0x0010, 0x00);
+        negative.step();
+        TW_CHECK_EQ(int{negative.bus.peek(0x0010)}, 0xFF);
+        TW_CHECK((negative.regs().status & Cpu6502::kNegative) != 0);
+        TW_CHECK((negative.regs().status & Cpu6502::kZero) == 0);
+    }
+    {
         // BIT reads the top two bits of memory into N and V.
         Run run{0x0200, {0xA9, 0x00, 0x24, 0x10}};
         run.bus.poke(0x0010, 0xC0);

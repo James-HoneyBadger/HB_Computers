@@ -98,10 +98,14 @@ impl Video {
 
     /// Every row, newline-separated.
     pub fn text(&self) -> String {
+        // Rows separated by a newline and nothing after the last one, which is
+        // what the C++ `Video::text` returns.
         let mut out = String::new();
         for row in 0..usize::from(self.rows) {
+            if row != 0 {
+                out.push('\n');
+            }
             out.push_str(&self.line(row));
-            out.push('\n');
         }
         out
     }

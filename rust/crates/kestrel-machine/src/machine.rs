@@ -254,6 +254,29 @@ impl Machine {
         self.type_key(KEY_RETURN);
     }
 
+    /// A line typed at the speed of the emulated machine rather than the host's.
+    /// The keyboard controller holds a fixed number of keys, and a line pushed in
+    /// at once overflows it and loses characters -- including the Return, which
+    /// welds two lines together.
+    pub fn type_line_paced(&mut self, text: &str) {
+        for byte in text.bytes() {
+            while self.bus.keyboard.len() >= 8 {
+                self.run_frames(1);
+            }
+            self.type_key(byte);
+            self.run_frames(2);
+        }
+        while self.bus.keyboard.len() >= 8 {
+            self.run_frames(1);
+        }
+        self.type_key(KEY_RETURN);
+        self.run_frames(2);
+        while !self.bus.keyboard.is_empty() {
+            self.run_frames(1);
+        }
+        self.run_frames(20);
+    }
+
     /// The BREAK key: a non-maskable interrupt, which the KERNAL turns into a
     /// warm start.
     pub fn press_break(&mut self) {
@@ -310,11 +333,10 @@ mod tests {
             "the power-on message, from the ROM:\n{}",
             machine.screen_text()
         );
-        machine.type_line("PRINT 2+2*3");
-        machine.run_frames(20);
+        machine.type_line_paced("PRINT 2+2*3");
         assert!(
-            machine.screen_text().contains("8"),
-            "four and twenty-four:\n{}",
+            machine.screen_text().lines().any(|row| row.trim() == "8"),
+            "two and two threes is eight:\n{}",
             machine.screen_text()
         );
         // Nothing ran off the rails: every opcode the ROM used is a documented one.
@@ -327,24 +349,27 @@ mod tests {
     #[test]
     fn the_1982_machine_stores_and_runs_a_program() {
         let mut machine = boot(Model::Kestrel);
-        machine.type_line("10 FOR I=1 TO 3");
-        machine.type_line("20 PRINT I*I");
-        machine.type_line("30 NEXT I");
-        machine.type_line("RUN");
+        machine.type_line_paced("10 FOR I=1 TO 3");
+        machine.type_line_paced("20 PRINT I*I");
+        machine.type_line_paced("30 NEXT I");
+        machine.type_line_paced("RUN");
         machine.run_frames(120);
         let screen = machine.screen_text();
+        let rows: Vec<&str> = screen.lines().map(str::trim).collect();
         for wanted in ["1", "4", "9"] {
-            assert!(screen.contains(wanted), "no {wanted} in:\n{screen}");
+            assert!(rows.contains(&wanted), "no {wanted} in:\n{screen}");
         }
     }
 
     #[test]
     fn the_1992_machine_boots_and_answers() {
         let mut machine = boot(Model::Kestrel16);
-        machine.type_line("PRINT 1000*20");
-        machine.run_frames(40);
-        let screen = machine.screen_text();
-        assert!(screen.contains("20000"), "sixteen bits, not eight:\n{screen}");
+        machine.type_line_paced("PRINT 1000*20");
+        assert!(
+            machine.screen_text().lines().any(|row| row.trim() == "20000"),
+            "sixteen bits, not eight:\n{}",
+            machine.screen_text()
+        );
         match machine.cpu {
             Cpu::Mos65816(ref cpu) => assert_eq!(cpu.illegal_opcodes(), 0),
             _ => panic!("the 1992 machine has a 65816"),

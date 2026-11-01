@@ -1,0 +1,9 @@
+[package]
+name = "kestrel-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The Rust port's command line: boot a Kestrel, type at it, print the tube"
+
+[dependencies]
+kestrel-machine = { path = "../kestrel-machine" }

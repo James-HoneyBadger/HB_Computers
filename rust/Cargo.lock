@@ -3,5 +3,12 @@
 version = 4
 
 [[package]]
+name = "kestrel-cli"
+version = "0.1.0"
+dependencies = [
+ "kestrel-machine",
+]
+
+[[package]]
 name = "kestrel-machine"
 version = "0.1.0"
