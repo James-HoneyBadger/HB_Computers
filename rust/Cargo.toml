@@ -1,0 +1,11 @@
+# The Rust port. The C++ tree stays until the port has reached it: one crate at a
+# time, each with the tests that prove it, so nothing is "converted" that is not
+# also still working.
+[workspace]
+resolver = "2"
+members = ["crates/kestrel-machine"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
