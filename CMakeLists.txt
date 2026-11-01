@@ -187,6 +187,7 @@ if(KESTREL_BUILD_TESTS)
     kestrel_suite(kestrel16_asm_tests)
     kestrel_suite(kestrel16_cpu_tests)
     kestrel_suite(kestrel16_machine_tests)
+    kestrel_suite(kestrel_samples_tests)
 
     # Both assemblers are run as the programs the build uses, so their tests
     # check the bytes that end up in the ROMs.
@@ -195,5 +196,9 @@ if(KESTREL_BUILD_TESTS)
     add_dependencies(kestrel_asm_tests kestrel_asm)
     target_compile_definitions(kestrel16_asm_tests PRIVATE
         KESTREL16_ASM_PATH="$<TARGET_FILE:kestrel16_asm>")
+    # The samples are run as the files a person would type, read from the tree
+    # rather than copied into the build.
+    target_compile_definitions(kestrel_samples_tests PRIVATE
+        KESTREL_SAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/samples")
     add_dependencies(kestrel16_asm_tests kestrel16_asm)
 endif()

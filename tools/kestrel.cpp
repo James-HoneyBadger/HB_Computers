@@ -41,6 +41,8 @@ void usage() {
         "  --frames   frames to run before the screen is printed (default 40)\n"
         "  --type     type a line at the prompt and let the machine answer; may\n"
         "             be given more than once\n"
+        "  --file     type every line of this file, in order, before any --type\n"
+        "             lines; this is how a program in samples/ is run\n"
         "  --tape     insert this cassette image (.tap); a blank one otherwise\n"
         "  --rom      which ROM to put in the 1982 machine's socket: basic, or\n"
         "             monitor for machine code (default basic)\n"
@@ -93,6 +95,22 @@ int main(int argc, char** argv) {
             options.rom = std::string{next()};
         } else if (arg == "--type") {
             options.lines.emplace_back(next());
+        } else if (arg == "--file") {
+            const std::string name{next()};
+            std::ifstream in{name};
+            if (!in) {
+                std::fprintf(stderr, "kestrel: cannot read %s\n", name.c_str());
+                return 2;
+            }
+            std::string line;
+            while (std::getline(in, line)) {
+                if (!line.empty() && line.back() == '\r') {
+                    line.pop_back();
+                }
+                if (!line.empty()) {
+                    options.lines.push_back(line);
+                }
+            }
         } else if (arg == "--no-screen") {
             options.screen = false;
         } else if (arg == "--help" || arg == "-h") {
