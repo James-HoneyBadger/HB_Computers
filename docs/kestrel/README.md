@@ -282,19 +282,18 @@ The honest list, because a manual that hides it is worse than useless:
 
 ### A fault, not a feature
 
-A comparison in an expression (`1=1`, `A<B`, and so on) after an array has been
-`DIM`ed overwrites the array's descriptor in the heap: the array stops being
-found and a later `DIM` of the same name is allowed again. `IF A=B THEN 100`
-still jumps — the test itself is fine — but any array the program holds is gone
-from that point on. Until the ROM is mended, a program that needs both arrays and
-comparisons should test with arithmetic instead:
+`FOR` runs its body at least once. A loop whose start is already past its limit
+— `FOR J=121 TO 100` — executes once instead of being skipped, so a start that
+is an expression needs its bound checked before it is used as a subscript:
 
 ```basic
-100 REM INSTEAD OF  IF A=B THEN 200
-110 T=A-B: IF T THEN 130
-120 GOTO 200
-130 REM ... continue
+60 FOR J=I*I TO 100 STEP I: IF J>100 THEN 75
+65 P(J)=1
+75 NEXT J
 ```
+
+Mending it means skipping a `FOR` whose start is past its limit by scanning ahead
+for the matching `NEXT`; that is the next job for the ROM.
 
 ---
 

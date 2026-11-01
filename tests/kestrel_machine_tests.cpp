@@ -566,6 +566,45 @@ void test_arrays() {
 }
 
 
+/// A big array is a big block of heap: 101 numbers, not the 8-bit remainder of
+/// one, so that it cannot collide with the value stack above MEMTOP.
+void test_a_big_array_stays_in_its_own_memory() {
+    Machine machine{Model::Kestrel};
+    machine.runFrames(20);
+    typeOut(machine, "10 DIM P(100)");
+    typeOut(machine, "20 P(90)=7");
+    // A comparison pushes the left operand on the value stack at $7F00; before
+    // the heap was measured in words it landed in the array's descriptor.
+    typeOut(machine, "30 IF 1=1 THEN P(91)=8");
+    typeOut(machine, "40 PRINT P(90);P(91)");
+    typeOut(machine, "CLS");
+    typeOut(machine, "RUN");
+    TW_CHECK((answerAfter(machine, "RUN")) == "78");
+    TW_CHECK(screenText(machine).find("BAD SUBSCRIPT") == std::string::npos);
+}
+
+/// Jumps from inside a line: IF ... THEN <line> finds the line, and a line that
+/// is not there is named rather than searched for ever.
+void test_a_jump_from_a_line_finds_its_target() {
+    Machine machine{Model::Kestrel};
+    machine.runFrames(20);
+    typeOut(machine, "10 PRINT \"A\"");
+    typeOut(machine, "20 IF 1 THEN 40");
+    typeOut(machine, "30 PRINT \"B\"");
+    typeOut(machine, "40 PRINT \"C\"");
+    typeOut(machine, "CLS");
+    typeOut(machine, "RUN");
+    TW_CHECK((answerAfter(machine, "RUN")) == "A");
+    TW_CHECK(screenText(machine).find("A\nC\n") != std::string::npos);
+
+    Machine missing{Model::Kestrel};
+    missing.runFrames(20);
+    typeOut(missing, "10 GOTO 999");
+    typeOut(missing, "RUN");
+    TW_CHECK((answerAfter(missing, "RUN")).empty());
+    TW_CHECK(screenText(missing).find("UNDEF'D STATEMENT") != std::string::npos);
+}
+
 /// Strings compare and join, which is how 1982 programs were written.
 void test_strings_compare_and_join() {
     Machine machine{Model::Kestrel};
@@ -720,6 +759,8 @@ int main() {
     test_strings_in_a_program();
     test_get_takes_one_key();
     test_arrays();
+    test_a_big_array_stays_in_its_own_memory();
+    test_a_jump_from_a_line_finds_its_target();
     test_strings_compare_and_join();
     test_read_takes_strings_too();
     test_stop_and_continue();

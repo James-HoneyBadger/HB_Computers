@@ -176,6 +176,8 @@ FINDLINE_NEXT:
         STA B_LINEBUF+1
         PLA
         STA B_LINEBUF
+        ORA B_LINEBUF+1          ; a zero link is the end of the program, and
+        BEQ FINDLINE_MISS        ; walking past it reads the zero page as lines
         JMP FINDLINE_LOOP
 FINDLINE_MISS:
         SEC
@@ -1086,6 +1088,8 @@ DO_IF:
         BCS IF_RUN_REST
         JSR PARSELINENO
         BCS ERR_SYNTAX
+        LDA B_INT               ; FINDLINE takes the number in A and Y
+        LDY B_INT+1
         JSR FINDLINE
         BCS ERR_UNDEF_LINE
         LDA #1
@@ -1564,6 +1568,8 @@ DO_LIST:
         BEQ LIST_ALL
         JSR PARSELINENO
         BCS LIST_ALL
+        LDA B_INT               ; FINDLINE takes the number in A and Y
+        LDY B_INT+1
         JSR FINDLINE
         BCS LIST_EMPTY
         LDA B_CURLINE

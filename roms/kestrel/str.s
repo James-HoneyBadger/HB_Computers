@@ -53,8 +53,8 @@ STRALLOC:
         SBC B_TMP
         STA B_TEMPSTR2
         LDA B_STREND+1
-        SBC #0
-        STA B_TEMPSTR2+1
+        SBC B_TMP+1             ; the size is a word: an array bigger than 255
+        STA B_TEMPSTR2+1        ; bytes has to move the heap by its high byte too
         LDA B_TEMPSTR2
         CMP B_ARYTAB
         LDA B_TEMPSTR2+1

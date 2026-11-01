@@ -100,13 +100,23 @@ int main(int argc, char** argv) {
 
     // A person types at the speed of the emulated machine, not the host's: the
     // keyboard controller holds sixteen keys, and a line pasted in at once
-    // would overflow it and lose characters.
+    // would overflow it and lose characters -- including the Return, which
+    // welds two lines together.
+    const auto typeKey = [&machine](std::uint8_t key) {
+        while (machine.keyboard().size() >= 8) {
+            machine.runFrames(1);
+        }
+        machine.type(key);
+        machine.runFrames(2);
+    };
     for (const std::string& line : options.lines) {
         for (const char ch : line) {
-            machine.type(static_cast<std::uint8_t>(ch));
-            machine.runFrames(2);
+            typeKey(static_cast<std::uint8_t>(ch));
         }
-        machine.type(static_cast<std::uint8_t>(SpecialKey::Return));
+        typeKey(static_cast<std::uint8_t>(SpecialKey::Return));
+        while (machine.keyboard().size() > 0) {
+            machine.runFrames(1);
+        }
         machine.runFrames(20);
     }
     // A program worth watching takes longer than the typing did.
