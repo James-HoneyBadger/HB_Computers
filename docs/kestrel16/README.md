@@ -163,6 +163,9 @@ THE ANSWER IS 42
 | `RUN` [`n`] | Run the program, or start it at line `n` |
 | `LIST` [`n`] | Show the program, or from line `n` on |
 | `GOTO n` | Continue at line `n` |
+| `IF cond THEN … [ELSE …]` | One branch or the other; a line number after `THEN` jumps |
+| `GOSUB n` / `RETURN` | Sixteen levels of subroutine |
+| `FOR v=a TO b` … `NEXT v` | A loop; the body runs no times if `a` is already past `b` |
 | `NEW` | Throw the program and the variables away |
 | `LET` | `LET A=41`, or `A=41`; variables are `A` to `Z`, sixteen bits each |
 | `CLS` | Clear the screen and print the banner |
@@ -171,7 +174,8 @@ THE ANSWER IS 42
 | `NEW` | Start again |
 
 Expressions are `+ - * /` with parentheses and unary minus; `*` and `/` bind
-tighter than `+` and `-`. Values are sixteen-bit signed integers, so
+tighter than `+` and `-`. Comparisons (`=` `<>` `<` `>` `<=` `>=`) give `-1` or
+`0`, and `AND`, `OR` and `NOT` combine them. Values are sixteen-bit signed integers, so
 `PRINT 30000+1` is `30001` and `PRINT 1000*20` is `20000` — neither of which the
 Kestrel's BASIC could hold.
 
@@ -213,9 +217,9 @@ says `?NO LINE` and stops the program.
 
 The honest list, because a manual that hides it is worse than useless:
 
-- **no `IF`, no `GOSUB`, no `FOR`/`NEXT`** — the statements that need a line to
-  come back to are the next thing to go in; the program store and the runner they
-  need are already there;
+- **no `STEP`** — a `FOR` counts up by one, and that is the only step there is;
+- **loops belong in a program** — a `FOR` typed at the prompt has no line to come
+  back to when the next line is typed;
 - **no strings as values** — `PRINT "text"` works, `A$` does not;
 - **no arrays, no functions** — no `DIM`, no `ABS` or `LEN`, no `DEF FN`;
 - **no filesystem** — the disk device moves sectors, and Kestrel DOS 2.0's jump

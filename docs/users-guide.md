@@ -380,8 +380,7 @@ PRINT A$
 
 ### What it does not do yet
 
-- **no `IF`, no `GOSUB`, no `FOR`/`NEXT`** — programs are stored and can be
-  `RUN`, `LIST`ed and `GOTO`n, but there is no conditional or loop yet;
+- **no `STEP`** — `FOR` counts up by one, and loops belong in a program;
 - **no strings as values** — `PRINT "text"` works, `A$` does not;
 - **no arrays and no functions** — no `DIM`, no `ABS`, no `DEF FN`;
 - **no filesystem in the language** — the disk device moves sectors; Kestrel DOS

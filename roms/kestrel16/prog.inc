@@ -487,3 +487,393 @@ DO_GOTO_MISSING:
         LDA #3
         STA ZP_JFLAG
         RTS
+
+; ---------------------------------------------------------------------------
+; Where a line's text is
+; ---------------------------------------------------------------------------
+
+; TEXT_BASE: A = the address of the text being run -- a program line's, or the
+; prompt's own line. ZP_LINE is $FFFF for the prompt.
+TEXT_BASE:
+        REP #$20
+        LDA ZP_LINE
+        CMP.W #$FFFF
+        BEQ TEXT_BASE_DIRECT
+        CLC
+        ADC.W #2
+        RTS
+TEXT_BASE_DIRECT:
+        LDA ZP_DLINE
+        RTS
+
+; TEXT_OFFSET: ZP_BASE = the text's address, ZP_OFF = how far into it the next
+; statement begins.
+TEXT_OFFSET:
+        JSR TEXT_BASE
+        STA ZP_BASE
+        REP #$20
+        LDA ZP_SRC
+        SEC
+        SBC ZP_BASE
+        STA ZP_OFF
+        SEP #$20
+        RTS
+
+; STORE_VAR: X becomes the value of the variable numbered ZP_VAR.
+STORE_VAR:
+        REP #$20
+        LDA ZP_VAR
+        AND.W #$00FF
+        ASL A
+        TAY
+        TXA
+        STA VARS,Y
+        SEP #$20
+        RTS
+
+; LOAD_VAR: X = the value of the variable numbered in A.
+LOAD_VAR:
+        REP #$20
+        AND.W #$00FF
+        ASL A
+        TAX
+        LDA VARS,X
+        TAX
+        SEP #$20
+        RTS
+
+; ---------------------------------------------------------------------------
+; GOSUB and RETURN
+; ---------------------------------------------------------------------------
+
+DO_GOSUB:
+        JSR EXPR
+        REP #$20
+        STX ZP_TMP16
+        SEP #$20
+        LDA ZP_GSUBSP
+        CMP #GOSUB_MAX
+        BCS DO_GOSUB_FULL
+        JSR TEXT_OFFSET
+        JSR PUSH_GOSUB
+        JSR FIND_LINE
+        BCC DO_GOSUB_MISSING
+        LDA #1
+        STA ZP_JFLAG
+        RTS
+DO_GOSUB_FULL:
+        JSR SAY_NOROOM
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+DO_GOSUB_MISSING:
+        JSR SAY_NOLINE
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+
+; PUSH_GOSUB: ZP_BASE and ZP_OFF are the line and the place in it to come back to.
+PUSH_GOSUB:
+        REP #$20
+        LDA ZP_GSUBSP
+        AND.W #$00FF
+        ASL A
+        ASL A
+        TAX
+        LDA ZP_BASE
+        STA GOSUB_BASE,X
+        LDA ZP_OFF
+        STA GOSUB_BASE+2,X
+        SEP #$20
+        INC ZP_GSUBSP
+        RTS
+
+DO_RETURN:
+        LDA ZP_GSUBSP
+        BNE DO_RETURN_POP
+        JSR SAY_RETGOSUB
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+DO_RETURN_POP:
+        DEC A
+        STA ZP_GSUBSP
+        REP #$20
+        AND.W #$00FF
+        ASL A
+        ASL A
+        TAX
+        LDA GOSUB_BASE,X
+        STA ZP_BASE
+        LDA GOSUB_BASE+2,X
+        CLC
+        ADC ZP_BASE
+        STA ZP_SRC
+        SEP #$20
+        LDA #BANK_KERNAL
+        STA ZP_SRC+2
+        LDA #2
+        STA ZP_JFLAG
+        RTS
+
+; ---------------------------------------------------------------------------
+; IF ... THEN ... ELSE
+; ---------------------------------------------------------------------------
+
+DO_IF:
+        JSR EXPR
+        REP #$20
+        TXA
+        CMP.W #0
+        SEP #$20
+        BEQ DO_IF_FALSE
+        LDX.W #<KW_THEN
+        LDY.W #KW_THEN_END - KW_THEN
+        JSR MATCHKW
+        BCC DO_IF_NOTTHEN
+        LDA [ZP_SRC]
+        CMP #'0'
+        BCC DO_IF_REST
+        CMP #'9'+1
+        BCS DO_IF_REST
+        JMP DO_GOTO             ; `IF x THEN 100`
+DO_IF_REST:
+        RTS
+DO_IF_NOTTHEN:
+        JSR SAY_WHAT
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+DO_IF_FALSE:
+DO_IF_SKIP:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        BEQ DO_IF_SKIP_END
+        JSR TO_UPPER
+        CMP #'E'
+        BEQ DO_IF_TRY_ELSE
+        INC ZP_SRC
+        BRA DO_IF_SKIP
+DO_IF_TRY_ELSE:
+        LDX.W #<KW_ELSE
+        LDY.W #KW_ELSE_END - KW_ELSE
+        JSR MATCHKW
+        BCS DO_IF_SKIP_END
+        INC ZP_SRC
+        BRA DO_IF_SKIP
+DO_IF_SKIP_END:
+        RTS
+
+; ELSE reached by a branch that ran: the rest of the line belongs to the other
+; branch, so it is skipped rather than run.
+DO_ELSE:
+DO_ELSE_LOOP:
+        LDA [ZP_SRC]
+        BEQ DO_ELSE_DONE
+        INC ZP_SRC
+        BRA DO_ELSE_LOOP
+DO_ELSE_DONE:
+        RTS
+
+; ---------------------------------------------------------------------------
+; FOR and NEXT
+; ---------------------------------------------------------------------------
+;
+; A frame is ten bytes at FOR_BASE: the variable, the step, the limit, where the
+; body's text is, and how far into it to come back to. Nothing is kept on the
+; machine stack: the three expressions are evaluated into zero page and copied in
+; one at a time, which is one fewer thing to get unbalanced.
+
+FOR_PTR:
+        REP #$20
+        LDA ZP_FORSP
+        AND.W #$00FF
+        STA ZP_CNT2
+        ASL A
+        ASL A
+        ASL A
+        CLC
+        ADC ZP_CNT2
+        TAX
+        SEP #$20
+        RTS
+
+DO_FOR:
+        JSR SKIPSP
+        JSR IS_ALPHA
+        BCC DO_FOR_BAD
+        LDA [ZP_SRC]
+        JSR TO_UPPER
+        SEC
+        SBC #'A'
+        STA ZP_VAR
+        INC ZP_SRC
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'='
+        BEQ DO_FOR_EQ
+        BRA DO_FOR_BAD
+DO_FOR_EQ:
+        INC ZP_SRC
+        JSR EXPR
+        JSR STORE_VAR
+        LDX.W #<KW_TO
+        LDY.W #KW_TO_END - KW_TO
+        JSR MATCHKW
+        BCC DO_FOR_BAD
+        JSR EXPR
+        STX ZP_LIMIT            ; its own word: EXPR's scratch is not free
+        ; One step at a time, upwards: STEP is the next thing to go in, and a
+        ; step the machine could not honour would be worse than one it refuses.
+        REP #$20
+        LDA.W #1
+        STA ZP_NEWLEN
+        SEP #$20
+DO_FOR_FRAME:
+        LDA ZP_FORSP
+        CMP #FOR_MAX
+        BCS DO_FOR_FULL
+        JSR TEXT_OFFSET
+        JSR FOR_PTR             ; X = the new frame's offset
+        LDA ZP_VAR
+        STA FOR_BASE,X
+        REP #$20
+        INX
+        INX
+        LDA ZP_NEWLEN
+        STA FOR_BASE,X          ; step
+        INX
+        INX
+        LDA ZP_LIMIT
+        STA FOR_BASE,X          ; limit
+        INX
+        INX
+        LDA ZP_BASE
+        STA FOR_BASE,X          ; the text
+        INX
+        INX
+        LDA ZP_OFF
+        STA FOR_BASE,X          ; where the body starts
+        SEP #$20
+        INC ZP_FORSP
+        RTS
+DO_FOR_FULL:
+        JSR SAY_NOROOM
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+DO_FOR_BAD:
+        JSR SAY_WHAT
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+
+DO_NEXT:
+        JSR SKIPSP
+        LDA #$FF
+        STA ZP_VAR              ; $FF: no variable was named
+        JSR IS_ALPHA
+        BCC DO_NEXT_FIND
+        LDA [ZP_SRC]
+        JSR TO_UPPER
+        SEC
+        SBC #'A'
+        STA ZP_VAR
+        INC ZP_SRC
+DO_NEXT_FIND:
+        LDA ZP_FORSP
+        BEQ DO_NEXT_NONE
+        DEC A
+        STA ZP_NEWLEN           ; the frame under consideration
+DO_NEXT_SEARCH:
+        LDA ZP_NEWLEN
+        JSR FOR_INDEX_PTR
+        LDA FOR_BASE,X
+        CMP ZP_VAR
+        BEQ DO_NEXT_HAVE
+        LDA ZP_VAR
+        CMP #$FF
+        BEQ DO_NEXT_HAVE
+        LDA ZP_NEWLEN
+        BEQ DO_NEXT_NONE
+        DEC A
+        STA ZP_NEWLEN
+        BRA DO_NEXT_SEARCH
+DO_NEXT_NONE:
+        JSR SAY_NEXTFOR
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+DO_NEXT_HAVE:
+        REP #$20
+        TXA
+        STA ZP_TMP16            ; the frame's offset
+        LDA ZP_NEWLEN
+        AND.W #$00FF
+        STA ZP_OFF              ; the frame's index, for when it is finished
+        SEP #$20
+        LDA FOR_BASE,X
+        JSR LOAD_VAR            ; X = the variable's value
+        REP #$20
+        TXA
+        STA ZP_VAL
+        LDX ZP_TMP16
+        LDA FOR_BASE+2,X        ; the step
+        CLC
+        ADC ZP_VAL
+        STA ZP_VAL              ; the value this pass has reached
+        LDA FOR_BASE,X
+        AND.W #$00FF
+        ASL A
+        TAY
+        LDA ZP_VAL
+        STA VARS,Y
+        ; the test, signed: both sides biased by $8000
+        EOR.W #$8000
+        STA ZP_CNT2             ; the value, biased
+        LDA FOR_BASE+4,X        ; the limit
+        EOR.W #$8000
+        STA ZP_NEWLEN           ; the limit, biased
+        LDA FOR_BASE+2,X        ; the step decides which end ends it
+        BMI DO_NEXT_NEGATIVE
+        LDA ZP_CNT2
+        CMP ZP_NEWLEN
+        BEQ DO_NEXT_LOOP
+        BCC DO_NEXT_LOOP        ; still at or below the limit
+        BRA DO_NEXT_FINISH
+DO_NEXT_NEGATIVE:
+        LDA ZP_CNT2
+        CMP ZP_NEWLEN
+        BEQ DO_NEXT_LOOP
+        BCS DO_NEXT_LOOP        ; still at or above it
+        BRA DO_NEXT_FINISH
+DO_NEXT_LOOP:
+        LDA FOR_BASE+6,X        ; the body, again
+        CLC
+        ADC FOR_BASE+8,X
+        STA ZP_SRC
+        SEP #$20
+        LDA #BANK_KERNAL
+        STA ZP_SRC+2
+        LDA #2
+        STA ZP_JFLAG
+        RTS
+DO_NEXT_FINISH:
+        SEP #$20
+        LDA ZP_OFF
+        STA ZP_FORSP            ; this frame goes
+        RTS
+
+; FOR_INDEX_PTR: A = a frame's index; X = that frame's offset.
+FOR_INDEX_PTR:
+        REP #$20
+        AND.W #$00FF
+        STA ZP_CNT2
+        ASL A
+        ASL A
+        ASL A
+        CLC
+        ADC ZP_CNT2
+        TAX
+        SEP #$20
+        RTS

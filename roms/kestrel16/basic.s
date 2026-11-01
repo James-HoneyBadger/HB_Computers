@@ -45,6 +45,9 @@ ZP_QP           = $57           ; a second one
 ZP_CNT2         = $5A           ; 16-bit scratch
 ZP_NEWLEN       = $5C           ; 16-bit, the record being written
 ZP_TMPLEN       = $5E           ; 16-bit, a text's length
+ZP_BASE         = $60           ; 16-bit: where the running line's text starts
+ZP_OFF          = $62           ; 16-bit: how far into it a statement begins
+ZP_LIMIT        = $64           ; 16-bit: a FOR's limit, safe from EXPR's scratch
 
 PROG_LIMIT      = $7E00         ; the program may not grow past here
 FOR_BASE        = $7E00         ; FOR frames, ten bytes each
@@ -174,6 +177,48 @@ KW_LIST_END:
 KW_GOTO:
         .text "GOTO"
 KW_GOTO_END:
+KW_IF:
+        .text "IF"
+KW_IF_END:
+KW_THEN:
+        .text "THEN"
+KW_THEN_END:
+KW_ELSE:
+        .text "ELSE"
+KW_ELSE_END:
+KW_GOSUB:
+        .text "GOSUB"
+KW_GOSUB_END:
+KW_RETURN:
+        .text "RETURN"
+KW_RETURN_END:
+KW_FOR:
+        .text "FOR"
+KW_FOR_END:
+KW_TO:
+        .text "TO"
+KW_TO_END:
+KW_STEP:
+        .text "STEP"
+KW_STEP_END:
+KW_NEXT:
+        .text "NEXT"
+KW_NEXT_END:
+KW_AND:
+        .text "AND"
+KW_AND_END:
+KW_OR:
+        .text "OR"
+KW_OR_END:
+KW_NOT:
+        .text "NOT"
+KW_NOT_END:
+TXT_NEXTFOR:
+        .text "?NEXT WITHOUT FOR"
+TXT_NEXTFOR_END:
+TXT_RETGOSUB:
+        .text "?RETURN WITHOUT GOSUB"
+TXT_RETGOSUB_END:
 TXT_NOLINE:
         .text "?NO LINE"
 TXT_NOLINE_END:
@@ -210,6 +255,28 @@ SAY_NOROOM:
         LDA #BANK_BASIC
         STA ZP_PTR+2
         LDX.W #TXT_NOROOM_END - TXT_NOROOM
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_NEXTFOR:
+        LDA #<TXT_NEXTFOR
+        STA ZP_PTR
+        LDA #>TXT_NEXTFOR
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_NEXTFOR_END - TXT_NEXTFOR
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_RETGOSUB:
+        LDA #<TXT_RETGOSUB
+        STA ZP_PTR
+        LDA #>TXT_RETGOSUB
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_RETGOSUB_END - TXT_RETGOSUB
         JSL L_PRINT
         JSR SAY_NEWLINE
         RTS
@@ -473,6 +540,30 @@ EXEC_TRY_LET:
         LDY.W #KW_GOTO_END - KW_GOTO
         JSR MATCHKW
         BCS DO_GOTO
+        LDX.W #<KW_IF
+        LDY.W #KW_IF_END - KW_IF
+        JSR MATCHKW
+        BCS DO_IF
+        LDX.W #<KW_GOSUB
+        LDY.W #KW_GOSUB_END - KW_GOSUB
+        JSR MATCHKW
+        BCS DO_GOSUB
+        LDX.W #<KW_RETURN
+        LDY.W #KW_RETURN_END - KW_RETURN
+        JSR MATCHKW
+        BCS DO_RETURN
+        LDX.W #<KW_FOR
+        LDY.W #KW_FOR_END - KW_FOR
+        JSR MATCHKW
+        BCS DO_FOR
+        LDX.W #<KW_NEXT
+        LDY.W #KW_NEXT_END - KW_NEXT
+        JSR MATCHKW
+        BCS DO_NEXT
+        LDX.W #<KW_ELSE
+        LDY.W #KW_ELSE_END - KW_ELSE
+        JSR MATCHKW
+        BCS DO_ELSE
         LDX.W #<KW_END
         LDY.W #KW_END_END - KW_END
         JSR MATCHKW
@@ -631,7 +722,210 @@ PRINT_DONE:
 ; Expressions. The value of an expression is returned in X.
 ; ---------------------------------------------------------------------------
 
+; Levels, loosest first: OR, AND, NOT, one comparison, then the arithmetic the
+; language began with. A comparison does not chain -- `1<2<3` is not a question
+; this machine answers -- which is what lets its value be returned with the
+; machine stack exactly as it was found.
 EXPR:
+        JSR EXPR_OR
+        RTS
+
+EXPR_OR:
+        JSR EXPR_AND
+        PHX
+EXPR_OR_LOOP:
+        JSR SKIPSP
+        LDX.W #<KW_OR
+        LDY.W #KW_OR_END - KW_OR
+        JSR MATCHKW
+        BCC EXPR_OR_DONE
+        JSR EXPR_AND
+        PLY
+        REP #$20
+        TXA
+        BNE EXPR_OR_TRUE
+        TYA
+        BNE EXPR_OR_TRUE
+        LDA.W #0
+        BRA EXPR_OR_PUSH
+EXPR_OR_TRUE:
+        LDA.W #$FFFF
+EXPR_OR_PUSH:
+        TAX
+        SEP #$20
+        PHX
+        BRA EXPR_OR_LOOP
+EXPR_OR_DONE:
+        PLX
+        RTS
+
+EXPR_AND:
+        JSR EXPR_NOT
+        PHX
+EXPR_AND_LOOP:
+        JSR SKIPSP
+        LDX.W #<KW_AND
+        LDY.W #KW_AND_END - KW_AND
+        JSR MATCHKW
+        BCC EXPR_AND_DONE
+        JSR EXPR_NOT
+        PLY
+        REP #$20
+        TXA
+        BEQ EXPR_AND_FALSE
+        TYA
+        BEQ EXPR_AND_FALSE
+        LDA.W #$FFFF
+        BRA EXPR_AND_PUSH
+EXPR_AND_FALSE:
+        LDA.W #0
+EXPR_AND_PUSH:
+        TAX
+        SEP #$20
+        PHX
+        BRA EXPR_AND_LOOP
+EXPR_AND_DONE:
+        PLX
+        RTS
+
+EXPR_NOT:
+        JSR SKIPSP
+        LDX.W #<KW_NOT
+        LDY.W #KW_NOT_END - KW_NOT
+        JSR MATCHKW
+        BCC EXPR_CMP
+        JSR EXPR_NOT
+        REP #$20
+        TXA
+        BNE EXPR_NOT_SAIDNO
+        LDA.W #$FFFF
+        BRA EXPR_NOT_PUSH
+EXPR_NOT_SAIDNO:
+        LDA.W #0
+EXPR_NOT_PUSH:
+        TAX
+        SEP #$20
+        RTS
+
+EXPR_CMP:
+        JSR EXPR_ARITH
+        PHX                     ; the left side, until an operator is found
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'='
+        BEQ EXPR_CMP_EQ
+        CMP #'<'
+        BEQ EXPR_CMP_LT
+        CMP #'>'
+        BEQ EXPR_CMP_GT
+        PLX                     ; not a comparison: the value itself
+        RTS
+EXPR_CMP_EQ:
+        INC ZP_SRC
+        LDA #1
+        BRA EXPR_CMP_GO
+EXPR_CMP_LT:
+        INC ZP_SRC
+        LDA [ZP_SRC]
+        CMP #'='
+        BEQ EXPR_CMP_LE
+        CMP #'>'
+        BEQ EXPR_CMP_NE
+        LDA #3
+        BRA EXPR_CMP_GO
+EXPR_CMP_LE:
+        INC ZP_SRC
+        LDA #5
+        BRA EXPR_CMP_GO
+EXPR_CMP_NE:
+        INC ZP_SRC
+        LDA #2
+        BRA EXPR_CMP_GO
+EXPR_CMP_GT:
+        INC ZP_SRC
+        LDA [ZP_SRC]
+        CMP #'='
+        BEQ EXPR_CMP_GE
+        LDA #4
+        BRA EXPR_CMP_GO
+EXPR_CMP_GE:
+        INC ZP_SRC
+        LDA #6
+EXPR_CMP_GO:
+        STA ZP_CNT2             ; the operator
+        JSR EXPR_ARITH
+        PLY                     ; the left side comes back
+        REP #$20
+        TYA
+        EOR.W #$8000
+        STA ZP_TMP16            ; left, biased into unsigned order
+        TXA
+        EOR.W #$8000
+        CMP ZP_TMP16
+        BEQ EXPR_CMP_SAME
+        BCC EXPR_CMP_ABOVE      ; the right is lower, so the left is greater
+        LDA.W #1                ; left < right
+        BRA EXPR_CMP_HAVE
+EXPR_CMP_ABOVE:
+        LDA.W #2
+        BRA EXPR_CMP_HAVE
+EXPR_CMP_SAME:
+        LDA.W #0
+EXPR_CMP_HAVE:
+        STA ZP_TMP16            ; 0 equal, 1 left is less, 2 left is greater
+        SEP #$20
+        LDA ZP_CNT2
+        CMP #1
+        BEQ EXPR_CMP_WANT_SAME
+        CMP #2
+        BEQ EXPR_CMP_WANT_DIFF
+        CMP #3
+        BEQ EXPR_CMP_WANT_LESS
+        CMP #4
+        BEQ EXPR_CMP_WANT_GREATER
+        CMP #5
+        BEQ EXPR_CMP_WANT_NOTGREATER
+        LDA ZP_TMP16            ; >=
+        CMP #1
+        BEQ EXPR_CMP_SAYNO
+        BRA EXPR_CMP_SAYYES
+EXPR_CMP_WANT_SAME:
+        LDA ZP_TMP16
+        BEQ EXPR_CMP_SAYYES
+        BRA EXPR_CMP_SAYNO
+EXPR_CMP_WANT_DIFF:
+        LDA ZP_TMP16
+        BNE EXPR_CMP_SAYYES
+        BRA EXPR_CMP_SAYNO
+EXPR_CMP_WANT_LESS:
+        LDA ZP_TMP16
+        CMP #1
+        BEQ EXPR_CMP_SAYYES
+        BRA EXPR_CMP_SAYNO
+EXPR_CMP_WANT_GREATER:
+        LDA ZP_TMP16
+        CMP #2
+        BEQ EXPR_CMP_SAYYES
+        BRA EXPR_CMP_SAYNO
+EXPR_CMP_WANT_NOTGREATER:
+        LDA ZP_TMP16
+        CMP #2
+        BEQ EXPR_CMP_SAYNO
+EXPR_CMP_SAYYES:
+        REP #$20
+        LDA.W #$FFFF
+        TAX
+        SEP #$20
+        RTS
+EXPR_CMP_SAYNO:
+        REP #$20
+        LDA.W #0
+        TAX
+        SEP #$20
+        RTS
+
+; The arithmetic the language began with.
+EXPR_ARITH:
         JSR TERM
         PHX
 EXPR_LOOP:

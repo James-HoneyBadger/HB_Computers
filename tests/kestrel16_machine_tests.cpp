@@ -41,7 +41,12 @@ public:
     Machine& machine() { return machine_; }
 
     void typeLine(const std::string& text) {
-        machine_.typeText(text);
+        // A key at a time, as a person types: the controller holds thirty-two
+        // keys, and a line pasted in at once loses the rest of itself.
+        for (const char ch : text) {
+            machine_.type(static_cast<std::uint8_t>(ch));
+            machine_.runFrames(1);
+        }
         machine_.type(static_cast<std::uint8_t>(SpecialKey::Return));
     }
 
@@ -289,6 +294,46 @@ void test_a_stored_program() {
     TW_CHECK(booted.shows("?NO LINE"));
 }
 
+void test_conditions_and_loops() {
+    // Comparisons, and the operators that combine them.
+    Booted booted;
+    // Two lines: the keyboard controller holds thirty-two keys, and a longer
+    // line typed in one go would lose characters here as it would anywhere.
+    booted.run("PRINT 1<2, 2<=2, 3<>4");
+    TW_CHECK_EQ(booted.answer(), std::string{"-1 -1 -1"});
+    booted.run("PRINT 5>4, 6>=7");
+    TW_CHECK_EQ(booted.answer(), std::string{"-1 0"});
+    booted.run("PRINT NOT 0");
+    TW_CHECK_EQ(booted.answer(), std::string{"-1"});
+    booted.run("PRINT (1<2) AND (3<2)");
+    TW_CHECK_EQ(booted.answer(), std::string{"0"});
+
+    // IF takes one branch or the other.
+    booted.run("IF 1<2 THEN PRINT \"YES\"");
+    TW_CHECK_EQ(booted.answer(), std::string{"YES"});
+    booted.run("IF 1>2 THEN PRINT \"A\" ELSE PRINT \"B\"");
+    TW_CHECK_EQ(booted.answer(), std::string{"B"});
+
+    // GOSUB goes there and RETURN comes back to the statement after it.
+    booted.run("10 GOSUB 100");
+    booted.run("20 PRINT \"BACK\"");
+    booted.run("30 END");
+    booted.run("100 PRINT \"SUB\"");
+    booted.run("110 RETURN");
+    booted.run("RUN");
+    TW_CHECK(booted.shows("SUB"));
+    TW_CHECK(booted.shows("BACK"));
+
+    // A FOR loop runs its body the right number of times.
+    booted.run("NEW");
+    booted.run("10 FOR I=1 TO 3");
+    booted.run("20 PRINT I;");
+    booted.run("30 NEXT I");
+    booted.run("40 PRINT");
+    booted.run("RUN");
+    TW_CHECK(booted.shows("123"));
+}
+
 void test_signed_division() {
     // Division is on signed sixteen-bit values: the sign comes off before the
     // divide and goes back on afterwards, and the quotient rounds towards zero.
@@ -336,5 +381,6 @@ int main() {
     test_the_screen_is_the_roms();
     test_signed_division();
     test_a_stored_program();
+    test_conditions_and_loops();
     return tw::test::summary("kestrel16_machine_tests");
 }
