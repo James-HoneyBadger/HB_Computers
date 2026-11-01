@@ -65,12 +65,15 @@ set(KESTREL_GENERATED ${CMAKE_BINARY_DIR}/generated/kestrel)
 
 function(kestrel_rom name origin size)
     set(header ${KESTREL_GENERATED}/${name}_rom.hpp)
+    # The image as data as well as as a header, so a program that is not built by
+    # this CMake can load it -- the Rust port does.
+    set(binary ${KESTREL_GENERATED}/${name}.bin)
     add_custom_command(
-        OUTPUT ${header}
+        OUTPUT ${header} ${binary}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${KESTREL_GENERATED}
         COMMAND kestrel_asm ${KESTREL_ROM_DIR}/${name}.s
                 --name ${name} --origin ${origin} --size ${size} --fill 0xFF
-                --header ${header}
+                --header ${header} --bin ${binary}
                 --symbols ${KESTREL_GENERATED}/${name}.sym
                 --listing ${KESTREL_GENERATED}/${name}.lst
         WORKING_DIRECTORY ${KESTREL_ROM_DIR}
@@ -92,12 +95,13 @@ set(KESTREL16_GENERATED ${CMAKE_BINARY_DIR}/generated/kestrel16)
 
 function(kestrel16_rom name origin size)
     set(header ${KESTREL16_GENERATED}/${name}_rom.hpp)
+    set(binary ${KESTREL16_GENERATED}/${name}.bin)
     add_custom_command(
-        OUTPUT ${header}
+        OUTPUT ${header} ${binary}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${KESTREL16_GENERATED}
         COMMAND kestrel16_asm ${KESTREL16_ROM_DIR}/${name}.s
                 --name ${name} --origin ${origin} --size ${size} --fill 0xFF
-                --header ${header}
+                --header ${header} --bin ${binary}
                 --symbols ${KESTREL16_GENERATED}/${name}.sym
                 --listing ${KESTREL16_GENERATED}/${name}.lst
         WORKING_DIRECTORY ${KESTREL16_ROM_DIR}

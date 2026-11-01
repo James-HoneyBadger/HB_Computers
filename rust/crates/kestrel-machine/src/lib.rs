@@ -3,9 +3,10 @@
 // kestrel-machine -- the port of `kestrel_machine`, crate by crate.
 //
 // What is here: the profile table, the four devices, the bus decode with its
-// I/O page, and both processors -- each with the tests that prove it. What is
-// next, in this order: the machine that binds a processor to a bus, the ROMs,
-// the command line, and the window. The C++ tree stays until this one can do
+// I/O page, both processors, and the machine that binds a processor to its bus
+// and boots the ROMs -- each with the tests that prove it. The Rust tree now
+// powers both machines on and reads their answers off the tube. What is next: the
+// command line and then the window, and the C++ tree stays until this one can do
 // everything it does.
 //
 // The port follows the original file by file, so a reader can put the two side by
@@ -15,6 +16,7 @@ pub mod bus;
 pub mod cpu6502;
 pub mod cpu65816;
 pub mod devices;
+pub mod machine;
 pub mod profile;
 
 pub use bus::{Bus, Register};

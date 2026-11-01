@@ -1,0 +1,387 @@
+// SPDX-License-Identifier: MIT
+//
+// The machine: one emulator with two models.
+//
+// The bus does the decode and holds the devices; the processor executes what the
+// ROM put in memory. This module is the join: it owns both, counts the frames as
+// the processor's cycles pass, and gives the host the three hands a person has --
+// type at it, let it run, read the tube back.
+//
+// Nothing a person sees the machine do is written here. The power-on message, the
+// prompt, the error messages and the arithmetic are all machine code in a ROM
+// image; this file only decides who runs and for how long.
+
+use std::path::Path;
+
+use crate::bus::Bus as MachineBus;
+use crate::cpu6502::{self, Cpu6502};
+use crate::cpu65816::{self, Cpu65816};
+use crate::profile::Model;
+
+/// The keyboard's return key, and the other keys that are not characters.
+pub const KEY_RETURN: u8 = 0x0D;
+
+impl cpu6502::Bus for MachineBus {
+    fn read(&mut self, address: u16) -> u8 {
+        MachineBus::read(self, u32::from(address))
+    }
+
+    fn write(&mut self, address: u16, value: u8) {
+        MachineBus::write(self, u32::from(address), value);
+    }
+}
+
+impl cpu65816::Bus for MachineBus {
+    fn read(&mut self, address: u32) -> u8 {
+        MachineBus::read(self, address)
+    }
+
+    fn write(&mut self, address: u32, value: u8) {
+        MachineBus::write(self, address, value);
+    }
+}
+
+/// Either processor, since a machine has exactly one.
+pub enum Cpu {
+    Mos6502(Cpu6502),
+    Mos65816(Cpu65816),
+}
+
+pub struct Machine {
+    pub bus: MachineBus,
+    pub cpu: Cpu,
+    cycles_to_frame: u32,
+}
+
+/// Why a ROM could not be put in the machine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RomError {
+    /// The image is not the size the machine's socket takes.
+    WrongSize { wanted: usize, got: usize },
+    /// The file could not be read.
+    Unreadable(String),
+}
+
+impl std::fmt::Display for RomError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RomError::WrongSize { wanted, got } => {
+                write!(f, "a ROM of {wanted} bytes was needed, {got} were given")
+            }
+            RomError::Unreadable(why) => write!(f, "the ROM could not be read: {why}"),
+        }
+    }
+}
+
+impl Cpu {
+    /// One instruction, or the interrupt if one is due. The line is recomputed
+    /// before every instruction because it is level-triggered: it is high while a
+    /// key waits or a frame has passed, and drops when the ROM has dealt with
+    /// both.
+    fn step(&mut self, bus: &mut MachineBus, irq: bool) -> u32 {
+        match self {
+            Cpu::Mos6502(cpu) => {
+                cpu.set_irq_line(irq);
+                cpu.step(&mut *bus)
+            }
+            Cpu::Mos65816(cpu) => {
+                cpu.set_irq_line(irq);
+                cpu.step(&mut *bus)
+            }
+        }
+    }
+
+    fn reset(&mut self, bus: &mut MachineBus) {
+        match self {
+            Cpu::Mos6502(cpu) => cpu.reset(&mut *bus),
+            Cpu::Mos65816(cpu) => cpu.reset(&mut *bus),
+        }
+    }
+
+    fn request_nmi(&mut self) {
+        match self {
+            Cpu::Mos6502(cpu) => cpu.request_nmi(),
+            Cpu::Mos65816(cpu) => cpu.request_nmi(),
+        }
+    }
+
+    pub fn instructions(&self) -> u64 {
+        match self {
+            Cpu::Mos6502(cpu) => cpu.instruction_count(),
+            Cpu::Mos65816(cpu) => cpu.instruction_count(),
+        }
+    }
+
+    pub fn cycles(&self) -> u64 {
+        match self {
+            Cpu::Mos6502(cpu) => cpu.cycle_count(),
+            Cpu::Mos65816(cpu) => cpu.cycle_count(),
+        }
+    }
+}
+
+impl Machine {
+    /// A machine, powered on with empty ROM sockets: the bus and the processor
+    /// are real, the language is not there yet. `mount_shipped_roms` is what a
+    /// caller that wants a working machine does next.
+    pub fn new(model: Model) -> Self {
+        let bus = MachineBus::new(profile_of(model));
+        let cpu = match model {
+            Model::Kestrel => Cpu::Mos6502(Cpu6502::new()),
+            Model::Kestrel16 => Cpu::Mos65816(Cpu65816::new()),
+        };
+        Self {
+            bus,
+            cpu,
+            cycles_to_frame: 0,
+        }
+    }
+
+    pub fn model(&self) -> Model {
+        self.bus.profile.model
+    }
+
+    /// The KERNAL: the part of the machine that is always there. Its size is the
+    /// profile's, and an image of the wrong size is refused.
+    pub fn mount_kernal(&mut self, image: &[u8]) -> Result<(), RomError> {
+        if image.len() != self.bus.kernal.len() {
+            return Err(RomError::WrongSize {
+                wanted: self.bus.kernal.len(),
+                got: image.len(),
+            });
+        }
+        self.bus.kernal.copy_from_slice(image);
+        Ok(())
+    }
+
+    /// The language: a socket ROM on the Kestrel, a bank of its own on the
+    /// Kestrel 16.
+    pub fn mount_basic(&mut self, image: &[u8]) -> Result<(), RomError> {
+        if image.len() != self.bus.basic.len() {
+            return Err(RomError::WrongSize {
+                wanted: self.bus.basic.len(),
+                got: image.len(),
+            });
+        }
+        self.bus.basic.copy_from_slice(image);
+        Ok(())
+    }
+
+    /// Loads the images the C++ build assembled. `root` is the build's
+    /// `generated` directory, which holds `kestrel/` and `kestrel16/`.
+    pub fn mount_shipped_roms(&mut self, root: &Path) -> Result<(), RomError> {
+        let directory = root.join(match self.model() {
+            Model::Kestrel => "kestrel",
+            Model::Kestrel16 => "kestrel16",
+        });
+        let kernal = read_image(&directory.join("kernal.bin"))?;
+        let basic = read_image(&directory.join("basic.bin"))?;
+        self.mount_kernal(&kernal)?;
+        self.mount_basic(&basic)
+    }
+
+    /// Power-on: RAM and the tube cleared, the devices idle, the clock at zero.
+    /// The ROMs are not touched -- they are read-only and the machine is
+    /// switched on with them already in.
+    pub fn reset(&mut self) {
+        for byte in &mut self.bus.ram {
+            *byte = 0;
+        }
+        let (ink, paper) = (self.bus.ink, self.bus.paper);
+        self.bus.video.power_on(ink, paper);
+        self.bus.keyboard.clear();
+        self.bus.cursor_column = 0;
+        self.bus.cursor_row = 0;
+        self.bus.cursor_on = self.bus.profile.model == Model::Kestrel;
+        self.bus.scrolled = false;
+        self.bus.frame_counter = 0;
+        self.bus.frame_flag = false;
+        self.cycles_to_frame = 0;
+        self.bus.sound = 0;
+        self.bus.notes_played = 0;
+        self.bus.random_state = 0xACE1;
+        self.bus.last_key = 0;
+        self.bus.disk_sector = 0;
+        self.bus.disk_address = 0;
+        // The Kestrel's count register reports the volume's size, so it answers
+        // from the moment the machine is switched on.
+        self.bus.disk_count = if self.bus.profile.model == Model::Kestrel && self.bus.disk.present()
+        {
+            self.bus.profile.disk_sectors as u16
+        } else {
+            0
+        };
+        self.bus.disk_status = 0;
+
+        let Machine { bus, cpu, .. } = self;
+        cpu.reset(bus);
+    }
+
+    /// Run the processor, and count frames as its cycles pass.
+    pub fn run_cycles(&mut self, cycles: i64) {
+        let per_frame = self.bus.profile.cycles_per_frame;
+        let machine = self;
+        let mut done = 0;
+        while done < cycles {
+            let irq = machine.bus.keyboard.available() || machine.bus.frame_flag;
+            let taken = machine.cpu.step(&mut machine.bus, irq);
+            done += i64::from(taken);
+            machine.cycles_to_frame += taken;
+            if machine.cycles_to_frame >= per_frame {
+                machine.cycles_to_frame -= per_frame;
+                machine.bus.tick_frame();
+            }
+        }
+    }
+
+    pub fn run_frames(&mut self, frames: i32) {
+        let per_frame = i64::from(self.bus.profile.cycles_per_frame);
+        self.run_cycles(per_frame * i64::from(frames));
+    }
+
+    pub fn type_key(&mut self, key: u8) {
+        self.bus.keyboard.push(key);
+    }
+
+    pub fn type_text(&mut self, text: &str) {
+        for byte in text.bytes() {
+            self.type_key(byte);
+        }
+    }
+
+    pub fn type_line(&mut self, text: &str) {
+        self.type_text(text);
+        self.type_key(KEY_RETURN);
+    }
+
+    /// The BREAK key: a non-maskable interrupt, which the KERNAL turns into a
+    /// warm start.
+    pub fn press_break(&mut self) {
+        self.cpu.request_nmi();
+    }
+
+    /// The tube, as text.
+    pub fn screen_text(&self) -> String {
+        self.bus.video.text()
+    }
+
+    pub fn screen_line(&self, row: usize) -> String {
+        self.bus.video.line(row)
+    }
+}
+
+fn profile_of(model: Model) -> &'static crate::profile::Profile {
+    match model {
+        Model::Kestrel => &crate::profile::KESTREL,
+        Model::Kestrel16 => &crate::profile::KESTREL16,
+    }
+}
+
+fn read_image(path: &Path) -> Result<Vec<u8>, RomError> {
+    std::fs::read(path).map_err(|error| RomError::Unreadable(format!("{}: {error}", path.display())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    /// The images the C++ build assembled. A Rust-only checkout has no ROMs, so
+    /// these tests say so rather than pretending to have run.
+    fn generated() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../build/generated")
+    }
+
+    fn boot(model: Model) -> Machine {
+        let mut machine = Machine::new(model);
+        machine
+            .mount_shipped_roms(&generated())
+            .expect("the assembled ROMs -- run ./start.sh build first");
+        machine.reset();
+        machine.run_frames(25);
+        machine
+    }
+
+    #[test]
+    fn the_1982_machine_boots_and_answers() {
+        let mut machine = boot(Model::Kestrel);
+        assert!(
+            machine.screen_text().contains("KESTREL BASIC"),
+            "the power-on message, from the ROM:\n{}",
+            machine.screen_text()
+        );
+        machine.type_line("PRINT 2+2*3");
+        machine.run_frames(20);
+        assert!(
+            machine.screen_text().contains("8"),
+            "four and twenty-four:\n{}",
+            machine.screen_text()
+        );
+        // Nothing ran off the rails: every opcode the ROM used is a documented one.
+        match machine.cpu {
+            Cpu::Mos6502(ref cpu) => assert_eq!(cpu.illegal_opcodes(), 0),
+            _ => panic!("the 1982 machine has a 6502"),
+        }
+    }
+
+    #[test]
+    fn the_1982_machine_stores_and_runs_a_program() {
+        let mut machine = boot(Model::Kestrel);
+        machine.type_line("10 FOR I=1 TO 3");
+        machine.type_line("20 PRINT I*I");
+        machine.type_line("30 NEXT I");
+        machine.type_line("RUN");
+        machine.run_frames(120);
+        let screen = machine.screen_text();
+        for wanted in ["1", "4", "9"] {
+            assert!(screen.contains(wanted), "no {wanted} in:\n{screen}");
+        }
+    }
+
+    #[test]
+    fn the_1992_machine_boots_and_answers() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line("PRINT 1000*20");
+        machine.run_frames(40);
+        let screen = machine.screen_text();
+        assert!(screen.contains("20000"), "sixteen bits, not eight:\n{screen}");
+        match machine.cpu {
+            Cpu::Mos65816(ref cpu) => assert_eq!(cpu.illegal_opcodes(), 0),
+            _ => panic!("the 1992 machine has a 65816"),
+        }
+    }
+
+    #[test]
+    fn a_rom_of_the_wrong_size_is_refused() {
+        let mut machine = Machine::new(Model::Kestrel);
+        let short = vec![0u8; 100];
+        assert_eq!(
+            machine.mount_kernal(&short),
+            Err(RomError::WrongSize { wanted: 8192, got: 100 })
+        );
+        assert_eq!(
+            machine.mount_basic(&short),
+            Err(RomError::WrongSize {
+                wanted: 16384,
+                got: 100
+            })
+        );
+    }
+
+    #[test]
+    fn the_frame_is_the_profile_s() {
+        let mut machine = boot(Model::Kestrel);
+        let before = machine.bus.frame_counter;
+        machine.run_frames(10);
+        assert!(
+            machine.bus.frame_counter >= before + 9,
+            "ten frames of twenty thousand cycles"
+        );
+        // The 1992 machine's frame is eight times longer, and so is the count of
+        // instructions in it.
+        let mut kestrel16 = boot(Model::Kestrel16);
+        let start = kestrel16.bus.frame_counter;
+        kestrel16.run_frames(1);
+        assert_eq!(kestrel16.bus.frame_counter, start + 1);
+    }
+}

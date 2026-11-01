@@ -9,7 +9,8 @@ prove it, and the C++ tree kept until the port can do everything it does.
 | `kestrel-machine` | `include/kestrel/`, `src/kestrel/` | **profile, devices and the bus decode done** |
 | `kestrel-machine` | `model1982/cpu6502.cpp` | done, `cpu6502.rs` |
 | `kestrel-machine` | `model1992/cpu65816.cpp` | done, `cpu65816.rs` |
-| `kestrel-machine` | the machine that binds a processor to a bus | next |
+| `kestrel-machine` | `src/kestrel/machine.cpp` | done, `machine.rs` -- boots both machines |
+| `kestrel-cli` | `tools/kestrel.cpp`, `tools/kestrel_emu.cpp` | next |
 | ... | `cpu6502.cpp` | after that |
 | ... | `cpu65816.cpp` | after that |
 | `kestrel-roms` | the ROM build (`build.rs` calling the assemblers) | after that |

@@ -389,6 +389,14 @@ impl Bus {
         self.disk_status |= 0x80;  // done
     }
 
+    /// One frame of the machine's own time. The counter and the flag are all
+    /// the machine does: the interrupt is the line the ROM sees, and the work --
+    /// blinking the cursor, draining the keyboard -- is the KERNAL's handler.
+    pub fn tick_frame(&mut self) {
+        self.frame_counter = self.frame_counter.wrapping_add(1);
+        self.frame_flag = true;
+    }
+
     /// The noise generator: one byte at a time, and deterministic, so a test that
     /// depends on RND gets the same numbers every run.
     pub fn random_byte(&mut self) -> u8 {
