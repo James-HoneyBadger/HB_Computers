@@ -185,6 +185,13 @@ a number is stored in the program, and a line without one is run at once.
 
 `HELP` prints the command list, which is where this table comes from.
 
+A `FOR` whose start is already past its limit runs its body no times, and leaves
+the variable holding that start, so `FOR J=I*I TO 100` is safe even when `I*I` has
+run past the end of the array it indexes. The machine walks forward for the
+matching `NEXT` to find out where the body ends, counting the loops it passes
+through on the way, and a `NEXT` inside a remark or a quoted string is not
+mistaken for it. `STEP` may be negative; `STEP 0` loops for ever, as it did then.
+
 ### Functions
 
 | | |
@@ -227,27 +234,33 @@ The machine prints the reason and where it happened: `SYNTAX ERROR IN 40`, or
 
 ### Worked example
 
+A sieve of Eratosthenes, the program every 1982 magazine carried:
+
 ```basic
-10 REM NAMES
-20 DIM N$(3)
-30 N$(1)="ADA": N$(2)="GRACE": N$(3)="KATHERINE"
-40 FOR I=1 TO 3
-50 GOSUB 100
-60 NEXT I
-70 END
-100 PRINT "HELLO, "; N$(I)
-110 RETURN
+10 REM PRIME SIEVE TO 100
+20 DIM P(100)
+30 FOR I=2 TO 100
+40 IF P(I) THEN 70
+50 PRINT I;
+60 FOR J=I*I TO 100 STEP I: P(J)=1: NEXT J
+70 NEXT I
+80 PRINT
 ```
 
 ```
 RUN
-HELLO, ADA
-HELLO, GRACE
-HELLO, KATHERINE
+2
+3
+5
+7
+11
+...
+97
 ```
 
-A `DIM`ed string array, a loop, a subroutine and a return: most of the machine
-in eight lines.
+Line 60 is the interesting one: when `I` passes ten, `I*I` is past the end of the
+array, and the loop runs no times at all rather than once with a subscript out of
+range — which is what `FOR` is for.
 
 ---
 
@@ -279,21 +292,6 @@ The honest list, because a manual that hides it is worse than useless:
 - **no lowercase input** — the machine uppercases what it reads;
 - **one language at a time** — the socket holds one ROM, and changing it resets
   the machine.
-
-### A fault, not a feature
-
-`FOR` runs its body at least once. A loop whose start is already past its limit
-— `FOR J=121 TO 100` — executes once instead of being skipped, so a start that
-is an expression needs its bound checked before it is used as a subscript:
-
-```basic
-60 FOR J=I*I TO 100 STEP I: IF J>100 THEN 75
-65 P(J)=1
-75 NEXT J
-```
-
-Mending it means skipping a `FOR` whose start is past its limit by scanning ahead
-for the matching `NEXT`; that is the next job for the ROM.
 
 ---
 

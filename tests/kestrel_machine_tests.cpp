@@ -566,6 +566,49 @@ void test_arrays() {
 }
 
 
+/// A FOR whose start is already past its limit runs its body no times, and the
+/// variable keeps the start it was given.
+void test_a_for_past_its_limit_is_empty() {
+    Machine machine{Model::Kestrel};
+    machine.runFrames(20);
+    typeOut(machine, "10 FOR I=5 TO 3");
+    typeOut(machine, "20 PRINT \"BODY\"");
+    typeOut(machine, "30 NEXT I");
+    typeOut(machine, "40 PRINT \"AFTER\"");
+    typeOut(machine, "CLS");
+    typeOut(machine, "RUN");
+    const std::string all = screenText(machine);
+    TW_CHECK(all.find("BODY") == std::string::npos);
+    TW_CHECK(all.find("AFTER") != std::string::npos);
+
+    // Counting down is the same rule the other way round, and the walk over the
+    // body knows a NEXT in a remark or in a string is not the one it wants.
+    Machine down{Model::Kestrel};
+    down.runFrames(20);
+    typeOut(down, "10 FOR I=3 TO 5 STEP -1");
+    typeOut(down, "20 REM NEXT I");
+    typeOut(down, "30 PRINT \"NEXT I\"");
+    typeOut(down, "40 NEXT I");
+    typeOut(down, "50 PRINT \"AFTER\"");
+    typeOut(down, "CLS");
+    typeOut(down, "RUN");
+    TW_CHECK(screenText(down).find("AFTER") != std::string::npos);
+
+    // The variable is left at the start, as it was on the machines of the day.
+    Machine kept{Model::Kestrel};
+    kept.runFrames(20);
+    typeOut(kept, "FOR I=5 TO 3: NEXT I: PRINT I");
+    TW_CHECK((answerAfter(kept, "FOR I=5 TO 3: NEXT I: PRINT I")) == "5");
+
+    // And a loop that does run still runs.
+    Machine runs{Model::Kestrel};
+    runs.runFrames(20);
+    typeOut(runs, "FOR I=5 TO 3 STEP -1: PRINT I;: NEXT I");
+    typeOut(runs, "CLS");
+    typeOut(runs, "FOR I=5 TO 3 STEP -1: PRINT I;: NEXT I");
+    TW_CHECK(screenText(runs).find("5\n4\n3\n") != std::string::npos);
+}
+
 /// A big array is a big block of heap: 101 numbers, not the 8-bit remainder of
 /// one, so that it cannot collide with the value stack above MEMTOP.
 void test_a_big_array_stays_in_its_own_memory() {
@@ -759,6 +802,7 @@ int main() {
     test_strings_in_a_program();
     test_get_takes_one_key();
     test_arrays();
+    test_a_for_past_its_limit_is_empty();
     test_a_big_array_stays_in_its_own_memory();
     test_a_jump_from_a_line_finds_its_target();
     test_strings_compare_and_join();

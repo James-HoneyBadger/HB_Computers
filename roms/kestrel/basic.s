@@ -1231,7 +1231,167 @@ FOR_STORE_STEP:
         LDA B_IPTR+1
         STA (B_TMPP),Y
         INC B_FORSP
+        JSR FOR_MAYBE_EMPTY     ; a loop whose start is past its limit skips
         CLC
+        RTS
+
+; FOR_MAYBE_EMPTY: a FOR whose start is already past its limit runs its body no
+; times at all, so the frame is dropped and the parser is moved past the NEXT
+; that closes it. STEP 0 and a start equal to the limit both run once, as they
+; did on the machines of the period.
+FOR_MAYBE_EMPTY:
+        LDA B_VNAME1
+        STA B_TEMP
+        LDA B_VNAME2
+        STA B_TEMP2
+        LDA #T_NUM
+        STA B_TEMP3
+        JSR VARREF              ; FAC = the start the variable already holds
+        JSR NEXTFRAME
+        LDY #2
+        LDA (B_TMPP),Y
+        STA B_ARG
+        INY
+        LDA (B_TMPP),Y
+        STA B_ARG+1
+        INY
+        LDA (B_TMPP),Y
+        STA B_ARG+2
+        INY
+        LDA (B_TMPP),Y
+        STA B_ARG+3
+        INY
+        LDA (B_TMPP),Y
+        STA B_ARG+4
+        JSR FCOMP               ; A = -1 below the limit, 0 level, 1 above
+        STA B_CHAR
+        JSR NEXTFRAME
+        LDY #8                  ; bit 7 of the step's mantissa, not its exponent
+        LDA (B_TMPP),Y
+        BMI FOR_EMPTY_DOWN
+        LDA B_CHAR
+        CMP #1                  ; counting up: a start above the limit is empty
+        BEQ FOR_EMPTY_SKIP
+        RTS
+FOR_EMPTY_DOWN:
+        LDA B_CHAR
+        CMP #$FF                ; counting down: a start below it is empty
+        BEQ FOR_EMPTY_SKIP
+        RTS
+
+FOR_EMPTY_SKIP:
+        DEC B_FORSP             ; the frame goes: this loop never ran
+        LDA B_VNAME1
+        STA B_SCAN1             ; the name to look for
+        LDA B_VNAME2
+        STA B_SCAN2
+        LDA #0
+        STA B_SCAND
+        LDA B_CURLINE
+        STA B_SCANLINE
+        LDA B_CURLINE+1
+        STA B_SCANLINE+1
+
+; The parser walks forward statement by statement, counting the FORs it meets,
+; until it meets the NEXT that belongs to this loop. Strings and remarks are
+; stepped over whole, and the walk crosses lines the same way the runner does.
+FOR_SKIP_SCAN:
+        JSR SKIPSP
+        JSR CURCHAR
+        BEQ FOR_SKIP_EOL
+        CMP #':'
+        BNE FOR_SKIP_WORD
+        JSR ADV
+        JMP FOR_SKIP_SCAN
+FOR_SKIP_WORD:
+        CMP #'"'
+        BEQ FOR_SKIP_STRING
+        LDA #<KW_REM
+        LDY #>KW_REM
+        JSR TRY
+        BCS FOR_SKIP_EOL        ; a remark runs to the end of the line
+        LDA #<KW_FOR
+        LDY #>KW_FOR
+        JSR TRY
+        BCS FOR_SKIP_DEEPER
+        LDA #<KW_NEXT
+        LDY #>KW_NEXT
+        JSR TRY
+        BCC FOR_SKIP_STEP       ; an ordinary word: carry on a character at a time
+        LDA B_SCAND
+        BNE FOR_SKIP_SHALLOWER
+        JSR SKIPSP
+        JSR CURCHAR
+        BEQ FOR_SKIP_FOUND      ; a bare NEXT closes the innermost loop, this one
+        JSR PARSENAME
+        BCS FOR_SKIP_STEP
+        LDA B_TEMP
+        CMP B_SCAN1
+        BNE FOR_SKIP_STEP
+        LDA B_TEMP2
+        CMP B_SCAN2
+        BNE FOR_SKIP_STEP
+        JMP FOR_SKIP_FOUND
+FOR_SKIP_DEEPER:
+        INC B_SCAND
+        JMP FOR_SKIP_SCAN
+FOR_SKIP_SHALLOWER:
+        DEC B_SCAND
+        JMP FOR_SKIP_SCAN
+FOR_SKIP_STEP:
+        JSR ADV
+        JMP FOR_SKIP_SCAN
+FOR_SKIP_STRING:
+        JSR ADV
+FOR_SKIP_STRING_LOOP:
+        JSR CURCHAR
+        BEQ FOR_SKIP_EOL
+        CMP #'"'
+        BEQ FOR_SKIP_STRING_END
+        JSR ADV
+        JMP FOR_SKIP_STRING_LOOP
+FOR_SKIP_STRING_END:
+        JSR ADV
+        JMP FOR_SKIP_SCAN
+
+FOR_SKIP_EOL:
+        ; The end of the text of this line: its link says where the walk goes.
+        LDY #0
+        LDA (B_SCANLINE),Y
+        PHA
+        INY
+        LDA (B_SCANLINE),Y
+        STA B_SCANLINE+1
+        PLA
+        STA B_SCANLINE
+        LDA B_SCANLINE
+        ORA B_SCANLINE+1
+        BEQ FOR_SKIP_NO_NEXT    ; the program stops first: there is no body
+        LDA B_SCANLINE
+        CLC
+        ADC #4
+        STA B_IPTR
+        LDA B_SCANLINE+1
+        ADC #0
+        STA B_IPTR+1
+        JMP FOR_SKIP_SCAN
+
+FOR_SKIP_FOUND:
+        ; B_IPTR is already past the NEXT and its variable, so the rest of that
+        ; statement runs and the loop is behind us.
+        LDA B_SCANLINE
+        STA B_CURLINE
+        LDA B_SCANLINE+1
+        STA B_CURLINE+1
+        RTS
+
+FOR_SKIP_NO_NEXT:
+        ; No NEXT anywhere: the program ends where it was scanning, which is
+        ; where a FOR with no loop at all leaves the machine.
+        LDA B_SCANLINE
+        STA B_CURLINE
+        LDA B_SCANLINE+1
+        STA B_CURLINE+1
         RTS
 
 ; FORFRAME: B_TMPP points at the frame for level B_FORSP.
