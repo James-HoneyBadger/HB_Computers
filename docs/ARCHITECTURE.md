@@ -80,5 +80,6 @@ back.
 | `kestrel16_asm_tests` | Every 65816 addressing mode and width rule, byte for byte |
 | `kestrel16_cpu_tests` | The 65816: widths, banks, the direct page, arithmetic, cycles |
 | `kestrel16_machine_tests` | The Kestrel 16: its ROMs boot, and typing at it works |
+| `kestrel_samples_tests` | Every program in `samples/` runs, and prints what its `.expected` file says |
 
 `ctest --test-dir build` runs all of them.

@@ -127,6 +127,7 @@ READY.
 | `--frames N` | How many frames to run before the screen is printed |
 | `--speed 1\|2\|4\|8\|turbo` | How fast the host clocks it; `turbo` by default |
 | `--type "LINE"` | Type a line at the prompt and let the machine answer; may be repeated |
+| `--file FILE` | Type every line of a file, in order, before any `--type` lines |
 | `--rom ID` | Which ROM to put in the 1982 machine's socket: `basic`, `monitor` |
 | `--tape FILE` | Insert this cassette image; the machine gets a blank one otherwise |
 | `--no-screen` | Print nothing |
@@ -142,6 +143,15 @@ $ ./build/kestrel --rom monitor --type "S 0900 0902" --type "L"
 
 `--rom monitor` boots the machine with the monitor in the socket instead of BASIC,
 which is how the cassette is used at all: `S` and `L` live there.
+
+`--file` is how a program in `samples/` is run: the lines are typed in order, at
+the speed a person could type them, so a numbered line is stored and a `RUN`
+afterwards runs it.
+
+```bash
+$ ./build/kestrel --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
+$ ./build/kestrel --model kestrel16 --file samples/kestrel16/03-division.bas
+```
 
 ---
 
@@ -176,7 +186,7 @@ ctest --test-dir build --output-on-failure
 | `kestrel_machine` | The machine, both models |
 | `kestrel` | The command line |
 | `kestrel_computers` | The window, if Qt 6 Widgets is found |
-| `kestrel_*_tests` | The six suites |
+| `kestrel_*_tests` | The seven suites |
 
 Each ROM is assembled by a custom command into `build/generated/`, with a header
 of the bytes and a listing beside it. A change to a `.s` file rebuilds the image,

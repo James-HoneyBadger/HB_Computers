@@ -352,7 +352,9 @@ The honest list, because a manual that hides it is worse than useless:
 - **no tape words in BASIC** — the cassette is the monitor's (see above);
 - **no `WHILE`, no procedures** — this is 1982 BASIC, and `GOSUB` is the idiom;
 - **no `MERGE`, no renumbering** — `DELETE` and retyping are the tools;
-- **no lowercase input** — the machine uppercases what it reads;
+- **no lowercase storage** — the machine echoes what is typed, and a program
+  lists back the way it was typed, but nothing folds a letter for you: keywords
+  are matched case-blind, so `print` is `PRINT`;
 - **one language at a time** — the socket holds one ROM, and changing it resets
   the machine.
 

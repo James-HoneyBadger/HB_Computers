@@ -58,8 +58,27 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Six suites: the two assemblers, the two processors, and the two machines booting
-their ROMs and answering at the keyboard.
+Seven suites: the two assemblers, the two processors, the two machines booting
+their ROMs and answering at the keyboard, and every sample program in
+[samples/](samples).
+
+`./start.sh` does the same three steps and then starts a machine:
+
+```bash
+./start.sh            # build, then the Kestrel's window
+./start.sh kestrel16  # build, then the Kestrel 16's window
+./start.sh test       # build, then every suite
+```
+
+### In a virtual machine
+
+A `Vagrantfile` in the root makes an Ubuntu 22.04 build machine -- g++ 12,
+CMake, Ninja and Qt 6 -- and builds and tests the tree as the `vagrant` user:
+
+```bash
+vagrant up      # provision, build, and run the suites
+vagrant ssh     # the tree is at /vagrant
+```
 
 ## Running
 
@@ -68,6 +87,7 @@ their ROMs and answering at the keyboard.
 ./build/kestrel --model kestrel16 --frames 20        # the 1992 machine
 ./build/kestrel_computers                            # the window
 ./build/kestrel_computers --model kestrel16          # the 1992 machine's window
+./build/kestrel --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
 ```
 
 ## What is in the tree
@@ -79,15 +99,26 @@ app/                      the window's main()
 tools/                    kestrel_asm, kestrel16_asm and the command line
 roms/kestrel/             the Kestrel's 6502 machine code
 roms/kestrel16/           the Kestrel 16's 65816 machine code
+samples/                  programs to type, run and learn from, and their expected output
 tests/                    one executable per suite, no external test framework
-docs/                     the manuals
+docs/                     the five books
+start.sh                  build what is not built, then start a machine
+Vagrantfile               the same in a clean Ubuntu 22.04 build machine
 ```
 
 ## The manuals
 
+Four books, two references and the machines' own manuals; [the index](docs/README.md) says which to read when.
+
 | Book | What it covers |
 | --- | --- |
-| [Kestrel Owner's Manual](docs/kestrel/README.md) | The 6502, the map, the I/O page, the KERNAL, Kestrel DOS, the language, the errors, the limits |
-| [Kestrel 16 Owner's Manual](docs/kestrel16/README.md) | The 65816, the banks, the KERNAL's two tables, the language, the limits |
-| [The tools](docs/TOOLS.md) | Both assemblers and their dialect, the command line, the window, the build |
+| [Instruction Manual](docs/instruction-manual.md) | The box: both machines, building, switching on, the keyboard, the window, the media, first sessions, troubleshooting |
+| [User Guide](docs/users-guide.md) | The software: Kestrel BASIC, the monitor ROM, Kestrel DOS, Kestrel 16 BASIC, errors, worked examples, the samples |
+| [Technical Reference](docs/technical-reference.md) | The hardware: both maps, the I/O pages, the colours, the bus, interrupts, the disk and tape formats, the ROM images, the processors |
+| [Programmer's Guide](docs/programmers-guide.md) | Writing for the machines and changing the emulator: the assemblers' pitfalls, the KERNAL's tables, the C++ API, the tests, the build |
+| [The tools](docs/TOOLS.md) | Both assemblers, the command line, the window, the build targets |
 | [Architecture](docs/ARCHITECTURE.md) | How the code is put together, for people changing it |
+
+The machines' own books are the long form of the language and hardware chapters:
+[the Kestrel Owner's Manual](docs/kestrel/README.md) and
+[the Kestrel 16 Owner's Manual](docs/kestrel16/README.md).
