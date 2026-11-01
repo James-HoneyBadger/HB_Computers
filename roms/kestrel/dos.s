@@ -351,8 +351,11 @@ DOSSAVE:
         JSR FINDINNER
         CMP #$FF
         BEQ DOSSAVE_SLOT
+        PHA                     ; the entry index, across the walk of its sectors
         JSR ENTRYPTR
-        JSR FREECHAIN
+        JSR FREECHAIN           ; which leaves ZP_PTR2 on the last sector it freed
+        PLA
+        JSR ENTRYPTR            ; so the entry is found again before it is cleared
         JSR CLEARENTRY
 
 DOSSAVE_SLOT:

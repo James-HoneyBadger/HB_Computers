@@ -459,6 +459,18 @@ void test_the_disk_holds_a_program() {
     TW_CHECK(all.find("SECOND") != std::string::npos);
     TW_CHECK(all.find("q") == std::string::npos);   // a digit, not a letter
 
+    // Saving over a name replaces the file rather than making a second one.
+    typeOut(machine, "SAVE \"DEMO\"");
+    typeOut(machine, "CLS");
+    typeOut(machine, "CATALOG");
+    const std::string replaced = screenText(machine);
+    TW_CHECK(replaced.find("DEMO") != std::string::npos);
+    TW_CHECK(replaced.rfind("DEMO") == replaced.find("DEMO"));
+    typeOut(machine, "NEW");
+    typeOut(machine, "LOAD \"DEMO\"");
+    typeOut(machine, "RUN");
+    TW_CHECK((answerAfter(machine, "RUN")) == "FROM DISK");
+
     // A name the directory does not hold is named as such.
     Machine missing{Model::Kestrel};
     missing.runFrames(20);
@@ -622,6 +634,19 @@ void test_arrays() {
     TW_CHECK(screenText(twice).find("REDIMENSIONED ARRAY") != std::string::npos);
 }
 
+
+/// INPUT asks again when the line cannot be read, and remembers which variable
+/// it was asking for.
+void test_input_asks_again_after_junk() {
+    Machine machine{Model::Kestrel};
+    machine.runFrames(20);
+    typeOut(machine, "INPUT A");
+    typeOut(machine, "ABC");
+    TW_CHECK(screenText(machine).find("REDO FROM START") != std::string::npos);
+    typeOut(machine, "7");
+    typeOut(machine, "PRINT A*2");
+    TW_CHECK((answerAfter(machine, "PRINT A*2")) == "14");
+}
 
 /// A FOR whose start is already past its limit runs its body no times, and the
 /// variable keeps the start it was given.
@@ -860,6 +885,7 @@ int main() {
     test_strings_in_a_program();
     test_get_takes_one_key();
     test_arrays();
+    test_input_asks_again_after_junk();
     test_a_for_past_its_limit_is_empty();
     test_a_big_array_stays_in_its_own_memory();
     test_a_jump_from_a_line_finds_its_target();

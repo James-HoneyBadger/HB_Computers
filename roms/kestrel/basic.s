@@ -1584,6 +1584,7 @@ INPUT_VAR:
         STA B_VNAME2
         LDA B_VNAMET
         STA B_VNAMET
+INPUT_READ:
         JSR K_GETLINE
         LDA #<INBUF
         STA B_IPTR
@@ -1611,7 +1612,13 @@ INPUT_REDO:
         LDA #>TXT_REDO
         STA ZP_STRPTR+1
         JSR K_PRINT
-        JMP INPUT_ASK
+        ; The line was unreadable: ask again for the same variable. Parsing a
+        ; name here would read it out of the line that just failed.
+        LDA #'?'
+        JSR K_CHROUT
+        LDA #' '
+        JSR K_CHROUT
+        JMP INPUT_READ
 INPUT_DONE:
         CLC
         RTS

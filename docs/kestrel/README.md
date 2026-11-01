@@ -163,7 +163,12 @@ time (see `$0C`–`$11` above). Everything above that is Kestrel DOS, in the KER
 
 From BASIC: `SAVE "NAME"`, `LOAD "NAME"`, `CATALOG`, and `DELETE` removes a line
 rather than a file. `CATALOG` lists the volume; a file that will not load reports
-its error on the `READY.` line.
+its error on the `READY.` line — `?FILE NOT FOUND` when the directory has no such
+name.
+
+Saving over a name that is already on the volume replaces it: the old file's
+sectors go back on the free map and its entry is cleared before the new one is
+written, so a volume never holds two files of the same name.
 
 ---
 
