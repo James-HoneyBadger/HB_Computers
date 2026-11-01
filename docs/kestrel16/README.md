@@ -168,6 +168,11 @@ tighter than `+` and `-`. Values are sixteen-bit signed integers, so
 `PRINT 30000+1` is `30001` and `PRINT 1000*20` is `20000` — neither of which the
 Kestrel's BASIC could hold.
 
+A `PRINT` item has to be something the machine can read. It is evaluated first and
+printed only if it is whole, so `PRINT A$` — which is `A` followed by a character
+that means nothing here — says `?WHAT?` and prints no value at all, and
+`PRINT 1+2` still prints `3`.
+
 Anything else is a mistake, and the machine says so:
 
 ```

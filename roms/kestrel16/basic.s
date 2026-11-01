@@ -29,6 +29,7 @@ ZP_CNT          = $3F           ; 16-bit counter
 ZP_CH           = $41           ; the character under the pointer
 ZP_FLAG         = $42           ; PRINT's separator state
 ZP_VAR          = $43           ; which variable an assignment is writing
+ZP_BAD          = $44           ; an expression held something unreadable
 
 VARS            = $0007C0       ; twenty-six words, A to Z
 
@@ -331,6 +332,7 @@ DO_PRINT_STMT:
         SEP #$20
         LDA #0
         STA ZP_FLAG
+        STA ZP_BAD
 PRINT_LOOP:
         JSR SKIPSP
         LDA [ZP_SRC]
@@ -341,7 +343,35 @@ PRINT_LOOP:
         BEQ PRINT_SEMI
         CMP #','
         BEQ PRINT_COMMA
+        ; An item has to consume something: `PRINT A$` used to fall through
+        ; here for ever, printing a zero a time, because `$` is neither a
+        ; separator nor the start of an expression.
+        LDA ZP_SRC              ; where the item starts, in a scratch operand
+        STA ZP_A
+        LDA ZP_SRC+1
+        STA ZP_A+1
         JSR EXPR
+        LDA ZP_BAD
+        BNE PRINT_DONE          ; the expression has already said what it made of it
+        LDA ZP_SRC
+        CMP ZP_A
+        BNE PRINT_ITEM
+        LDA ZP_SRC+1
+        CMP ZP_A+1
+        BNE PRINT_ITEM
+        JSR SAY_WHAT            ; nothing was understood: name it and stop
+        RTS
+PRINT_ITEM:
+        JSR SKIPSP              ; an item is only worth printing if what follows
+        LDA [ZP_SRC]            ; it could follow it: `PRINT A$` prints nothing
+        BEQ PRINT_VALUE
+        CMP #';'
+        BEQ PRINT_VALUE
+        CMP #','
+        BEQ PRINT_VALUE
+        JSR SAY_WHAT
+        RTS
+PRINT_VALUE:
         JSR PRNUM
         BRA PRINT_LOOP
 PRINT_STRING:
@@ -606,6 +636,9 @@ FACTOR_VAR:
         SEP #$20
         RTS
 FACTOR_NONE:
+        LDA #1
+        STA ZP_BAD              ; the statement has been named as unreadable
+        JSR SAY_WHAT
         REP #$20
         LDA #0
         TAX

@@ -174,6 +174,21 @@ void test_cls_and_unknown_statements() {
     TW_CHECK(booted.shows("?WHAT?"));
 }
 
+/// A print item that names nothing is named as such, once, and nothing is
+/// printed for it: `PRINT A$` used to print a zero a time for ever.
+void test_an_item_that_names_nothing_is_refused() {
+    Booted booted;
+    booted.run("CLS");
+    booted.run("PRINT A$");
+    TW_CHECK(booted.shows("?WHAT?"));
+    booted.run("CLS");
+    booted.run("PRINT 1+$");
+    TW_CHECK(booted.shows("?WHAT?"));
+    booted.run("CLS");
+    booted.run("PRINT 1+2");
+    TW_CHECK_EQ(booted.answer(), std::string{"3"});
+}
+
 void test_the_keyboard_reaches_the_screen() {
     Booted booted;
     booted.machine().typeText("HELLO");
@@ -242,6 +257,7 @@ int main() {
     test_variables_and_strings();
     test_sixteen_bit_numbers();
     test_cls_and_unknown_statements();
+    test_an_item_that_names_nothing_is_refused();
     test_the_keyboard_reaches_the_screen();
     test_a_line_is_collected();
     test_a_wrong_sized_rom_is_refused();
