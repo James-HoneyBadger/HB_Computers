@@ -22,6 +22,24 @@ PROGSTART       = $000800
 PROG_LIMIT      = $007E00       ; the program may not grow past here
 RAMTOP          = $007F00
 
+; The language's string space. Bank three is nobody else's -- the filesystem has
+; bank two and the program has bank zero -- so a string variable can be a fixed
+; slot there: a name always points at the same place, an assignment overwrites
+; what was there, and nothing ever has to be collected.
+STRINGS         = $030000
+STR_SLOT        = 32            ; a length byte and thirty-one characters
+STR_MAX         = 31
+BANK_STR        = $03
+
+; The arrays, in the same bank: a table of twenty-six entries, four bytes each
+; -- where a letter's run starts and how many elements it has -- and a heap
+; above the table that a DIM takes from and nothing gives back.
+ARRAYS          = $030500       ; twenty-six entries, four bytes each
+ARR_TOP         = $030568       ; two bytes: the heap's first free offset
+ARR_HEAP        = $1000         ; where the heap begins, as an offset in bank three
+ARR_LIMIT       = $FF00         ; and the first offset past the end of it
+ARR_MAX         = 4000          ; the longest run a DIM may ask for
+
 ; The tube: 80 x 50 cells, then one attribute byte each.
 SCREEN          = $008000
 ATTRS           = $008FA0

@@ -353,6 +353,9 @@ than its predecessor, and honest about it:
 | --- | --- |
 | `PRINT` | expressions and strings, `;` for no space, `,` for a space, a trailing `;` leaves the line open. `?` is shorthand |
 | `LET A=41` | or `A=41`; variables are `A` to `Z`, sixteen bits each |
+| `LET A$="text"` | a string variable, `A$` to `Z$`, up to thirty-one characters |
+| `LEN(A$)` | how many characters a string has |
+| `DIM A(10)` | an array of eleven words, `A(0)` to `A(10)`; one dimension, and the `DIM` comes first |
 | `RUN` [`n`] / `LIST` [`n`] | run the stored program, or show it from line `n` |
 | `GOTO n` | continue at line `n` |
 | `IF cond THEN …` [`ELSE` …] | one branch or the other; a line number after `THEN` jumps |
@@ -399,8 +402,12 @@ PRINT A$
 - **loops that span lines belong in a program** — a loop typed at the prompt runs
   only as far as the end of its line, because each new line starts with no loops
   pending; a loop whose `FOR` and `NEXT` share a line runs at the prompt;
-- **no strings as values** — `PRINT "text"` works, `A$` does not;
-- **no arrays and no functions** — no `DIM`, no `ABS`, no `DEF FN`;
+- **strings, in part** — `A$` holds thirty-one characters and can be assigned,
+  printed, compared and measured with `LEN`; no concatenation, no `LEFT$` or
+  `MID$`, no `CHR$`, `STR$` or `VAL`;
+- **arrays, in part** — `DIM A(10)` and `A(i)` with one dimension, and whole
+  words only: no string arrays, and no `DIM A(2,3)`;
+- **no other functions** — no `ABS`, no `DEF FN`;
 - **a filesystem, in part** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD` and `DELETE`
   work; there is no `FIND` statement;
 - **no cassette blocks** — the tape is a byte stream and the block format is not
@@ -494,6 +501,8 @@ compared with the `.expected` file beside it, so these programs run as written.
 | [06-limits](../samples/kestrel16/06-limits.bas) | what the language does not do yet |
 | [07-branches-and-loops](../samples/kestrel16/07-branches-and-loops.bas) | `IF`/`THEN`, `GOSUB`/`RETURN` and `FOR`/`NEXT` in one program |
 | [08-for-step](../samples/kestrel16/08-for-step.bas) | positive and negative `STEP`, a loop that runs no times, `STEP 0` rejected |
+| [09-strings](../samples/kestrel16/09-strings.bas) | `A$` variables, `LEN`, and comparing two strings |
+| [10-arrays](../samples/kestrel16/10-arrays.bas) | `DIM`, a sieve, and nested loops |
 
 Run one:
 

@@ -17,7 +17,14 @@
 
         .org BASIC
 
-; The language's own direct page, above the KERNAL's.
+; The language's own direct page, above the KERNAL's. $00-$0F is the expression
+; scratch the map keeps for a language; the strings use the bottom of it.
+ZP_SSTR         = $00           ; 24-bit: the string being read
+ZP_SLEN         = $03           ; 16-bit: how many characters it has
+ZP_SDST         = $05           ; 24-bit: the slot an assignment is writing
+ZP_ARR          = $08           ; a byte: the letter an array operation is about
+ZP_SSTR2        = $09           ; 24-bit: the left side of a string comparison
+ZP_SLEN2        = $0C           ; 16-bit: and how long it is
 ZP_SRC          = $30           ; a 24-bit pointer into the line being read
 ZP_KW           = $33           ; a 24-bit pointer to a keyword
 ZP_SAVE         = $36           ; a 24-bit pointer, saved and restored
@@ -223,6 +230,12 @@ KW_STEP_END:
 KW_NEXT:
         .text "NEXT"
 KW_NEXT_END:
+KW_LEN:
+        .text "LEN"
+KW_LEN_END:
+KW_DIM:
+        .text "DIM"
+KW_DIM_END:
 KW_AND:
         .text "AND"
 KW_AND_END:
@@ -259,6 +272,15 @@ TXT_DELETED_END:
 TXT_NONAME:
         .text "?FILENAME"
 TXT_NONAME_END:
+TXT_MISMATCH:
+        .text "?TYPE MISMATCH"
+TXT_MISMATCH_END:
+TXT_TOOLONG:
+        .text "?STRING TOO LONG"
+TXT_TOOLONG_END:
+TXT_SUBSCRIPT:
+        .text "?SUBSCRIPT"
+TXT_SUBSCRIPT_END:
 
 SAY_BANNER:
         LDA #<TXT_BANNER
@@ -333,6 +355,39 @@ SAY_NONAME:
         LDA #BANK_BASIC
         STA ZP_PTR+2
         LDX.W #TXT_NONAME_END - TXT_NONAME
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_MISMATCH:
+        LDA #<TXT_MISMATCH
+        STA ZP_PTR
+        LDA #>TXT_MISMATCH
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_MISMATCH_END - TXT_MISMATCH
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_TOOLONG:
+        LDA #<TXT_TOOLONG
+        STA ZP_PTR
+        LDA #>TXT_TOOLONG
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_TOOLONG_END - TXT_TOOLONG
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_SUBSCRIPT:
+        LDA #<TXT_SUBSCRIPT
+        STA ZP_PTR
+        LDA #>TXT_SUBSCRIPT
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_SUBSCRIPT_END - TXT_SUBSCRIPT
         JSL L_PRINT
         JSR SAY_NEWLINE
         RTS
@@ -648,6 +703,10 @@ EXEC_TRY_LET:
         LDY.W #KW_REM_END - KW_REM
         JSR MATCHKW
         BCS DO_REM
+        LDX.W #(KW_DIM & $FFFF)
+        LDY.W #KW_DIM_END - KW_DIM
+        JSR MATCHKW
+        BCS DO_DIM
         LDX.W #(KW_NEW & $FFFF)
         LDY.W #KW_NEW_END - KW_NEW
         JSR MATCHKW
@@ -839,12 +898,68 @@ DO_ASSIGN:
         SEC
         SBC #'A'
         STA ZP_VAR              ; the expression may use ZP_CH as scratch
+        STA ZP_ARR
         JSR SRC_STEP
+        LDA [ZP_SRC]
+        CMP #'$'                ; `A$` is a string, and `A $` is not
+        BEQ ASSIGN_STR
+        CMP #'('                ; `A(3)=1` writes one element of an array
+        BEQ ASSIGN_ARRAY
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #'='
         BEQ ASSIGN_STORE
         JSR SAY_WHAT
+        RTS
+ASSIGN_STR:
+        JSR SRC_STEP            ; past the dollar
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'='
+        BEQ ASSIGN_STR_STORE
+        JSR SAY_WHAT
+        RTS
+ASSIGN_STR_STORE:
+        JSR SRC_STEP            ; past the equals
+        JSR PARSE_STR
+        BCC ASSIGN_MISMATCH     ; a number cannot go into a string
+        JSR STR_STORE
+        RTS
+ASSIGN_MISMATCH:
+        JSR SAY_MISMATCH
+        LDA #3                  ; the line stops here, as it does on ?WHAT?
+        STA ZP_JFLAG
+        RTS
+ASSIGN_ARRAY:
+        JSR SRC_STEP            ; past the opening bracket
+        JSR EXPR                ; X = the subscript
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE ASSIGN_SUBSCRIPT
+        JSR SRC_STEP
+        LDA ZP_VAR              ; the letter, which the subscript cannot take
+        STA ZP_ARR
+        JSR ARR_ELEM            ; ZP_SDST = the element, and X survives it
+        BCS ASSIGN_SUBSCRIPT
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'='
+        BEQ ASSIGN_ARRAY_STORE
+        JSR SAY_WHAT
+        RTS
+ASSIGN_ARRAY_STORE:
+        JSR SRC_STEP            ; past the equals
+        JSR EXPR                ; X = the value, which uses none of ZP_SDST
+        REP #$20
+        TXA
+        STA [ZP_SDST]
+        SEP #$20
+        RTS
+ASSIGN_SUBSCRIPT:
+        JSR SAY_SUBSCRIPT
+        LDA #3
+        STA ZP_JFLAG
         RTS
 ASSIGN_STORE:
         JSR SRC_STEP
@@ -883,13 +998,48 @@ PRINT_LOOP:
         BEQ PRINT_SEMI
         CMP #','
         BEQ PRINT_COMMA
-        ; An item has to consume something: `PRINT A$` used to fall through
-        ; here for ever, printing a zero a time, because `$` is neither a
-        ; separator nor the start of an expression.
-        LDA ZP_SRC              ; where the item starts, in a scratch operand
+        ; `IF x THEN PRINT "A" ELSE PRINT "B"`: the ELSE belongs to the line and
+        ; not to the items, so printing stops before it and the dispatcher takes
+        ; it, which is what skips the other branch.
+        LDX.W #(KW_ELSE & $FFFF)
+        LDY.W #KW_ELSE_END - KW_ELSE
+        JSR MATCHKW
+        BCC PRINT_NOT_ELSE
+        LDA ZP_SAVE             ; MATCHKW kept the pointer: put it back
+        STA ZP_SRC
+        LDA ZP_SAVE+1
+        STA ZP_SRC+1
+        LDA ZP_SAVE+2
+        STA ZP_SRC+2
+        JMP PRINT_END
+PRINT_NOT_ELSE:
+        ; `PRINT A$="X"` is a value, not two items. An item still has to consume
+        ; something, or the line would print a zero a time for ever, which is
+        ; what `PRINT A$` did before strings existed.
+        LDA ZP_SRC              ; where the item starts
         STA ZP_A
         LDA ZP_SRC+1
         STA ZP_A+1
+        JSR PARSE_STR
+        BCC PRINT_EXPR
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'='
+        BEQ PRINT_REWIND
+        CMP #'<'
+        BEQ PRINT_REWIND
+        CMP #'>'
+        BEQ PRINT_REWIND
+        JSR PRINT_STRVAL
+        LDA #0
+        STA ZP_FLAG
+        BRA PRINT_LOOP
+PRINT_REWIND:
+        LDA ZP_A                ; the string was the left side of a comparison
+        STA ZP_SRC
+        LDA ZP_A+1
+        STA ZP_SRC+1            ; the bank byte cannot have moved
+PRINT_EXPR:
         JSR EXPR
         LDA ZP_BAD
         BNE PRINT_DONE          ; the expression has already said what it made of it
@@ -933,6 +1083,308 @@ PRINT_STR_CLOSE:
         LDA #0
         STA ZP_FLAG
         BRA PRINT_LOOP
+
+; PRINT_STRVAL: the string in ZP_SSTR, ZP_SLEN characters of it, goes to the
+; tube. The KERNAL's PRINT takes the pointer in ZP_PTR and the length in X, and
+; it keeps its own index, so a string that scrolls the screen is still printed
+; whole.
+PRINT_STRVAL:
+        REP #$20
+        LDA ZP_SSTR
+        STA ZP_PTR
+        SEP #$20
+        LDA ZP_SSTR+2
+        STA ZP_PTR+2
+        REP #$20
+        LDX ZP_SLEN
+        JSL L_PRINT
+        SEP #$20
+        RTS
+
+; ---------------------------------------------------------------------------
+; Strings. A string variable is a fixed slot in bank three -- a length byte and
+; STR_MAX characters -- and its address comes from its letter alone, so a name
+; always means the same place, an assignment overwrites what was there, and
+; nothing ever has to be collected.
+; ---------------------------------------------------------------------------
+
+; PARSE_STR: the string at ZP_SRC goes into ZP_SSTR and ZP_SLEN, and the line
+; pointer steps past it. Carry clear, and the pointer exactly where it was,
+; when what is there is not a string at all.
+PARSE_STR:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'"'
+        BEQ PARSE_STR_LITERAL
+        LDA ZP_SRC
+        STA ZP_SAVE
+        LDA ZP_SRC+1
+        STA ZP_SAVE+1
+        LDA ZP_SRC+2
+        STA ZP_SAVE+2
+        JSR IS_ALPHA
+        BCC PARSE_STR_NONE
+        LDA [ZP_SRC]
+        JSR TO_UPPER
+        SEC
+        SBC #'A'
+        STA ZP_CH
+        JSR SRC_STEP
+        LDA [ZP_SRC]
+        CMP #'$'
+        BEQ PARSE_STR_VAR
+        LDA ZP_SAVE             ; a letter on its own is a number: put it back
+        STA ZP_SRC
+        LDA ZP_SAVE+1
+        STA ZP_SRC+1
+        LDA ZP_SAVE+2
+        STA ZP_SRC+2
+PARSE_STR_NONE:
+        CLC
+        RTS
+PARSE_STR_VAR:
+        JSR SRC_STEP            ; past the dollar
+        JSR STR_ADDR
+        SEC
+        RTS
+PARSE_STR_LITERAL:
+        JSR SRC_STEP            ; past the opening quote
+        LDA ZP_SRC
+        STA ZP_SSTR
+        LDA ZP_SRC+1
+        STA ZP_SSTR+1
+        LDA ZP_SRC+2
+        STA ZP_SSTR+2
+        REP #$20
+        LDA.W #0
+        STA ZP_SLEN
+        SEP #$20
+PARSE_STR_LIT_LOOP:
+        LDA [ZP_SRC]
+        BEQ PARSE_STR_LIT_DONE  ; a quote that never closes ends its line
+        CMP #'"'
+        BEQ PARSE_STR_LIT_CLOSE
+        JSR SRC_STEP
+        REP #$20
+        INC ZP_SLEN
+        SEP #$20
+        BRA PARSE_STR_LIT_LOOP
+PARSE_STR_LIT_CLOSE:
+        JSR SRC_STEP            ; past the closing quote
+PARSE_STR_LIT_DONE:
+        SEC
+        RTS
+
+; STR_ADDR: ZP_CH = a letter's number. ZP_SSTR = the text of that string, and
+; ZP_SLEN = its length.
+STR_ADDR:
+        REP #$20
+        LDA ZP_CH
+        AND.W #$00FF
+        ASL A
+        ASL A
+        ASL A
+        ASL A
+        ASL A                   ; thirty-two bytes a slot
+        TAX
+        SEP #$20
+        LDA.L STRINGS,X         ; the length byte at the slot's start
+        STA ZP_SLEN
+        LDA #0
+        STA ZP_SLEN+1
+        REP #$20
+        TXA
+        INC A                   ; the text begins after the length
+        CLC
+        ADC.W #(STRINGS & $FFFF)
+        STA ZP_SSTR
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SSTR+2
+        RTS
+
+; STR_STORE: the string in ZP_SSTR goes into the slot for the variable in
+; ZP_VAR. A string that will not fit is refused rather than cut.
+STR_STORE:
+        REP #$10
+        REP #$20
+        LDA ZP_VAR
+        AND.W #$00FF
+        ASL A
+        ASL A
+        ASL A
+        ASL A
+        ASL A
+        CLC
+        ADC.W #(STRINGS & $FFFF)
+        STA ZP_SDST             ; the slot's length byte
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SDST+2
+        REP #$20
+        LDA ZP_SLEN
+        CMP.W #(STR_MAX+1)
+        SEP #$20
+        BCS STR_STORE_LONG
+        LDA ZP_SLEN
+        STA [ZP_SDST]
+        REP #$20
+        LDA ZP_SDST
+        INC A                   ; past the length: the text
+        STA ZP_SDST
+        SEP #$20
+        LDY.W #0
+STR_STORE_LOOP:
+        CPY ZP_SLEN
+        BCS STR_STORE_DONE
+        LDA [ZP_SSTR],Y
+        STA [ZP_SDST],Y
+        INY
+        BRA STR_STORE_LOOP
+STR_STORE_DONE:
+        RTS
+STR_STORE_LONG:
+        JSR SAY_TOOLONG
+        RTS
+
+; ---------------------------------------------------------------------------
+; Arrays. One dimension, and a DIM before use: twenty-six runs of words in bank
+; three, described by a table beside the strings. The heap only ever grows, so a
+; DIM that asks for the same size again keeps the run it already has.
+; ---------------------------------------------------------------------------
+
+; ARR_ENTRY: ZP_ARR = a letter's number. X = that letter's entry in the table.
+; The letter has a byte of its own because the expressions of a DIM and a
+; subscript use every other scratch there is: ZP_CH is the digit of a number and
+; the letter of a variable, and it is gone by the time the table is wanted.
+;
+; Its callers are on both sides of a REP: the arithmetic of a DIM is sixteen
+; bits wide, so the width it was entered with has to be the width it leaves --
+; an eight-bit return from here turned the `CMP.W` after it into two bytes and a
+; stray opcode, which the processor took as a reset.
+ARR_ENTRY:
+        PHP
+        REP #$20
+        LDA ZP_ARR
+        AND.W #$00FF
+        ASL A
+        ASL A                   ; four bytes an entry
+        TAX
+        PLP                     ; the caller's widths, and its flags, come back
+        RTS
+
+; ARR_ELEM: X = a subscript, ZP_ARR = the letter. ZP_SDST = that element in bank
+; three. Carry set, and nothing written, when the letter has no array or the
+; subscript is outside it.
+ARR_ELEM:
+        REP #$20
+        TXA
+        BMI ARR_ELEM_BAD        ; below nought
+        STA ZP_A                ; the subscript
+        LDA ZP_ARR
+        AND.W #$00FF
+        ASL A
+        ASL A
+        TAX                     ; the entry, in X: there is no long,Y to index by
+        LDA.L ARRAYS+2,X        ; how many elements the letter's array has
+        BEQ ARR_ELEM_BAD        ; nought: DIM never made one
+        CMP ZP_A
+        BEQ ARR_ELEM_BAD        ; the end is one past the last element
+        BCC ARR_ELEM_BAD
+        LDA.L ARRAYS,X          ; where the run starts
+        STA ZP_B
+        LDA ZP_A
+        ASL A                   ; two bytes an element
+        CLC
+        ADC ZP_B
+        STA ZP_SDST             ; the element's offset in bank three
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SDST+2
+        CLC
+        RTS
+ARR_ELEM_BAD:
+        SEP #$20
+        SEC
+        RTS
+
+; DO_DIM: `DIM A(10)` gives A eleven elements, nought to ten, which is what the
+; 1982 machine's automatic eleven meant. One dimension, one letter, one line.
+DO_DIM:
+        JSR SKIPSP
+        JSR IS_ALPHA
+        BCC DIM_BAD
+        LDA [ZP_SRC]
+        JSR TO_UPPER
+        SEC
+        SBC #'A'
+        STA ZP_VAR              ; kept there: the bound is an expression
+        STA ZP_ARR
+        JSR SRC_STEP
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE DIM_BAD
+        JSR SRC_STEP
+        JSR EXPR
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE DIM_BAD
+        JSR SRC_STEP
+        REP #$20
+        TXA
+        BMI DIM_BAD_WIDE        ; a negative bound is not a size
+        CMP.W #ARR_MAX
+        BCS DIM_BAD_WIDE
+        INC A
+        STA ZP_CNT              ; the elements, nought included
+        LDA ZP_VAR
+        STA ZP_ARR              ; the bound may have been an array element itself
+        JSR ARR_ENTRY
+        ; a run of the same size or less is already the letter's, and stays so
+        LDA.L ARRAYS,X
+        BEQ DIM_TAKE            ; never dimensioned: it needs a run
+        LDA.L ARRAYS+2,X        ; how many it has now
+        CMP ZP_CNT
+        BCC DIM_TAKE            ; smaller than the new one: a new run
+        LDA ZP_CNT
+        STA.L ARRAYS+2,X        ; as many as were asked for, same place
+        SEP #$20
+        RTS
+DIM_TAKE:
+        LDA.L ARR_TOP           ; where the heap is
+        STA ZP_A
+        LDA ZP_CNT
+        ASL A                   ; two bytes an element
+        CLC
+        ADC ZP_A
+        CMP.W #ARR_LIMIT
+        BCS DIM_NOROOM
+        STA.L ARR_TOP           ; the heap has grown
+        LDA ZP_VAR
+        STA ZP_ARR
+        JSR ARR_ENTRY
+        LDA ZP_A
+        STA.L ARRAYS,X          ; where the run starts
+        LDA ZP_CNT
+        STA.L ARRAYS+2,X        ; and how long it is
+        SEP #$20
+        RTS
+DIM_NOROOM:
+        SEP #$20
+        JSR SAY_NOROOM
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+DIM_BAD_WIDE:
+        SEP #$20
+DIM_BAD:
+        JSR SAY_SUBSCRIPT
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+
 PRINT_SEMI:
         JSR SRC_STEP
         LDA #1
@@ -1042,51 +1494,130 @@ EXPR_NOT_PUSH:
         RTS
 
 EXPR_CMP:
-        JSR EXPR_ARITH
-        PHX                     ; the left side, until an operator is found
+        ; A string on the left makes this a string comparison: the two sides are
+        ; compared a character at a time and the answer is -1 or 0, like the
+        ; numbers, so `IF A$="YES" THEN` branches on it.
+        JSR PARSE_STR
+        BCC EXPR_CMP_NUM
+        JSR STR_SAVE
+        JSR EXPR_CMP_OP
+        BCC EXPR_CMP_STRBAD     ; a string on its own is not a value
+        JSR PARSE_STR
+        BCC EXPR_CMP_STRBAD     ; and a string cannot be compared with a number
+        JSR STR_COMPARE
+        BRA EXPR_CMP_APPLY
+EXPR_CMP_STRBAD:
+        JMP FACTOR_MISMATCH
+
+; EXPR_CMP_OP: the comparison operator at ZP_SRC goes into ZP_CNT2 as one of
+; six, and the pointer steps past it. Carry clear, and the pointer alone, when
+; there is no operator: `PRINT 1+2` is not a comparison.
+EXPR_CMP_OP:
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #'='
-        BEQ EXPR_CMP_EQ
+        BEQ EXPR_CMP_OP_EQ
         CMP #'<'
-        BEQ EXPR_CMP_LT
+        BEQ EXPR_CMP_OP_LT
         CMP #'>'
-        BEQ EXPR_CMP_GT
-        PLX                     ; not a comparison: the value itself
+        BEQ EXPR_CMP_OP_GT
+        CLC
         RTS
-EXPR_CMP_EQ:
+EXPR_CMP_OP_EQ:
         JSR SRC_STEP
-        LDA #1
-        BRA EXPR_CMP_GO
-EXPR_CMP_LT:
+        LDA #1                  ; =
+        BRA EXPR_CMP_OP_HAVE
+EXPR_CMP_OP_LT:
         JSR SRC_STEP
         LDA [ZP_SRC]
         CMP #'='
-        BEQ EXPR_CMP_LE
+        BEQ EXPR_CMP_OP_LE
         CMP #'>'
-        BEQ EXPR_CMP_NE
-        LDA #3
-        BRA EXPR_CMP_GO
-EXPR_CMP_LE:
+        BEQ EXPR_CMP_OP_NE
+        LDA #3                  ; <
+        BRA EXPR_CMP_OP_HAVE
+EXPR_CMP_OP_LE:
         JSR SRC_STEP
-        LDA #5
-        BRA EXPR_CMP_GO
-EXPR_CMP_NE:
+        LDA #5                  ; <=
+        BRA EXPR_CMP_OP_HAVE
+EXPR_CMP_OP_NE:
         JSR SRC_STEP
-        LDA #2
-        BRA EXPR_CMP_GO
-EXPR_CMP_GT:
+        LDA #2                  ; <>
+        BRA EXPR_CMP_OP_HAVE
+EXPR_CMP_OP_GT:
         JSR SRC_STEP
         LDA [ZP_SRC]
         CMP #'='
-        BEQ EXPR_CMP_GE
-        LDA #4
-        BRA EXPR_CMP_GO
-EXPR_CMP_GE:
+        BEQ EXPR_CMP_OP_GE
+        LDA #4                  ; >
+        BRA EXPR_CMP_OP_HAVE
+EXPR_CMP_OP_GE:
         JSR SRC_STEP
-        LDA #6
-EXPR_CMP_GO:
-        STA ZP_CNT2             ; the operator
+        LDA #6                  ; >=
+EXPR_CMP_OP_HAVE:
+        STA ZP_CNT2
+        SEC
+        RTS
+
+; STR_SAVE: the string being held goes into the second pair, so the right-hand
+; side of a comparison can use the first.
+STR_SAVE:
+        LDA ZP_SSTR
+        STA ZP_SSTR2
+        LDA ZP_SSTR+1
+        STA ZP_SSTR2+1
+        LDA ZP_SSTR+2
+        STA ZP_SSTR2+2
+        REP #$20
+        LDA ZP_SLEN
+        STA ZP_SLEN2
+        SEP #$20
+        RTS
+
+; STR_COMPARE: the string in ZP_SSTR2/ZP_SLEN2 against the one in
+; ZP_SSTR/ZP_SLEN, a character at a time. ZP_TMP16 comes back 0 for the same
+; text, 1 when the first is lower, 2 when it is higher; a string that ends first
+; is the lower, which is how `"AB" < "ABC"` and every dictionary agrees.
+STR_COMPARE:
+        REP #$10
+        LDY.W #0
+STR_COMPARE_LOOP:
+        CPY ZP_SLEN2
+        BEQ STR_COMPARE_LEFTEND
+        CPY ZP_SLEN
+        BEQ STR_COMPARE_HIGHER  ; the left has a character the right has not
+        LDA [ZP_SSTR2],Y
+        STA ZP_CH
+        LDA [ZP_SSTR],Y
+        CMP ZP_CH
+        BCC STR_COMPARE_HIGHER  ; the right is lower, so the left is higher
+        BNE STR_COMPARE_LOWER   ; the right is higher, so the left is lower
+        INY
+        BRA STR_COMPARE_LOOP
+STR_COMPARE_LEFTEND:
+        CPY ZP_SLEN
+        BEQ STR_COMPARE_SAME
+        BRA STR_COMPARE_LOWER   ; the left ended first, so it is the lower
+STR_COMPARE_SAME:
+        REP #$20
+        LDA.W #0
+        BRA STR_COMPARE_SET
+STR_COMPARE_LOWER:
+        REP #$20
+        LDA.W #1
+        BRA STR_COMPARE_SET
+STR_COMPARE_HIGHER:
+        REP #$20
+        LDA.W #2
+STR_COMPARE_SET:
+        STA ZP_TMP16
+        SEP #$20
+        RTS
+EXPR_CMP_NUM:
+        JSR EXPR_ARITH
+        PHX                     ; the left side, until an operator is found
+        JSR EXPR_CMP_OP
+        BCC EXPR_CMP_NONE
         JSR EXPR_ARITH
         PLY                     ; the left side comes back
         REP #$20
@@ -1107,6 +1638,7 @@ EXPR_CMP_SAME:
         LDA.W #0
 EXPR_CMP_HAVE:
         STA ZP_TMP16            ; 0 equal, 1 left is less, 2 left is greater
+EXPR_CMP_APPLY:
         SEP #$20
         LDA ZP_CNT2
         CMP #1
@@ -1156,6 +1688,9 @@ EXPR_CMP_SAYNO:
         LDA.W #0
         TAX
         SEP #$20
+        RTS
+EXPR_CMP_NONE:
+        PLX                     ; not a comparison: the value itself
         RTS
 
 ; The arithmetic the language began with.
@@ -1341,11 +1876,52 @@ FACTOR:
         BEQ FACTOR_NEG
         CMP #'+'
         BEQ FACTOR_PLUS
+        CMP #'"'
+        BEQ FACTOR_ISSTR        ; a string where a number was wanted
         CMP #'0'
-        BCC FACTOR_VAR
+        BCC FACTOR_WORD
         CMP #'9'+1
-        BCS FACTOR_VAR
+        BCS FACTOR_WORD
         BRA FACTOR_NUM
+FACTOR_WORD:
+        ; LEN(<string>) is the one function this language has, and it is worth
+        ; having: a string knows how long it is, and nothing else can ask.
+        LDX.W #(KW_LEN & $FFFF)
+        LDY.W #KW_LEN_END - KW_LEN
+        JSR MATCHKW
+        BCS FACTOR_LEN
+        BRA FACTOR_VAR
+FACTOR_ISSTR:
+        JMP FACTOR_MISMATCH
+FACTOR_LEN:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        JSR PARSE_STR
+        BCC FACTOR_MISMATCH
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        REP #$20
+        LDA ZP_SLEN
+        TAX
+        SEP #$20
+        RTS
+FACTOR_MISMATCH:
+        JSR SAY_MISMATCH
+        LDA #1
+        STA ZP_BAD              ; the statement has been named as unreadable
+        LDA #3                  ; and the line stops here, as it does on ?WHAT?
+        STA ZP_JFLAG
+        REP #$20
+        LDA #0
+        TAX
+        SEP #$20
+        RTS
 FACTOR_PLUS:
         JSR SRC_STEP
         BRA FACTOR
@@ -1419,12 +1995,47 @@ FACTOR_VAR:
         SBC #'A'
         STA ZP_CH
         JSR SRC_STEP
+        LDA [ZP_SRC]
+        CMP #'('
+        BEQ FACTOR_ARRAY        ; `A(3)` is an element of an array
+        CMP #'$'
+        BEQ FACTOR_MISMATCH     ; `A$` is a string where a number was wanted
         LDA ZP_CH
         REP #$20
         AND.W #$00FF
         ASL A
         TAX
         LDA VARS,X
+        TAX
+        SEP #$20
+        RTS
+FACTOR_ARRAY:
+        LDA ZP_CH               ; the letter, which the subscript cannot take
+        STA ZP_ARR
+        JSR SRC_STEP            ; past the opening bracket
+        JSR EXPR                ; X = the subscript
+        PHX
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE FACTOR_ARRAY_BAD
+        JSR SRC_STEP
+        PLX
+        JSR ARR_ELEM
+        BCS FACTOR_ARRAY_BAD
+        REP #$20
+        LDA [ZP_SDST]           ; a word from bank three
+        TAX
+        SEP #$20
+        RTS
+FACTOR_ARRAY_BAD:
+        JSR SAY_SUBSCRIPT
+        LDA #1
+        STA ZP_BAD
+        LDA #3
+        STA ZP_JFLAG
+        REP #$20
+        LDA.W #0
         TAX
         SEP #$20
         RTS

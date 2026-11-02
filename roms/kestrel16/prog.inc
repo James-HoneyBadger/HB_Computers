@@ -41,7 +41,9 @@ PROG_NEW:
         PLP
         RTS
 
-; CLEAR_VARS: every variable is zero, as after NEW or RUN.
+; CLEAR_VARS: every variable is zero, as after NEW or RUN. A string variable's
+; zero is a length of nought: its text is still there, but nothing reads past
+; the length, so the slot behaves as empty.
 CLEAR_VARS:
         PHP
         REP #$20
@@ -53,6 +55,51 @@ CLEAR_VARS_LOOP:
         INX
         CPX.W #52
         BCC CLEAR_VARS_LOOP
+        SEP #$20
+        JSR CLEAR_STRS
+        JSR CLEAR_ARRAYS
+        PLP
+        RTS
+
+; CLEAR_STRS: the length byte of every string slot goes to nought.
+CLEAR_STRS:
+        PHP
+        REP #$10
+        REP #$20
+        LDX.W #0
+CLEAR_STRS_LOOP:
+        LDA.W #0
+        STA.L STRINGS,X
+        TXA
+        CLC
+        ADC.W #STR_SLOT
+        TAX
+        CPX.W #(26*STR_SLOT)
+        BCC CLEAR_STRS_LOOP
+        SEP #$20
+        PLP
+        RTS
+
+; CLEAR_ARRAYS: every letter's array is forgotten and the heap starts again at
+; the bottom. The runs themselves are not wiped: a count of nought is what says
+; an array is not there, and the next DIM writes over what it takes.
+CLEAR_ARRAYS:
+        PHP
+        REP #$10
+        REP #$20
+        LDX.W #0
+CLEAR_ARRAYS_LOOP:
+        LDA.W #0
+        STA.L ARRAYS,X          ; the run's offset, both bytes of it
+        STA.L ARRAYS+2,X        ; and its count: four bytes an entry, not two
+        TXA
+        CLC
+        ADC.W #4
+        TAX
+        CPX.W #(26*4)
+        BCC CLEAR_ARRAYS_LOOP
+        LDA.W #ARR_HEAP
+        STA.L ARR_TOP
         SEP #$20
         PLP
         RTS
@@ -684,19 +731,10 @@ DO_ELSE_DONE:
 ; machine stack: the three expressions are evaluated into zero page and copied in
 ; one at a time, which is one fewer thing to get unbalanced.
 
+; FOR_PTR: ZP_FORSP is the count, so X = where the next frame goes.
 FOR_PTR:
-        REP #$20
         LDA ZP_FORSP
-        AND.W #$00FF
-        STA ZP_CNT2
-        ASL A
-        ASL A
-        ASL A
-        CLC
-        ADC ZP_CNT2
-        TAX
-        SEP #$20
-        RTS
+        JMP FOR_INDEX_PTR
 
 DO_FOR:
         JSR SKIPSP
@@ -1009,15 +1047,21 @@ DO_NEXT_FINISH:
         RTS
 
 ; FOR_INDEX_PTR: A = a frame's index; X = that frame's offset.
+;
+; A frame is ten bytes: the variable, a word each for the step, the limit, the
+; body's text and how far into it to come back to. The stride has to be those
+; ten -- it was eight plus one, which put a nested loop's frame one byte into its
+; parent's, and the parent's body offset lost its high byte the moment the inner
+; loop started.
 FOR_INDEX_PTR:
         REP #$20
         AND.W #$00FF
-        STA ZP_CNT2
         ASL A
+        STA ZP_CNT2             ; twice the frame's number
         ASL A
-        ASL A
+        ASL A                   ; eight times
         CLC
-        ADC ZP_CNT2
+        ADC ZP_CNT2             ; ten, which is the frame
         TAX
         SEP #$20
         RTS

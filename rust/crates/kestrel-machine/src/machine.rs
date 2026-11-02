@@ -654,6 +654,163 @@ mod tests {
         assert!(!screen.contains("?WHAT?"), "nothing there was unreadable:\n{screen}");
     }
 
+    /// Strings arrived with a slot each in bank three: a length byte and
+    /// thirty-one characters, so a name always means the same address and no
+    /// collector is needed. This is the whole of what a string can do today --
+    /// be assigned, printed, compared, and measured.
+    #[test]
+    fn a_1992_string_variable_holds_its_text() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 A$=\"KESTREL\"",
+            "20 B$=A$",
+            "30 PRINT A$;\" \";LEN(A$)",
+            "40 IF B$=\"KESTREL\" THEN PRINT \"SAME\"",
+            "50 IF B$<\"KESTREL2\" THEN PRINT \"LESS\"",
+            "60 PRINT A$=\"OTHER\"",
+            "70 PRINT LEN(\"abc\")",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        for wanted in ["KESTREL 7", "SAME", "LESS", "3"] {
+            assert!(
+                screen.lines().any(|row| row.trim() == wanted),
+                "the machine printed {wanted:?}:\n{screen}"
+            );
+        }
+        assert!(
+            screen.lines().any(|row| row.trim() == "0"),
+            "a comparison that is false prints 0:\n{screen}"
+        );
+        assert!(!screen.contains("?WHAT?"), "nothing there was unreadable:\n{screen}");
+        assert!(
+            !screen.contains("?TYPE MISMATCH"),
+            "and no string was asked for a number:\n{screen}"
+        );
+    }
+
+    /// `DIM` makes an array, `A(i)` reads one element and `A(i)=v` writes one.
+    /// The sieve is the program every 1982 magazine carried, and it is here
+    /// because it needs all of it: an array, two nested loops, one of them with
+    /// a step, and a jump out of a branch.
+    #[test]
+    fn a_1992_array_holds_a_number_per_element() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 DIM A(5)",
+            "20 FOR I=0 TO 5",
+            "30 A(I)=I*I",
+            "40 NEXT I",
+            "50 FOR I=0 TO 5",
+            "60 PRINT A(I);",
+            "70 NEXT I",
+            "80 PRINT",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(60);
+
+        assert!(
+            machine.screen_text().lines().any(|row| row.starts_with("01491625")),
+            "every element kept its own number:\n{}",
+            machine.screen_text()
+        );
+    }
+
+    /// The sieve, which is what the arrays are for.
+    #[test]
+    fn a_1992_sieve_finds_the_primes() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 DIM P(100)",
+            "20 FOR I=2 TO 100",
+            "30 IF P(I) THEN 60",
+            "40 PRINT I;",
+            "50 FOR J=I*I TO 100 STEP I:P(J)=1:NEXT J",
+            "60 NEXT I",
+            "70 PRINT",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(200);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen
+                .lines()
+                .any(|row| row.starts_with("23571113171923293137414347535")),
+            "the primes came out:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim_end().ends_with("838997")),
+            "and ran to the end of the sieve:\n{screen}"
+        );
+    }
+
+    /// A subscript outside the array, and a letter never dimensioned, are both
+    /// named rather than quietly reading whichever word follows.
+    #[test]
+    fn a_1992_array_refuses_a_subscript_it_has_not_got() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced("DIM A(5)");
+        machine.type_line_paced("PRINT A(6)");
+        machine.type_line_paced("PRINT B(1)");
+        machine.type_line_paced("DIM A(20)");
+        machine.type_line_paced("PRINT A(20)");
+        machine.type_line_paced("DIM A(5)");
+        machine.type_line_paced("PRINT A(19)");
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.matches("?SUBSCRIPT").count() >= 3,
+            "each out-of-range subscript was refused:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "0"),
+            "and a good one reads nought:\n{screen}"
+        );
+    }
+
+    /// A string is thirty-one characters, an assignment that will not fit is
+    /// refused and leaves the old text alone, and a number given to a string
+    /// variable is named as the mistake it is.
+    #[test]
+    fn a_1992_string_that_will_not_fit_is_refused() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced(&format!("A$=\"{}\"", "X".repeat(31)));
+        machine.type_line_paced(&format!("B$=\"{}\"", "Y".repeat(40)));
+        machine.type_line_paced("PRINT LEN(A$)");
+        machine.type_line_paced("PRINT LEN(B$)");
+        machine.type_line_paced("C$=7");
+        machine.type_line_paced("PRINT LEN(C$)");
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "31"),
+            "thirty-one characters is a string:\n{screen}"
+        );
+        assert!(
+            screen.contains("?STRING TOO LONG"),
+            "forty is not, and the machine says so:\n{screen}"
+        );
+        assert!(
+            screen.contains("?TYPE MISMATCH"),
+            "and a number is not a string:\n{screen}"
+        );
+        assert!(
+            screen.lines().filter(|row| row.trim() == "0").count() >= 2,
+            "an attempt that failed left both slots empty:\n{screen}"
+        );
+    }
+
     #[test]
     fn the_1992_machine_formats_a_volume() {
         let path = std::env::temp_dir().join("kestrel-dos2-format.dsk");

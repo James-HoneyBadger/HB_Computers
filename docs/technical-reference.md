@@ -104,7 +104,8 @@ Bank zero keeps the shape the Kestrel had, which is what makes them one family.
 | `$00` | `$C000`–`$DFFF` | Cartridge ROM, 8 KiB |
 | `$00` | `$E000`–`$FFFF` | The KERNAL, with the vectors in the top sixteen bytes |
 | `$01` | `$0000`–`$FFFF` | The language ROM, whole |
-| `$02`–`$03` | | RAM |
+| `$02` | | RAM: the filesystem's header, directory and sector buffer |
+| `$03` | | RAM: the language's strings (a slot a letter) and its array heap |
 | `$04`–`$07` | | The cartridge's RAM, 256 KiB, when one is fitted |
 | `$08`–`$0F` | | RAM |
 
