@@ -70,7 +70,23 @@ impl Emulator {
     /// cold boot and anything in memory is lost; the same model is a reset.
     fn select_model(&mut self, model: Model) -> Result<bool, String> {
         let different = model != self.model;
+        // A different machine is a different drive and a different deck, but the
+        // *media* are still in them: the person put them there, and switching
+        // model is not ejecting. Losing them silently made a CATALOG read a drive
+        // that was empty.
+        let disk = self.disk_path.clone();
+        let tape = self.tape_path.clone();
         *self = Self::boot(model, self.roms.clone(), self.frames, self.quiet)?;
+        if let Some(path) = disk {
+            if self.machine.mount_disk_image(&path).is_ok() {
+                self.disk_path = Some(path);
+            }
+        }
+        if let Some(path) = tape {
+            if self.machine.mount_tape_image(&path).is_ok() {
+                self.tape_path = Some(path);
+            }
+        }
         Ok(different)
     }
 

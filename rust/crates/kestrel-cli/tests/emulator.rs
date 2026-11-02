@@ -114,3 +114,26 @@ fn a_disk_and_a_tape_can_be_put_in_and_taken_out() {
     assert_eq!(std::fs::read(&tape).expect("the tape"), vec![1, 2, 3]);
     let _ = std::fs::remove_dir_all(&directory);
 }
+
+/// A model switch is not an eject: the disk a person put in is still in the drive
+/// afterwards, when the new drive can take it. It used to be lost, which made the
+/// machine's filesystem answer "no disk" for reasons that had nothing to do with
+/// the disk.
+#[test]
+fn the_media_survive_a_model_switch() {
+    let directory = std::env::temp_dir().join("kestrel-emu-media-switch");
+    std::fs::create_dir_all(&directory).expect("a directory for the media");
+    // The 1992 drive takes 4096 sectors of 512 bytes; a medium that fits the
+    // machine being booted is the medium that stays in it.
+    let disk = directory.join("switch.dsk");
+    std::fs::write(&disk, vec![0u8; 4096 * 512]).expect("a disk image");
+
+    let script = format!("/disk {}\n/model kestrel16\n/disk\n", disk.display());
+    let out = session(&script, &["--model", "kestrel16"]);
+    assert!(out.contains("in the drive"), "{out}");
+    assert!(
+        out.contains("written"),
+        "the volume was still in the drive after the switch:\n{out}"
+    );
+    let _ = std::fs::remove_dir_all(&directory);
+}
