@@ -35,7 +35,9 @@ fn run_sample(sample: &Path, model: Model) {
         .mount_assembled_roms()
         .expect("the ROM sources to assemble");
     machine.reset();
-    machine.run_frames(25);
+    // Long enough for the banner and the first READY: keys typed into a machine
+    // that is still starting up come out of a buffer the KERNAL has just cleared.
+    machine.run_frames(40);
 
     for line in lines(sample) {
         machine.type_line_paced(&line);
@@ -46,7 +48,9 @@ fn run_sample(sample: &Path, model: Model) {
             machine.type_line_paced("RUN");
             machine.run_frames(400);
         }
-        Model::Kestrel16 => machine.run_frames(40),
+        // The 1992 machine runs a stored line as it is typed, so it only needs
+        // time for the last one: a sieve to thirty wants a hundred frames.
+        Model::Kestrel16 => machine.run_frames(120),
     }
 
     let screen = machine.screen_text();

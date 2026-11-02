@@ -778,6 +778,36 @@ mod tests {
         );
     }
 
+    /// Strings can be joined and sliced: `+` in the temporary, and the three
+    /// functions that hand back part of one. This is the 1982 machine's string
+    /// sample, which the 1992 machine can now run too.
+    #[test]
+    fn a_1992_string_can_be_joined_and_sliced() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 A$=\"KESTREL\"",
+            "20 PRINT LEFT$(A$,3);\"/\";RIGHT$(A$,3);\"/\";MID$(A$,3,3)",
+            "30 B$=\"AB\"+\"CD\"+\"EF\"",
+            "40 PRINT B$;\" \";LEN(B$)",
+            "50 PRINT \"X\"+A$+\"Y\"",
+            "60 PRINT CHR$(75);\"ESTREL\";\" \";ASC(\"A\")",
+            "70 PRINT \"[\";LEFT$(A$,0);\"]\";MID$(A$,99,2)",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        for wanted in ["KES/REL/STR", "ABCDEF 6", "XKESTRELY", "KESTREL 65", "[]"] {
+            assert!(
+                screen.lines().any(|row| row.trim() == wanted),
+                "the machine printed {wanted:?}:\n{screen}"
+            );
+        }
+        assert!(!screen.contains("?WHAT?"), "nothing there was unreadable:\n{screen}");
+    }
+
     /// A string is thirty-one characters, an assignment that will not fit is
     /// refused and leaves the old text alone, and a number given to a string
     /// variable is named as the mistake it is.

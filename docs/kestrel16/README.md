@@ -189,6 +189,9 @@ THE ANSWER IS 42
 | `LET` | `LET A=41`, or `A=41`; variables are `A` to `Z`, sixteen bits each |
 | `LET A$="text"` | a string variable, `A$` to `Z$`, up to thirty-one characters |
 | `LEN(A$)` | how many characters a string has |
+| `A$+B$` | the two joined, in a temporary of thirty-one characters |
+| `LEFT$(A$,n)` / `RIGHT$(A$,n)` / `MID$(A$,n,m)` | part of a string; `MID$` counts its first character as one, and a count past the end is as much as there is |
+| `CHR$(n)` / `ASC(A$)` | the character with that number, and the number of the first character |
 | `DIM A(10)` | an array of eleven words, `A(0)` to `A(10)`; one dimension, and the `DIM` comes first |
 | `CLS` | Clear the screen and print the banner |
 | `REM` | A remark |
@@ -260,8 +263,8 @@ The honest list, because a manual that hides it is worse than useless:
   only as far as the end of its line, because each new line starts with no loops
   and no subroutines pending. A whole loop on one line, colons and all, runs;
 - **strings, in part** — a string variable holds up to thirty-one characters,
-  and can be assigned, printed, compared and measured. There is no `+` for two
-  of them and none of `LEFT$`, `MID$`, `RIGHT$`, `CHR$`, `STR$` or `VAL`;
+  and can be assigned, printed, compared, joined, sliced and measured. There is
+  no `STR$` and no `VAL`, so a number and its digits are not the same thing;
 - **arrays, in part** — `DIM A(10)` and `A(i)`, one dimension and whole words.
   There are no string arrays and no `DIM` of more than one subscript, and a
   `DIM` that asks for more elements than the letter already has takes a fresh

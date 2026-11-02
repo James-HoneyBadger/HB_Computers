@@ -30,6 +30,8 @@ STRINGS         = $030000
 STR_SLOT        = 32            ; a length byte and thirty-one characters
 STR_MAX         = 31
 BANK_STR        = $03
+STRTMP          = $030400       ; where two strings are joined: STR_MAX bytes
+STRCHR          = $030430       ; the one character a CHR$ has
 
 ; The arrays, in the same bank: a table of twenty-six entries, four bytes each
 ; -- where a letter's run starts and how many elements it has -- and a heap

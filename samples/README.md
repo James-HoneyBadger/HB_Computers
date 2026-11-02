@@ -54,5 +54,5 @@ stands.
 | `06-limits.bas` | what the language does not do yet, said plainly |
 | `07-branches-and-loops.bas` | `IF`/`THEN`, `GOSUB`/`RETURN` and `FOR`/`NEXT` |
 | `08-for-step.bas` | positive and negative `STEP`, a loop past its limit, `STEP 0` rejected |
-| `09-strings.bas` | `A$` variables, `LEN`, and comparing two strings |
+| `09-strings.bas` | `A$` variables, `LEN`, comparing, joining and slicing |
 | `10-arrays.bas` | `DIM`, a sieve, and two loops one inside the other |

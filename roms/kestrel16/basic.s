@@ -23,6 +23,7 @@ ZP_SSTR         = $00           ; 24-bit: the string being read
 ZP_SLEN         = $03           ; 16-bit: how many characters it has
 ZP_SDST         = $05           ; 24-bit: the slot an assignment is writing
 ZP_ARR          = $08           ; a byte: the letter an array operation is about
+ZP_STOT         = $0E           ; 16-bit: how long the joined string is so far
 ZP_SSTR2        = $09           ; 24-bit: the left side of a string comparison
 ZP_SLEN2        = $0C           ; 16-bit: and how long it is
 ZP_SRC          = $30           ; a 24-bit pointer into the line being read
@@ -236,6 +237,21 @@ KW_LEN_END:
 KW_DIM:
         .text "DIM"
 KW_DIM_END:
+KW_LEFT:
+        .text "LEFT$"
+KW_LEFT_END:
+KW_RIGHT:
+        .text "RIGHT$"
+KW_RIGHT_END:
+KW_MID:
+        .text "MID$"
+KW_MID_END:
+KW_CHR:
+        .text "CHR$"
+KW_CHR_END:
+KW_ASC:
+        .text "ASC"
+KW_ASC_END:
 KW_AND:
         .text "AND"
 KW_AND_END:
@@ -992,8 +1008,6 @@ PRINT_LOOP:
         ; two statements on one line, and the next one starts after the colon.
         CMP #':'
         BEQ PRINT_END
-        CMP #'"'
-        BEQ PRINT_STRING
         CMP #';'
         BEQ PRINT_SEMI
         CMP #','
@@ -1068,22 +1082,6 @@ PRINT_VALUE:
         LDA #0                  ; the value ended the item, so the next thing
         STA ZP_FLAG             ; decides whether the line ends
         BRA PRINT_LOOP
-PRINT_STRING:
-        JSR SRC_STEP
-PRINT_STR_LOOP:
-        LDA [ZP_SRC]
-        BEQ PRINT_END
-        CMP #'"'
-        BEQ PRINT_STR_CLOSE
-        JSL L_CHROUT
-        JSR SRC_STEP
-        BRA PRINT_STR_LOOP
-PRINT_STR_CLOSE:
-        JSR SRC_STEP
-        LDA #0
-        STA ZP_FLAG
-        BRA PRINT_LOOP
-
 ; PRINT_STRVAL: the string in ZP_SSTR, ZP_SLEN characters of it, goes to the
 ; tube. The KERNAL's PRINT takes the pointer in ZP_PTR and the length in X, and
 ; it keeps its own index, so a string that scrolls the screen is still printed
@@ -1108,11 +1106,61 @@ PRINT_STRVAL:
 ; nothing ever has to be collected.
 ; ---------------------------------------------------------------------------
 
-; PARSE_STR: the string at ZP_SRC goes into ZP_SSTR and ZP_SLEN, and the line
-; pointer steps past it. Carry clear, and the pointer exactly where it was,
-; when what is there is not a string at all.
+; PARSE_STR: the string expression at ZP_SRC goes into ZP_SSTR and ZP_SLEN,
+; and the line pointer steps past it. Carry clear, and the pointer exactly
+; where it was, when what is there is not a string at all.
+;
+; The expression is factors joined by `+`: a literal, a string variable, or one
+; of the four functions that make a string. Two of them are joined in the
+; temporary, because a result that is neither one operand nor the other has to
+; live somewhere, and the temporary is `STR_MAX` bytes of bank three that
+; nothing else wants.
 PARSE_STR:
+        JSR PARSE_STR_ONE
+        BCC PARSE_STR_EMPTY
         JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'+'
+        BNE PARSE_STR_ONE_DONE
+        JSR STR_TO_TEMP         ; the left side moves, and the rest is added
+PARSE_STR_MORE:
+        JSR SRC_STEP            ; past the plus
+        JSR PARSE_STR_ONE
+        BCC PARSE_STR_BADADD    ; a number where the other half of a sum was
+        JSR STR_APPEND
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'+'
+        BEQ PARSE_STR_MORE
+PARSE_STR_ONE_DONE:
+        SEC
+        RTS
+PARSE_STR_BADADD:
+        JMP FACTOR_MISMATCH
+PARSE_STR_EMPTY:
+        CLC
+        RTS
+
+; PARSE_STR_ONE: one string, with no `+` in it.
+PARSE_STR_ONE:
+        JSR SKIPSP
+        ; the functions first: `LEFT$` begins with a letter, and so does `A$`
+        LDX.W #(KW_LEFT & $FFFF)
+        LDY.W #KW_LEFT_END - KW_LEFT
+        JSR MATCHKW
+        BCS PARSE_LEFT
+        LDX.W #(KW_RIGHT & $FFFF)
+        LDY.W #KW_RIGHT_END - KW_RIGHT
+        JSR MATCHKW
+        BCS PARSE_RIGHT
+        LDX.W #(KW_MID & $FFFF)
+        LDY.W #KW_MID_END - KW_MID
+        JSR MATCHKW
+        BCS PARSE_MID
+        LDX.W #(KW_CHR & $FFFF)
+        LDY.W #KW_CHR_END - KW_CHR
+        JSR MATCHKW
+        BCS PARSE_CHR
         LDA [ZP_SRC]
         CMP #'"'
         BEQ PARSE_STR_LITERAL
@@ -1174,6 +1222,269 @@ PARSE_STR_LIT_CLOSE:
 PARSE_STR_LIT_DONE:
         SEC
         RTS
+
+; ---------------------------------------------------------------------------
+; The functions that make a string. Each takes its own name already matched, so
+; the pointer stands at the bracket.
+; ---------------------------------------------------------------------------
+
+; PARSE_SLICE_OPEN: past the bracket, and the string inside it is in
+; ZP_SSTR/ZP_SLEN. Carry set when that is not a string.
+PARSE_SLICE_OPEN:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR PARSE_STR
+        RTS
+PARSE_SLICE_BAD:
+        JMP FACTOR_MISMATCH
+
+; PARSE_LEFT: LEFT$(s,n) -- the first n characters, and all of them if n is more
+; than there are.
+PARSE_LEFT:
+        JSR PARSE_SLICE_OPEN
+        BCC PARSE_SLICE_BAD
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #','
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR EXPR
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR SLICE_CLAMP         ; X = the count, no more than the string has
+        REP #$20
+        LDA ZP_A
+        STA ZP_SLEN
+        SEP #$20
+        SEC
+        RTS
+
+; PARSE_RIGHT: RIGHT$(s,n) -- the last n characters.
+PARSE_RIGHT:
+        JSR PARSE_SLICE_OPEN
+        BCC PARSE_SLICE_BAD
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #','
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR EXPR
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR SLICE_CLAMP         ; ZP_A = the count
+        REP #$20
+        LDA ZP_SLEN
+        SEC
+        SBC ZP_A                ; this many characters are left out
+        CLC
+        ADC ZP_SSTR             ; so the text starts there
+        STA ZP_SSTR
+        LDA ZP_A
+        STA ZP_SLEN
+        SEP #$20
+        SEC
+        RTS
+
+; PARSE_MID: MID$(s,start,n) -- n characters from the start, counting the first
+; character as one.
+PARSE_MID:
+        JSR PARSE_SLICE_OPEN
+        BCC PARSE_SLICE_BAD
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #','
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR EXPR                ; the first character wanted
+        REP #$20
+        TXA
+        STA ZP_B                ; kept: the count's own expression follows
+        SEP #$20
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #','
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR EXPR
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR SLICE_CLAMP_COUNT   ; ZP_A = the count, no more than could be there
+        REP #$20
+        LDA ZP_B                ; the start, counting the first character as one
+        BPL MID_HAVE_START
+        LDA.W #1
+MID_HAVE_START:
+        DEC A                   ; how many characters come before it
+        BPL MID_HAVE_OFFSET
+        LDA.W #0
+MID_HAVE_OFFSET:
+        CMP ZP_SLEN
+        BCC MID_HAVE_TEXT
+        LDA ZP_SLEN             ; a start past the end is an empty string
+MID_HAVE_TEXT:
+        STA ZP_B
+        LDA ZP_SSTR
+        CLC
+        ADC ZP_B
+        STA ZP_SSTR
+        LDA ZP_SLEN
+        SEC
+        SBC ZP_B                ; how much of the string is left from there
+        STA ZP_B
+        LDA ZP_A
+        CMP ZP_B
+        BCC MID_HAVE_COUNT
+        LDA ZP_B                ; all that is left is fewer than was asked for
+MID_HAVE_COUNT:
+        STA ZP_SLEN
+        SEP #$20
+        SEC
+        RTS
+
+; SLICE_CLAMP: X = a count, ZP_SLEN = how many characters there are. ZP_A = the
+; count the string can honour: nought for nought or less, and the whole string
+; when the count is more than it has. A negative count is nought rather than a
+; pointer that walks backwards.
+SLICE_CLAMP_COUNT = SLICE_CLAMP
+SLICE_CLAMP:
+        REP #$20
+        TXA
+        BPL SLICE_CLAMP_POSITIVE
+        LDA.W #0
+SLICE_CLAMP_POSITIVE:
+        CMP ZP_SLEN
+        BCC SLICE_CLAMP_HAVE
+        BEQ SLICE_CLAMP_HAVE
+        LDA ZP_SLEN
+SLICE_CLAMP_HAVE:
+        STA ZP_A
+        SEP #$20
+        RTS
+
+; PARSE_CHR: CHR$(n) -- the character whose number is n, in a byte of its own.
+PARSE_CHR:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR EXPR
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        REP #$20
+        TXA
+        SEP #$20
+        STA.L STRCHR
+        REP #$20
+        LDA.W #(STRCHR & $FFFF)
+        STA ZP_SSTR
+        LDA.W #1
+        STA ZP_SLEN
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SSTR+2
+        SEC
+        RTS
+
+; ---------------------------------------------------------------------------
+; Joining two strings in the temporary.
+; ---------------------------------------------------------------------------
+
+; STR_TO_TEMP: the string in ZP_SSTR becomes the temporary, which is where the
+; right-hand sides are added to, and ZP_STOT says how long it is so far.
+STR_TO_TEMP:
+        REP #$20
+        LDA ZP_SLEN
+        CMP.W #(STR_MAX+1)
+        SEP #$20
+        BCS STR_TEMP_LONG
+        REP #$20
+        LDA.W #(STRTMP & $FFFF)
+        STA ZP_SDST             ; there is no long,Y: a pointer and an index
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SDST+2
+        REP #$10
+        LDY.W #0
+STR_TO_TEMP_LOOP:
+        CPY ZP_SLEN
+        BCS STR_TO_TEMP_DONE
+        LDA [ZP_SSTR],Y
+        STA [ZP_SDST],Y
+        INY
+        BRA STR_TO_TEMP_LOOP
+STR_TO_TEMP_DONE:
+        REP #$20
+        LDA ZP_SLEN
+        STA ZP_STOT
+        LDA.W #(STRTMP & $FFFF)
+        STA ZP_SSTR
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SSTR+2
+        SEC
+        RTS
+STR_TEMP_LONG:
+        JMP SAY_TOOLONG
+
+; STR_APPEND: the string in ZP_SSTR goes onto the end of the temporary, and
+; ZP_SSTR/ZP_SLEN come back describing the longer one.
+STR_APPEND:
+        REP #$20
+        LDA ZP_STOT
+        CLC
+        ADC ZP_SLEN
+        CMP.W #(STR_MAX+1)
+        SEP #$20
+        BCS STR_APPEND_LONG
+        REP #$20
+        LDA.W #(STRTMP & $FFFF)
+        CLC
+        ADC ZP_STOT             ; where the new characters begin
+        STA ZP_SDST
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SDST+2
+        REP #$10
+        LDY.W #0
+STR_APPEND_LOOP:
+        CPY ZP_SLEN
+        BCS STR_APPEND_DONE
+        LDA [ZP_SSTR],Y
+        STA [ZP_SDST],Y
+        INY
+        BRA STR_APPEND_LOOP
+STR_APPEND_DONE:
+        REP #$20
+        LDA ZP_STOT
+        CLC
+        ADC ZP_SLEN
+        STA ZP_STOT             ; the temporary is that much longer
+        STA ZP_SLEN
+        LDA.W #(STRTMP & $FFFF)
+        STA ZP_SSTR
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SSTR+2
+        SEC
+        RTS
+STR_APPEND_LONG:
+        JMP SAY_TOOLONG
 
 ; STR_ADDR: ZP_CH = a letter's number. ZP_SSTR = the text of that string, and
 ; ZP_SLEN = its length.
@@ -1884,8 +2195,12 @@ FACTOR:
         BCS FACTOR_WORD
         BRA FACTOR_NUM
 FACTOR_WORD:
-        ; LEN(<string>) is the one function this language has, and it is worth
-        ; having: a string knows how long it is, and nothing else can ask.
+        ; ASC(<string>) is the number of its first character, and LEN(<string>)
+        ; how many characters it has. Both are numbers, so both live here.
+        LDX.W #(KW_ASC & $FFFF)
+        LDY.W #KW_ASC_END - KW_ASC
+        JSR MATCHKW
+        BCS FACTOR_ASC
         LDX.W #(KW_LEN & $FFFF)
         LDY.W #KW_LEN_END - KW_LEN
         JSR MATCHKW
@@ -1908,6 +2223,32 @@ FACTOR_LEN:
         JSR SRC_STEP
         REP #$20
         LDA ZP_SLEN
+        TAX
+        SEP #$20
+        RTS
+FACTOR_ASC:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        JSR PARSE_STR
+        BCC FACTOR_MISMATCH
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        REP #$20
+        LDA ZP_SLEN
+        BEQ FACTOR_ASC_EMPTY    ; a string with no characters in it has no first
+        LDA [ZP_SSTR]
+        AND.W #$00FF
+        TAX
+        SEP #$20
+        RTS
+FACTOR_ASC_EMPTY:
+        LDA.W #0
         TAX
         SEP #$20
         RTS
