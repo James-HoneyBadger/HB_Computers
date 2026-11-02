@@ -753,6 +753,69 @@ mod tests {
         );
     }
 
+    /// An array of strings: `DIM A$(2)` is three slots, each holding as much as
+    /// a string variable does, and an element is a string wherever one is wanted.
+    #[test]
+    fn a_1992_array_holds_a_string_per_element() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 DIM S$(2)",
+            "20 S$(0)=\"ONE\":S$(1)=\"TWO\":S$(2)=\"THREE\"",
+            "30 PRINT S$(0);\"/\";S$(1);\"/\";S$(2)",
+            "40 PRINT LEN(S$(2))",
+            "50 PRINT S$(1)+S$(2)",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(120);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "ONE/TWO/THREE"),
+            "every element kept its own text:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "5"),
+            "and a string element measures like a string:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "TWOTHREE"),
+            "and joins like one:\n{screen}"
+        );
+        assert!(
+            !screen.contains("?WHAT?") && !screen.contains("?SUBSCRIPT"),
+            "and none of it was a mistake:\n{screen}"
+        );
+    }
+
+    /// A string array's slots are its own: a subscript past the end is named,
+    /// and a word array is not a string array.
+    #[test]
+    fn a_1992_string_array_refuses_what_it_has_not_got() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced("DIM S$(1)");
+        machine.type_line_paced("DIM A(3)");
+        machine.type_line_paced("PRINT S$(2)");
+        machine.type_line_paced("PRINT A$(1)");
+        machine.type_line_paced("PRINT A(1)+1");
+        machine.run_frames(60);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.matches("?SUBSCRIPT").count() >= 1,
+            "the out-of-range subscript was refused:\n{screen}"
+        );
+        assert!(
+            screen.matches("?TYPE MISMATCH").count() >= 1,
+            "and a word array is not a string one:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "1"),
+            "while the word array still reads and adds:\n{screen}"
+        );
+    }
+
     /// A subscript outside the array, and a letter never dimensioned, are both
     /// named rather than quietly reading whichever word follows.
     #[test]

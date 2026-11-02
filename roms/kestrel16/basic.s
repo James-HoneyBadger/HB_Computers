@@ -1083,6 +1083,8 @@ ASSIGN_STR:
         LDA [ZP_SRC]
         CMP #'='
         BEQ ASSIGN_STR_STORE
+        CMP #'('                ; `A$(3)="text"` writes one element of one
+        BEQ ASSIGN_STR_ELEM
         JSR SAY_WHAT
         RTS
 ASSIGN_STR_STORE:
@@ -1091,39 +1093,30 @@ ASSIGN_STR_STORE:
         BCC ASSIGN_MISMATCH     ; a number cannot go into a string
         JSR STR_STORE
         RTS
+ASSIGN_STR_ELEM:
+        JSR PARSE_ELEM          ; ZP_SDST = the element
+        BCS ASSIGN_SUBSCRIPT
+        JSR ARR_IS_STRING       ; a word is not a string
+        BCC ASSIGN_MISMATCH
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'='
+        BEQ ASSIGN_STR_ELEM_STORE
+        JSR SAY_WHAT
+        RTS
+ASSIGN_STR_ELEM_STORE:
+        JSR SRC_STEP            ; past the equals
+        JSR PARSE_STR
+        BCC ASSIGN_MISMATCH
+        JSR STR_COPY            ; into the element's slot
+        RTS
 ASSIGN_MISMATCH:
         JSR SAY_MISMATCH
         LDA #3                  ; the line stops here, as it does on ?WHAT?
         STA ZP_JFLAG
         RTS
 ASSIGN_ARRAY:
-        JSR SRC_STEP            ; past the opening bracket
-        JSR EXPR                ; X = the first subscript
-        PHX
-        REP #$20
-        LDA.W #0
-        STA ZP_B                ; no second subscript yet
-        SEP #$20
-        JSR SKIPSP
-        LDA [ZP_SRC]
-        CMP #','
-        BNE ASSIGN_ARRAY_CLOSE
-        JSR SRC_STEP
-        JSR EXPR
-        REP #$20
-        TXA
-        STA ZP_B
-        SEP #$20
-ASSIGN_ARRAY_CLOSE:
-        JSR SKIPSP
-        LDA [ZP_SRC]
-        CMP #')'
-        BNE ASSIGN_SUBSCRIPT
-        JSR SRC_STEP
-        LDA ZP_VAR              ; the letter, which the subscripts cannot take
-        STA ZP_ARR
-        PLX
-        JSR ARR_ELEM            ; ZP_SDST = the element
+        JSR PARSE_ELEM          ; ZP_SDST = the element
         BCS ASSIGN_SUBSCRIPT
         JSR SKIPSP
         LDA [ZP_SRC]
@@ -1388,7 +1381,53 @@ PARSE_STR_NONE:
         RTS
 PARSE_STR_VAR:
         JSR SRC_STEP            ; past the dollar
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('                ; `A$(3)` is one element of a string array
+        BEQ PARSE_STR_ELEM
         JSR STR_ADDR
+        SEC
+        RTS
+PARSE_STR_ELEM:
+        LDA ZP_CH               ; the letter, which the subscripts cannot take
+        STA ZP_ARR
+        JSR PARSE_ELEM          ; ZP_SDST = the element
+        BCS PARSE_STR_ELEM_BAD
+        JSR ARR_IS_STRING
+        BCC PARSE_STR_ELEM_WORD
+        LDA ZP_SDST
+        STA ZP_SSTR
+        LDA ZP_SDST+1
+        STA ZP_SSTR+1
+        LDA ZP_SDST+2
+        STA ZP_SSTR+2
+        LDY.W #0
+        LDA [ZP_SSTR],Y         ; the slot's own length byte
+        REP #$20
+        AND.W #$00FF
+        STA ZP_SLEN
+        LDA ZP_SSTR
+        INC A                   ; and the text follows the length, as everywhere
+        STA ZP_SSTR
+        SEP #$20
+        SEC
+        RTS
+PARSE_STR_ELEM_WORD:
+        JSR SAY_MISMATCH        ; a word is not a string
+        BRA PARSE_STR_ELEM_EMPTY
+PARSE_STR_ELEM_BAD:
+        JSR SAY_SUBSCRIPT
+PARSE_STR_ELEM_EMPTY:
+        LDA #3
+        STA ZP_JFLAG
+        REP #$20                ; what comes back is an empty string, so a caller
+        LDA.W #0                ; that goes on does not read a slot that is not
+        STA ZP_SLEN             ; there
+        LDA.W #(STRTMP & $FFFF)
+        STA ZP_SSTR
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SSTR+2
         SEC
         RTS
 PARSE_STR_LITERAL:
@@ -1886,6 +1925,12 @@ STR_STORE:
         SEP #$20
         LDA #BANK_STR
         STA ZP_SDST+2
+        ; and on into the copy, which is the same for an array element
+
+; STR_COPY: the string in ZP_SSTR goes into the slot at ZP_SDST, length byte
+; first, and more characters than a slot holds is refused rather than cut.
+STR_COPY:
+        REP #$10
         REP #$20
         LDA ZP_SLEN
         CMP.W #(STR_MAX+1)
@@ -1955,6 +2000,7 @@ ARR_ELEM:
         BEQ ARR_ELEM_BAD        ; the end is one past the last
         BCC ARR_ELEM_BAD
         LDA.L ARRAYS+6,X        ; and how many columns
+        AND.W #$7FFF            ; the top bit says the elements are strings
         CMP ZP_B
         BEQ ARR_ELEM_BAD
         BCC ARR_ELEM_BAD
@@ -1978,7 +2024,7 @@ ARR_ELEM_ADDRESS:
         LDA.L ARRAYS,X          ; where the run starts
         STA ZP_B
         LDA ZP_A
-        ASL A                   ; two bytes an element
+        JSR ARR_SHIFT           ; two bytes an element, or a string slot
         CLC
         ADC ZP_B
         STA ZP_SDST
@@ -1990,6 +2036,81 @@ ARR_ELEM_ADDRESS:
 ARR_ELEM_BAD:
         SEP #$20
         SEC
+        RTS
+
+; PARSE_ELEM: ZP_ARR = a letter, and the text at `(i)` or `(i,j)`. The pointer
+; steps past the closing bracket and ZP_SDST = the element. Carry set, and
+; nothing written, when the letter has no array or a subscript is outside it.
+PARSE_ELEM:
+        JSR SRC_STEP            ; past the opening bracket
+        JSR EXPR                ; X = the first subscript
+        PHX
+        REP #$20
+        LDA.W #0
+        STA ZP_B                ; no second subscript yet
+        SEP #$20
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #','
+        BNE PARSE_ELEM_CLOSE
+        JSR SRC_STEP
+        JSR EXPR                ; X = the second
+        REP #$20
+        TXA
+        STA ZP_B
+        SEP #$20
+PARSE_ELEM_CLOSE:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE PARSE_ELEM_BAD
+        JSR SRC_STEP
+        PLX
+        JMP ARR_ELEM            ; the element, or carry set
+PARSE_ELEM_BAD:
+        PLX                     ; the first subscript, still waiting
+        SEP #$20
+        SEC
+        RTS
+
+; ARR_SHIFT: A = an element's number, ZP_ARR = the letter. A = its offset in
+; the run: two bytes for a word, and a whole string slot for a string.
+ARR_SHIFT:
+        PHP
+        REP #$20
+        STA ZP_TMP16
+        JSR ARR_ENTRY
+        LDA.L ARRAYS+6,X
+        AND.W #$8000
+        BEQ ARR_SHIFT_WORD
+        LDA ZP_TMP16
+        ASL A
+        ASL A
+        ASL A
+        ASL A
+        ASL A                   ; STR_SLOT bytes an element
+        PLP
+        RTS
+ARR_SHIFT_WORD:
+        LDA ZP_TMP16
+        ASL A
+        PLP
+        RTS
+
+; ARR_IS_STRING: ZP_ARR = a letter. Carry set when that array holds strings.
+ARR_IS_STRING:
+        PHP
+        REP #$20
+        JSR ARR_ENTRY
+        LDA.L ARRAYS+6,X
+        AND.W #$8000
+        BEQ ARR_IS_STRING_NO
+        PLP
+        SEC
+        RTS
+ARR_IS_STRING_NO:
+        PLP
+        CLC
         RTS
 
 ; DO_DIM: `DIM A(10)` gives A eleven elements, nought to ten, which is what the
@@ -2005,8 +2126,15 @@ DO_DIM:
         SEC
         SBC #'A'
         STA ZP_VAR              ; kept there: the bounds are expressions
-        STA ZP_ARR
         JSR SRC_STEP
+        LDA [ZP_SRC]
+        CMP #'$'                ; `DIM A$(3)` is an array of strings
+        BNE DIM_OPEN
+        LDA ZP_VAR
+        ORA #$80                ; the top bit of the letter says so
+        STA ZP_VAR
+        JSR SRC_STEP
+DIM_OPEN:
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #'('
@@ -2032,6 +2160,7 @@ DIM_SECOND:
         PLX                     ; and the rows
 DIM_CHECK:
         JSR SKIPSP
+        SEP #$20                ; the bounds have been read as words
         LDA [ZP_SRC]
         CMP #')'
         BNE DIM_BAD
@@ -2049,10 +2178,20 @@ DIM_CHECK:
         BCS DIM_BAD_WIDE
         INC A
         STA ZP_CNT2             ; and the columns
+        SEP #$20
+        LDA ZP_VAR
+        AND #$80                ; the top bit of the letter says the elements are
+        BEQ DIM_COLUMNS         ; strings, and the mark rides on the columns
+        LDA ZP_CNT2+1
+        ORA #$80
+        STA ZP_CNT2+1
+DIM_COLUMNS:
+        REP #$20
         ; from here nothing parses an expression, so the shape stays put
         LDA ZP_TMP16
         STA ZP_A
         LDA ZP_CNT2
+        AND.W #$7FFF
         STA ZP_B
         ; the elements are rows times columns, added up rather than multiplied:
         ; the sum stops the moment it passes what the heap could ever hold, and
@@ -2075,8 +2214,11 @@ DIM_TIMES_DONE:
         BNE DIM_HAVE_SIZE       ; an array of nothing is not an array
         BRA DIM_BAD_WIDE
 DIM_HAVE_SIZE:
+        SEP #$20
         LDA ZP_VAR
+        AND #$7F
         STA ZP_ARR              ; the bounds may have been array elements
+        REP #$20
         JSR ARR_ENTRY
         ; a run of the same size or less is already the letter's, and stays so
         LDA.L ARRAYS,X
@@ -2091,12 +2233,26 @@ DIM_TAKE:
         LDA.L ARR_TOP           ; where the heap is
         STA ZP_B                ; the run will begin there
         LDA ZP_CNT
-        ASL A                   ; two bytes an element
+        JSR DIM_BYTES           ; two bytes an element, or a whole string slot
+        BEQ DIM_NOROOM          ; more elements than a slot each could ever hold
         CLC
         ADC ZP_B
         CMP.W #ARR_LIMIT
         BCS DIM_NOROOM
         STA.L ARR_TOP           ; the heap has grown
+        STA ZP_A                ; and the run ends here
+        REP #$10
+        LDX ZP_B                ; and begins here
+        SEP #$20
+        LDA #0
+DIM_CLEAR:
+        CPX ZP_A
+        BCS DIM_CLEARED
+        STA.L $030000,X         ; the heap is bank three: only its low half varies
+        INX
+        BRA DIM_CLEAR
+DIM_CLEARED:
+        REP #$20                ; the entry is written a word at a time
         JSR ARR_ENTRY
         LDA ZP_B
         STA.L ARRAYS,X          ; where the run starts
@@ -2110,6 +2266,32 @@ DIM_SHAPE:
         STA.L ARRAYS+6,X        ; and the columns
         SEP #$20
         RTS
+; DIM_BYTES: A = how many elements, sixteen bits wide, and ZP_CNT2 = the
+; columns with the string flag on their top bit. A = the bytes the run needs: two
+; an element for words, a whole slot for strings -- or nought when that many
+; slots would not fit in a word at all, which no heap can hold either.
+DIM_BYTES:
+        STA ZP_A                ; ZP_TMP16 still holds the rows, for the shape
+        LDA ZP_CNT2
+        AND.W #$8000
+        BEQ DIM_BYTES_WORD
+        LDA ZP_A
+        CMP.W #(65535/STR_SLOT+1)
+        BCS DIM_BYTES_NONE
+        ASL A
+        ASL A
+        ASL A
+        ASL A
+        ASL A                   ; STR_SLOT bytes an element
+        RTS
+DIM_BYTES_WORD:
+        LDA ZP_A
+        ASL A
+        RTS
+DIM_BYTES_NONE:
+        LDA.W #0
+        RTS
+
 DIM_NOROOM:
         SEP #$20
         JSR SAY_NOROOM
@@ -2836,31 +3018,7 @@ FACTOR_VAR:
 FACTOR_ARRAY:
         LDA ZP_CH               ; the letter, which the subscripts cannot take
         STA ZP_ARR
-        JSR SRC_STEP            ; past the opening bracket
-        JSR EXPR                ; X = the first subscript
-        PHX
-        REP #$20
-        LDA.W #0
-        STA ZP_B                ; no second subscript yet
-        SEP #$20
-        JSR SKIPSP
-        LDA [ZP_SRC]
-        CMP #','
-        BNE FACTOR_ARRAY_CLOSE
-        JSR SRC_STEP
-        JSR EXPR                ; X = the second
-        REP #$20
-        TXA
-        STA ZP_B
-        SEP #$20
-FACTOR_ARRAY_CLOSE:
-        JSR SKIPSP
-        LDA [ZP_SRC]
-        CMP #')'
-        BNE FACTOR_ARRAY_BAD
-        JSR SRC_STEP
-        PLX
-        JSR ARR_ELEM
+        JSR PARSE_ELEM          ; ZP_SDST = the element
         BCS FACTOR_ARRAY_BAD
         REP #$20
         LDA [ZP_SDST]           ; a word from bank three

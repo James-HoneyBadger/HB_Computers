@@ -5,4 +5,7 @@
 50 FOR J=I*I TO 30 STEP I:P(J)=1:NEXT J
 60 NEXT I
 70 PRINT
+80 DIM N$(2)
+90 N$(0)="ONE":N$(1)="TWO":N$(2)="THREE"
+100 PRINT N$(2);" ";N$(0);" ";N$(1)
 RUN

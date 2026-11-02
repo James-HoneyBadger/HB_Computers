@@ -361,6 +361,7 @@ than its predecessor, and honest about it:
 | `STR$(n)` / `VAL(A$)` | the digits of a number, and the number those digits begin with |
 | `PEEK(addr)` / `POKE addr,value` | one byte of bank zero: the tube, the I/O page and the program |
 | `DIM A(10)` / `DIM M(2,3)` | an array of eleven words, `A(0)` to `A(10)`, or `M(i,j)` with two subscripts; the `DIM` comes first |
+| `DIM S$(10)` / `S$(i)` | an array of strings, each a slot of thirty-one characters |
 | `RUN` [`n`] / `LIST` [`n`] | run the stored program, or show it from line `n` |
 | `GOTO n` | continue at line `n` |
 | `IF cond THEN …` [`ELSE` …] | one branch or the other; a line number after `THEN` jumps |
@@ -412,8 +413,8 @@ PRINT A$
 - **strings, in part** — `A$` holds thirty-one characters and can be assigned,
   printed, compared, joined with `+`, sliced with `LEFT$`/`RIGHT$`/`MID$`, and
   turned into characters, digits and back with `CHR$`/`ASC`/`STR$`/`VAL`;
-- **arrays, in part** — `DIM A(10)` and `A(i)` with one or two subscripts, and
-  whole words only: no string arrays, and no more than two subscripts;
+- **arrays, in part** — `DIM A(10)` and `A(i)` with one or two subscripts, of
+  whole words or of strings: no more than two subscripts;
 - **no other functions** — no `ABS`, no `DEF FN`;
 - **a filesystem** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD`, `DELETE` and `FIND`
   all work;

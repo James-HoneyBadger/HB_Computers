@@ -55,4 +55,4 @@ stands.
 | `07-branches-and-loops.bas` | `IF`/`THEN`, `GOSUB`/`RETURN` and `FOR`/`NEXT` |
 | `08-for-step.bas` | positive and negative `STEP`, a loop past its limit, `STEP 0` rejected |
 | `09-strings.bas` | `A$` variables, `LEN`, comparing, joining and slicing |
-| `10-arrays.bas` | `DIM`, a sieve, and two loops one inside the other |
+| `10-arrays.bas` | `DIM`, a sieve, two loops one inside the other, and an array of strings |

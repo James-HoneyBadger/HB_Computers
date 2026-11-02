@@ -200,6 +200,7 @@ THE ANSWER IS 42
 | `CSAVE "NAME"` | the program store onto the cassette, as one more block after what is already there |
 | `CLOAD "NAME"` | the first block of that name becomes the program store |
 | `DIM A(10)` / `DIM M(2,3)` | an array of eleven words, `A(0)` to `A(10)`, or of twelve, `M(i,j)`; one or two dimensions, and the `DIM` comes first |
+| `DIM S$(10)` / `S$(i)` | the same, holding strings: a slot of thirty-one characters each, so the heap gives out sooner |
 | `CLS` | Clear the screen and print the banner |
 | `REM` | A remark |
 | `END` | Finish the line |
@@ -270,9 +271,11 @@ The honest list, because a manual that hides it is worse than useless:
   only as far as the end of its line, because each new line starts with no loops
   and no subroutines pending. A whole loop on one line, colons and all, runs;
 - **strings, in part** — a string variable holds up to thirty-one characters,
-  and can be assigned, printed, compared, joined, sliced and measured;
-- **arrays, in part** — `DIM A(10)` and `A(i)` with one or two subscripts, and
-  whole words only. There are no string arrays and no `DIM` of more than two
+  and can be assigned, printed, compared, joined, sliced and measured; an array
+  of them holds as many as the heap has room for, and `DIM S$(10)` is written
+  with the dollar as `S$(i)` is read;
+- **arrays, in part** — `DIM A(10)` and `A(i)` with one or two subscripts, of
+  whole words or of string slots. There is no `DIM` of more than two
   subscripts, and a `DIM` that asks for more elements than the letter already
   has takes a fresh run from the heap and does not give the old one back;
 - **no other functions** — no `ABS`, no `DEF FN`;
