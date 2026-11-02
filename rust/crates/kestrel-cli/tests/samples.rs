@@ -43,10 +43,12 @@ fn run_sample(sample: &Path, model: Model) {
         machine.type_line_paced(&line);
     }
     match model {
-        // The 1982 machine stores numbered lines; they have to be run.
+        // The 1982 machine stores numbered lines; they have to be run. A
+        // program with a hundred throws of two dice, or a sieve of its own,
+        // wants more than the four hundred frames a shorter one needs.
         Model::Kestrel => {
             machine.type_line_paced("RUN");
-            machine.run_frames(400);
+            machine.run_frames(800);
         }
         // The 1992 machine runs a stored line as it is typed, so it only needs
         // time for the last one: a sieve to thirty wants a hundred frames.

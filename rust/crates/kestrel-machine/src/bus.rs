@@ -10,6 +10,10 @@
 use crate::devices::{Disk, Keyboard, Tape, Video};
 use crate::profile::{Model, Profile};
 
+/// Where the noise register starts. Any value but zero will do, and this one is
+/// the seed the shift register was published with, so no two runs disagree.
+pub const NOISE_SEED: u32 = 2_463_534_242;
+
 /// What a register in the I/O page is. The two machines put the same devices at
 /// slightly different offsets, so the layout is chosen from the profile and the
 /// decoder switches on the kind rather than on the number.
@@ -140,7 +144,7 @@ pub struct Bus {
     pub frame_flag: bool,
     pub sound: u8,
     pub notes_played: u32,
-    pub random_state: u16,
+    pub random_state: u32,
     pub disk_sector: u32,
     pub disk_address: u32,
     pub disk_count: u16,
@@ -175,7 +179,7 @@ impl Bus {
             frame_flag: false,
             sound: 0,
             notes_played: 0,
-            random_state: 0xACE1,
+            random_state: NOISE_SEED,
             disk_sector: 0,
             disk_address: 0,
             disk_count: 0,
@@ -398,11 +402,17 @@ impl Bus {
     }
 
     /// The noise generator: one byte at a time, and deterministic, so a test that
-    /// depends on RND gets the same numbers every run.
+    /// depends on RND gets the same numbers every run. The register is a
+    /// thirty-two bit shift register, so a program that reads it in a tight loop
+    /// still gets one value after another rather than a short cycle, and the byte
+    /// comes from the middle of it, where consecutive readings look least alike.
     pub fn random_byte(&mut self) -> u8 {
-        let bit = (self.random_state ^ (self.random_state >> 1)) & 1;
-        self.random_state = (self.random_state >> 1) | (bit << 15);
-        self.random_state as u8
+        let mut state = self.random_state;
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        self.random_state = state;
+        (state >> 8) as u8
     }
 
     pub fn read(&mut self, address: u32) -> u8 {

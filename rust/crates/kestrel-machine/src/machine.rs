@@ -13,7 +13,7 @@
 
 use std::path::Path;
 
-use crate::bus::Bus as MachineBus;
+use crate::bus::{Bus as MachineBus, NOISE_SEED};
 use crate::cpu6502::{self, Cpu6502};
 use crate::cpu65816::{self, Cpu65816};
 use crate::profile::Model;
@@ -241,7 +241,7 @@ impl Machine {
         self.cycles_to_frame = 0;
         self.bus.sound = 0;
         self.bus.notes_played = 0;
-        self.bus.random_state = 0xACE1;
+        self.bus.random_state = NOISE_SEED;
         self.bus.last_key = 0;
         self.bus.disk_sector = 0;
         self.bus.disk_address = 0;
@@ -1701,5 +1701,68 @@ mod tests {
         let start = kestrel16.bus.frame_counter;
         kestrel16.run_frames(1);
         assert_eq!(kestrel16.bus.frame_counter, start + 1);
+    }
+
+    /// A relation with a variable on its right, which is what any program that
+    /// compares two of its own numbers writes. The operator used to be kept in a
+    /// zero page cell the variable lookup overwrote, so `A<B` answered false
+    /// whenever `B` was smaller than `A` was.
+    #[test]
+    fn the_1982_machine_compares_two_variables() {
+        let mut machine = boot(Model::Kestrel);
+        for line in [
+            "10 A=5:B=7",
+            "20 PRINT A<B,A>B",
+            "30 PRINT A=B,A<>B",
+            "40 PRINT A<=B,A>=B",
+            "50 C=7:D=5",
+            "60 PRINT C>D,C<D",
+            "70 PRINT A<7,5<B",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(120);
+
+        let screen = machine.screen_text();
+        let rows: Vec<Vec<&str>> = screen
+            .lines()
+            .map(|row| row.split_whitespace().collect())
+            .collect();
+        for wanted in [
+            ["-1", "0"],
+            ["0", "-1"],
+            ["-1", "0"],
+            ["-1", "0"],
+            ["-1", "-1"],
+        ] {
+            assert!(
+                rows.contains(&wanted.to_vec()),
+                "expected {wanted:?} among:\n{screen}"
+            );
+        }
+    }
+
+    /// `INT` drops the fraction of a number of any size, not only of one that
+    /// fits in the sixteen bits the small-number path works in.
+    #[test]
+    fn the_1982_machine_takes_the_whole_part_of_a_large_number() {
+        let mut machine = boot(Model::Kestrel);
+        for line in [
+            "10 PRINT INT(2.5)",
+            "20 PRINT INT(70000.5)",
+            "30 PRINT INT(108000.5)",
+            "40 PRINT INT(131073.5)",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(120);
+
+        let screen = machine.screen_text();
+        let rows: Vec<&str> = screen.lines().map(str::trim).collect();
+        for wanted in ["2", "70000", "108000", "131073"] {
+            assert!(rows.contains(&wanted), "no {wanted} in:\n{screen}");
+        }
     }
 }

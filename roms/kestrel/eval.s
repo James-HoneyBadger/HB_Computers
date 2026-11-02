@@ -244,12 +244,13 @@ EXPR_REL_LOOP:
         JSR SKIPSP
         JSR RELOP
         BCC EXPR_REL_DONE
-        PHA                     ; the operator, which the right side may use
+        PHA                     ; the operator waits on the machine stack: the
+                                ; right side may use every zero page temporary,
+                                ; B_TEMP3 included, since it holds the third
+                                ; character of the variable it looks up
         LDA B_FLAGS
         AND #2
         BNE EXPR_REL_STRINGS
-        PLA
-        STA B_TEMP3
         JSR PUSHNUM
         JSR EXPR_ADD
         JSR STRNONE
@@ -259,7 +260,10 @@ EXPR_REL_LOOP:
         PHA                     ; the answer, which STRCLR would overwrite
         JSR STRCLR
         PLA
-        LDX B_TEMP3
+        TAY
+        PLA                     ; the operator
+        TAX
+        TYA
         JMP EXPR_REL_TEST
 EXPR_REL_STRINGS:
         ; A string on the left: it and the operator wait on the machine stack,

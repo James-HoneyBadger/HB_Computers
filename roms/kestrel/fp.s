@@ -889,7 +889,7 @@ FINT:
         BEQ FINT_DONE
         LDA B_FAC
         CMP #128+16
-        BCS FINT_DONE           ; this size has no fraction to lose
+        BCS FINT_LARGE          ; this size keeps its fraction lower down
         CMP #128
         BCS FINT_POSITIVE
         ; Below one: zero, or minus one when negative.
@@ -918,8 +918,8 @@ FINT_POSITIVE:
         STA B_TMP
 FINT_SHIFT:
         JSR SHR_A
-        LDA B_WORK+3
-        AND #1
+        LDA #0
+        ROL A                   ; the bit the shift pushed out, and no other
         ORA B_TMP
         STA B_TMP
         DEX
@@ -967,6 +967,39 @@ FINT_STORE:
         LDA B_WORK+3
         STA B_FAC+4
 FINT_DONE:
+        RTS
+
+; Above 2^16 the fraction sits in the bottom of the mantissa, which the path
+; above never looks at because it keeps only the low word. Here the mantissa is
+; sixteen point sixteen, so the fraction is simply the lowest few bits of the low
+; word: drop them, and the number left is the whole one it already held.
+FINT_LARGE:
+        CMP #128+32
+        BCS FINT_DONE           ; 2^32 and above has nothing below the point
+        LDA #128+32
+        SEC
+        SBC B_FAC               ; how many bits of fraction there are
+        TAX
+        STX B_TMP2
+        LDA B_FAC+3
+        STA B_WORK
+        LDA B_FAC+4
+        STA B_WORK+1
+FINT_LARGE_DROP:
+        LSR B_WORK
+        ROR B_WORK+1
+        DEX
+        BNE FINT_LARGE_DROP
+        LDX B_TMP2
+FINT_LARGE_KEEP:
+        ASL B_WORK+1
+        ROL B_WORK
+        DEX
+        BNE FINT_LARGE_KEEP
+        LDA B_WORK
+        STA B_FAC+3
+        LDA B_WORK+1
+        STA B_FAC+4
         RTS
 
 ; FSGN: FAC = -1, 0 or 1 by its sign.
