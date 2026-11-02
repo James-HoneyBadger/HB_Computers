@@ -711,10 +711,22 @@ FMT_NAME:
         LDX #0
         LDY #DISK_WRITE
         JSR WRITESECT
+        CMP #0
         BNE FMT_ERR
-        ; And an empty directory beside it: after the zeroing loop the buffer is
-        ; already sixteen empty entries, so it is the same buffer written to
-        ; sector 1.
+        ; And an empty directory beside it. The buffer still holds the header, so
+        ; it has to be cleared again: sixteen entries of thirty-two zero bytes,
+        ; which is what an empty directory is.
+        LDA #2
+        STA ZP_PTR+2
+        STZ ZP_PTR
+        STZ ZP_PTR+1
+        LDY #0
+        LDA #0
+FMT_CLEAR2:
+        STA [ZP_PTR],Y
+        INY
+        CPY #512
+        BNE FMT_CLEAR2
         LDX #1
         LDY #DISK_WRITE
         JSR WRITESECT
@@ -742,6 +754,60 @@ DOSSTATUS:
 
 ; The other services are not written yet, and say so rather than guessing.
 DOSCATALOG:
+        PHP
+        SEP #$20
+        REP #$10
+        ; The line starts before the read: `[` goes out first, and only then is the
+        ; buffer pointer set, because CHROUT moves ZP_PTR as it prints.
+        LDA #'['
+        JSR CHROUT
+        SEP #$20
+        REP #$10
+        LDA #2
+        STA ZP_PTR+2
+        STZ ZP_PTR
+        STZ ZP_PTR+1
+        LDX #0
+        LDY #DISK_READ
+        ; The sector routines end with PLP, so the flags that come back are the
+        ; caller's, not the status: compare before branching on it.
+        JSR READSECT
+        CMP #0
+        BEQ CAT_OK
+        ; A read that fails says so, with the controller's code, rather than
+        ; printing half a line as though all were well.
+        PHA
+        LDA #'?'
+        JSR CHROUT
+        PLA
+        CLC
+        ADC #'0'
+        JSR CHROUT
+        JSR NEWLINE
+        LDA #1
+        PLP
+        RTS
+CAT_OK:
+        LDY #8
+        LDX #0
+CAT_NAME:
+        LDA [ZP_PTR],Y
+        JSR CHROUT
+        INY
+        INX
+        CPX #16
+        BNE CAT_NAME
+        LDA #']'
+        JSR CHROUT
+        JSR NEWLINE
+        LDA #0
+        PLP
+        RTS
+CAT_ERR2:
+        LDA #1
+        PLP
+        RTS
+
 DOSFIND:
 DOSLOAD:
 DOSSAVE:

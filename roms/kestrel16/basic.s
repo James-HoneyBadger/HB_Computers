@@ -159,6 +159,9 @@ KW_CLS_END:
 KW_FORMAT:
         .text "FORMAT"
 KW_FORMAT_END:
+KW_CATALOG:
+        .text "CATALOG"
+KW_CATALOG_END:
 KW_REM:
         .text "REM"
 KW_REM_END:
@@ -514,6 +517,10 @@ EXEC_TRY_LET:
         LDY.W #KW_FORMAT_END - KW_FORMAT
         JSR MATCHKW
         BCS DO_FORMAT
+        LDX.W #<KW_CATALOG
+        LDY.W #KW_CATALOG_END - KW_CATALOG
+        JSR MATCHKW
+        BCS DO_CATALOG
         LDX.W #<KW_REM
         LDY.W #KW_REM_END - KW_REM
         JSR MATCHKW
@@ -581,6 +588,9 @@ DO_REM_DONE:
         JMP EXEC_DONE
 DO_FORMAT:
         JSL L_DOSFORMAT
+        BRA EXEC_DONE
+DO_CATALOG:
+        JSL L_DOSCATALOG
         BRA EXEC_DONE
 DO_CLS:
         JSL L_CLS

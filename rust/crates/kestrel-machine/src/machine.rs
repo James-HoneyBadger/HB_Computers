@@ -478,6 +478,28 @@ mod tests {
     /// machine from the image to prove the file outlived the first one.
     /// The first service of Kestrel DOS 2.0: `FORMAT` writes a volume header, and
     /// the file on the host is what says so.
+    /// `CATALOG` reads the volume header back through the DOS and prints the
+    /// name it finds, which is the first time the 1992 machine has read anything
+    /// it wrote to a disk.
+    #[test]
+    fn the_1992_machine_reads_its_volume_back() {
+        let path = std::env::temp_dir().join("kestrel-dos2-catalog.dsk");
+        std::fs::write(&path, vec![0u8; 4096 * 512]).expect("a blank volume");
+
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_disk_image(&path).expect("a disk in the drive");
+        machine.type_line_paced("FORMAT");
+        machine.type_line_paced("CATALOG");
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "[                ]"),
+            "the volume name came back off the disk:\n{screen}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
     #[test]
     fn the_1992_machine_formats_a_volume() {
         let path = std::env::temp_dir().join("kestrel-dos2-format.dsk");
