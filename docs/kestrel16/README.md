@@ -187,7 +187,6 @@ THE ANSWER IS 42
 | `IF cond THEN … [ELSE …]` | One branch or the other; a line number after `THEN` jumps |
 | `GOSUB n` / `RETURN` | Sixteen levels of subroutine |
 | `FOR v=a TO b [STEP s]` … `NEXT v` | A loop; `s` may be positive or negative, defaults to `1`, and may not be zero |
-| `NEW` | Throw the program and the variables away |
 | `LET` | `LET A=41`, or `A=41`; variables are `A` to `Z`, sixteen bits each |
 | `LET A$="text"` | a string variable, `A$` to `Z$`, up to thirty-one characters |
 | `LEN(A$)` | how many characters a string has |

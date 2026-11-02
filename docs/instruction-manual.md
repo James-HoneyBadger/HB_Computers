@@ -238,7 +238,7 @@ and the beginnings of a machine that a decade of software could have grown on.
 | [samples/kestrel16](../samples/kestrel16) | eleven programs: sixteen-bit arithmetic, branches and loops, strings, arrays, and functions of the program's own |
 
 Each sample has a `.expected` file beside it holding the lines the machine must
-put on the screen. the samples suite runs every one of them, so a sample
+put on the screen. The samples suite runs every one of them, so a sample
 that stops working is a failing suite rather than a stale page.
 
 Run one at a time:
