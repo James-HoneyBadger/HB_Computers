@@ -200,6 +200,8 @@ K_PEEK          = KERNAL+$0048
 K_POKE          = KERNAL+$004B
 K_GETKEY        = KERNAL+$004E
 K_NEWLINE       = KERNAL+$0051
+K_TAPESAVE      = KERNAL+$0054
+K_TAPELOAD      = KERNAL+$0057
 
 ; The long-call table, for the language in bank one: each entry is four
 ; bytes, JSR and RTL, so a caller reaches the same routines with JSL.
@@ -231,3 +233,5 @@ L_PEEKBYTE    = KERNAL+$1F00+24*4
 L_POKEBYTE    = KERNAL+$1F00+25*4
 L_GETKEY      = KERNAL+$1F00+26*4
 L_NEWLINE     = KERNAL+$1F00+27*4
+L_TAPESAVE    = KERNAL+$1F00+28*4
+L_TAPELOAD    = KERNAL+$1F00+29*4

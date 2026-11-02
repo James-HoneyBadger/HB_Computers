@@ -44,6 +44,8 @@
         jmp POKEBYTE            ; $E04B
         jmp GETKEY              ; $E04E
         jmp NEWLINE             ; $E051
+        jmp TAPESAVE            ; $E054
+        jmp TAPELOAD            ; $E057
 
 ; ---------------------------------------------------------------------------
 ; Reset, the frame, and BREAK
@@ -1098,6 +1100,262 @@ DOS_STEP:
         RTS
 
 ; ---------------------------------------------------------------------------
+; The cassette
+;
+; A tape is a byte stream with a play head, so a block has to say where it
+; begins and where it ends:
+;
+;       $55 $55                 two sync bytes
+;       name, sixteen bytes     upper case, space padded, as the directory has it
+;       length, two bytes       how many data bytes follow, low byte first
+;       data                    the program store, exactly that many
+;       check, one byte         the exclusive-or of the data alone
+;
+; A block that is not the one wanted is skipped by its length, so a tape may
+; hold as many as it fits, in any order, and a block whose check byte does not
+; agree is passed over rather than loaded.
+; ---------------------------------------------------------------------------
+
+TAPE_SYNC       = $55
+TAPE_MORE       = $10           ; status bit: there is more to read
+TAPE_PLAY       = 1
+TAPE_RECORD     = 2
+TAPE_STOP       = 3
+TAPE_REWIND     = 4
+
+; TAPE_PUT: A = a byte, onto the tape.
+TAPE_PUT:
+        STA IO_TAPEDATA
+        RTS
+
+; TAPE_GET: A = the next byte, and carry set, or carry clear when the tape has
+; run out -- which is what a block that is not there looks like.
+TAPE_GET:
+        LDA IO_TAPESTAT
+        AND #TAPE_MORE
+        BEQ TAPE_GET_NONE
+        LDA IO_TAPEDATA
+        SEC
+        RTS
+TAPE_GET_NONE:
+        LDA #0
+        CLC
+        RTS
+
+; TAPESAVE: A = a name, as DOSSAVE takes it. The program store goes onto the
+; tape as one more block: the tape is rewound and fast-forwarded to the end
+; first, so a tape carries as many saves as it has room for, in any order.
+TAPESAVE:
+        PHP
+        REP #$20
+        STA ZP_DOSNM            ; both bytes of the pointer, as DOSSAVE takes it
+        SEP #$20
+        STZ ZP_DOSNM+2
+        REP #$10
+        JSR DOS_PROGSIZE        ; ZP_DOSLEN = the bytes, terminator and all
+        BCS TAPESAVE_ERR
+        LDA #TAPE_REWIND
+        STA IO_TAPECTRL
+        LDA #TAPE_PLAY
+        STA IO_TAPECTRL
+TAPESAVE_END:
+        JSR TAPE_GET            ; to the end of what is already on the tape
+        BCS TAPESAVE_END
+        LDA #TAPE_RECORD
+        STA IO_TAPECTRL
+        LDA #TAPE_SYNC
+        JSR TAPE_PUT
+        LDA #TAPE_SYNC
+        JSR TAPE_PUT
+        LDY #0
+TAPESAVE_NAME:
+        LDA [ZP_DOSNM],Y
+        JSR TAPE_PUT
+        INY
+        CPY.W #DOS_NAME_LEN
+        BNE TAPESAVE_NAME
+        LDA ZP_DOSLEN           ; the length, low byte first
+        JSR TAPE_PUT
+        LDA ZP_DOSLEN+1
+        JSR TAPE_PUT
+        REP #$20
+        LDA.W #PROGSTART
+        STA ZP_DOSSRC
+        SEP #$20
+        STZ ZP_DOSSRC+2
+        REP #$20
+        LDA ZP_DOSLEN
+        STA ZP_DOSLEFT
+        SEP #$20
+        LDA #0
+        STA ZP_DOSFLAG          ; the check, as the data goes by
+TAPESAVE_COPY:
+        REP #$20
+        LDA ZP_DOSLEFT
+        BEQ TAPESAVE_CHECK
+        DEC A
+        STA ZP_DOSLEFT
+        SEP #$20
+        LDA [ZP_DOSSRC]
+        PHA
+        JSR TAPE_PUT
+        PLA
+        EOR ZP_DOSFLAG
+        STA ZP_DOSFLAG
+        JSR DOS_STEP
+        BRA TAPESAVE_COPY
+TAPESAVE_CHECK:
+        SEP #$20                ; the loop left the accumulator sixteen bits wide
+        LDA ZP_DOSFLAG
+        JSR TAPE_PUT
+        LDA #TAPE_STOP
+        STA IO_TAPECTRL
+        LDA #DOS_OK
+        PLP
+        CLC
+        RTS
+TAPESAVE_ERR:
+        LDA #TAPE_STOP
+        STA IO_TAPECTRL
+        LDX #DOS_TXT_FULL
+        JSR DOS_SAY
+        LDA #DOS_FULL
+        PLP
+        SEC
+        RTS
+
+; TAPELOAD: A = a name. The tape is rewound and played, and the first block
+; whose name and check both agree becomes the program store.
+TAPELOAD:
+        PHP
+        REP #$20
+        STA ZP_DOSNM
+        SEP #$20
+        STZ ZP_DOSNM+2
+        REP #$10
+        LDA #TAPE_REWIND
+        STA IO_TAPECTRL
+        LDA #TAPE_PLAY
+        STA IO_TAPECTRL
+TAPELOAD_SYNC:
+        JSR TAPE_GET
+        BCC TAPELOAD_NONE
+        CMP #TAPE_SYNC
+        BNE TAPELOAD_SYNC
+        JSR TAPE_GET
+        BCC TAPELOAD_NONE
+        CMP #TAPE_SYNC
+        BNE TAPELOAD_SYNC
+        ; the name, compared as it arrives
+        LDA #1
+        STA ZP_DOSFLAG
+        LDY #0
+TAPELOAD_NAME:
+        JSR TAPE_GET
+        BCC TAPELOAD_NONE
+        STA ZP_SCRATCH
+        LDA [ZP_DOSNM],Y
+        CMP ZP_SCRATCH
+        BEQ TAPELOAD_NAME_SAME
+        LDA #0
+        STA ZP_DOSFLAG
+TAPELOAD_NAME_SAME:
+        INY
+        CPY.W #DOS_NAME_LEN
+        BNE TAPELOAD_NAME
+        ; how long it is
+        JSR TAPE_GET
+        BCC TAPELOAD_NONE
+        STA ZP_DOSLEN
+        JSR TAPE_GET
+        BCC TAPELOAD_NONE
+        STA ZP_DOSLEN+1
+        ; a block that would not fit in the program area is refused whole
+        REP #$20
+        LDA.W #PROGSTART
+        CLC
+        ADC ZP_DOSLEN
+        CMP.W #PROG_LIMIT
+        SEP #$20
+        BCS TAPELOAD_FULL
+        ; the data goes into the store, and the check is taken either way
+        REP #$20
+        LDA.W #PROGSTART
+        STA ZP_DOSSRC
+        SEP #$20
+        STZ ZP_DOSSRC+2
+        REP #$20
+        LDA ZP_DOSLEN
+        STA ZP_DOSLEFT
+        SEP #$20
+        LDA #0
+        STA ZP_SCRATCH2         ; the check
+TAPELOAD_COPY:
+        REP #$20
+        LDA ZP_DOSLEFT
+        BEQ TAPELOAD_CHECK
+        DEC A
+        STA ZP_DOSLEFT
+        SEP #$20
+        JSR TAPE_GET
+        BCC TAPELOAD_NONE
+        STA ZP_SCRATCH
+        LDA ZP_DOSFLAG
+        BEQ TAPELOAD_SKIP       ; another block's data goes by unread
+        LDA ZP_SCRATCH
+        STA [ZP_DOSSRC]
+        JSR DOS_STEP
+TAPELOAD_SKIP:
+        LDA ZP_SCRATCH
+        EOR ZP_SCRATCH2
+        STA ZP_SCRATCH2
+        BRA TAPELOAD_COPY
+TAPELOAD_CHECK:
+        SEP #$20                ; the loop left the accumulator sixteen bits wide
+        JSR TAPE_GET
+        BCC TAPELOAD_NONE
+        CMP ZP_SCRATCH2
+        BNE TAPELOAD_NEXT       ; a block that does not add up is passed over
+        LDA ZP_DOSFLAG
+        BEQ TAPELOAD_NEXT
+        JSR DOS_PROGSIZE        ; where the store ends, for PROG_TOP
+        BCS TAPELOAD_NONE
+        REP #$20
+        LDA.W #PROGSTART
+        CLC
+        ADC ZP_DOSLEN
+        SEC
+        SBC.W #2
+        STA.L PROG_TOP
+        SEP #$20
+        LDA #TAPE_STOP
+        STA IO_TAPECTRL
+        LDA #DOS_OK
+        PLP
+        CLC
+        RTS
+TAPELOAD_NEXT:
+        JMP TAPELOAD_SYNC
+TAPELOAD_FULL:
+        LDA #TAPE_STOP
+        STA IO_TAPECTRL
+        LDX #DOS_TXT_FULL
+        JSR DOS_SAY
+        LDA #DOS_FULL
+        PLP
+        SEC
+        RTS
+TAPELOAD_NONE:
+        LDA #TAPE_STOP
+        STA IO_TAPECTRL
+        LDX #DOS_TXT_NOFILE
+        JSR DOS_SAY
+        LDA #DOS_MISSING
+        PLP
+        SEC
+        RTS
+
+; ---------------------------------------------------------------------------
 ; The directory
 ; ---------------------------------------------------------------------------
 
@@ -1927,6 +2185,12 @@ K2_GETKEY:
         RTL
 K2_NEWLINE:
         JSR NEWLINE
+        RTL
+K2_TAPESAVE:
+        JSR TAPESAVE
+        RTL
+K2_TAPELOAD:
+        JSR TAPELOAD
         RTL
 
 ; ---------------------------------------------------------------------------

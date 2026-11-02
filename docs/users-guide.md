@@ -360,7 +360,7 @@ than its predecessor, and honest about it:
 | `CHR$(n)` / `ASC(A$)` | the character with that number, and the number of the first character |
 | `STR$(n)` / `VAL(A$)` | the digits of a number, and the number those digits begin with |
 | `PEEK(addr)` / `POKE addr,value` | one byte of bank zero: the tube, the I/O page and the program |
-| `DIM A(10)` | an array of eleven words, `A(0)` to `A(10)`; one dimension, and the `DIM` comes first |
+| `DIM A(10)` / `DIM M(2,3)` | an array of eleven words, `A(0)` to `A(10)`, or `M(i,j)` with two subscripts; the `DIM` comes first |
 | `RUN` [`n`] / `LIST` [`n`] | run the stored program, or show it from line `n` |
 | `GOTO n` | continue at line `n` |
 | `IF cond THEN …` [`ELSE` …] | one branch or the other; a line number after `THEN` jumps |
@@ -369,6 +369,7 @@ than its predecessor, and honest about it:
 | `FORMAT` / `CATALOG` | write a volume, or list what is on it |
 | `FIND "NAME"` | entry, first sector and sector count of a file on the volume |
 | `SAVE "NAME"` / `LOAD "NAME"` / `DELETE "NAME"` | the program store and Kestrel DOS 2.0 |
+| `CSAVE "NAME"` / `CLOAD "NAME"` | the program store and the cassette, as a named block |
 | `CLS` | clears the screen and prints the banner |
 | `REM` | a remark |
 | `END` | ends the line |
@@ -411,13 +412,14 @@ PRINT A$
 - **strings, in part** — `A$` holds thirty-one characters and can be assigned,
   printed, compared, joined with `+`, sliced with `LEFT$`/`RIGHT$`/`MID$`, and
   turned into characters, digits and back with `CHR$`/`ASC`/`STR$`/`VAL`;
-- **arrays, in part** — `DIM A(10)` and `A(i)` with one dimension, and whole
-  words only: no string arrays, and no `DIM A(2,3)`;
+- **arrays, in part** — `DIM A(10)` and `A(i)` with one or two subscripts, and
+  whole words only: no string arrays, and no more than two subscripts;
 - **no other functions** — no `ABS`, no `DEF FN`;
 - **a filesystem** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD`, `DELETE` and `FIND`
   all work;
-- **no cassette blocks** — the tape is a byte stream and the block format is not
-  written.
+- **the cassette, in part** — `CSAVE "NAME"` and `CLOAD "NAME"` move the
+  program store as named blocks, and a tape may hold as many as fit; nothing
+  else can be saved or loaded, and there is no way to see what a tape holds.
 
 ---
 

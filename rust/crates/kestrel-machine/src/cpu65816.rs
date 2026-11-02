@@ -709,7 +709,12 @@ impl Cpu65816 {
         self.push8(bus, self.pbr);
         self.push8(bus, (self.pc >> 8) as u8);
         self.push8(bus, self.pc as u8);
-        let pushed = if software { self.p } else { self.p | 0x20 };
+        // The pushed flag byte carries the widths the code was running with, and
+        // software interrupts set bit 4, which is the B flag on the stack and the
+        // index width everywhere else. What a hardware interrupt must not do is
+        // claim a width the code was not using: an accumulator forced to eight
+        // bits here narrowed the instruction it resumed in the middle of.
+        let pushed = if software { self.p | INDEX_8 } else { self.p };
         self.push8(bus, pushed);
         self.set_flag(IRQ_DISABLE, true);
         self.set_flag(DECIMAL, false);

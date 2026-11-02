@@ -534,7 +534,7 @@ fn a_native_interrupt_keeps_the_index_width() {
     // The pushed copy has the unused bit set and the index-width bit as it was.
     let pushed = run.ram.peek(0x01FC);
     assert_eq!(pushed & 0x10, 0x10, "bit 4 is the index width, and it survived");
-    assert_eq!(pushed & 0x20, 0x20, "and bit 5 is set, as the chip sets it");
+    assert_eq!(pushed & 0x20, 0x20, "and bit 5 is the accumulator width, as it was");
 
     // After the handler returns, the indexes are still eight bits wide.
     let mut registers = run.regs();
@@ -544,6 +544,35 @@ fn a_native_interrupt_keeps_the_index_width() {
     run.cpu.set_irq_line(false);
     run.step();
     assert_eq!(run.regs().p & INDEX_8, INDEX_8, "and RTI did not widen them");
+}
+
+/// The accumulator width has to survive an interrupt for the same reason the
+/// index width does, and it did not: a sixteen-bit loop interrupted between two
+/// of its own instructions resumed eight bits wide, so the next instruction read
+/// its operand a byte short and the machine walked off into the middle of
+/// itself. A sieve to thirty found it.
+#[test]
+fn a_native_interrupt_keeps_the_accumulator_width() {
+    let mut run = Run::new(ORIGIN, &[0xEA]); // NOP
+    run.ram.poke(0xFFEE, 0x00);
+    run.ram.poke(0xFFEF, 0x90);
+    run.set(|r| {
+        r.p = 0;
+        r.s = 0x01FF;
+    });
+    run.cpu.set_irq_line(true);
+    assert_eq!(run.step(), 8);
+    let pushed = run.ram.peek(0x01FC);
+    assert_eq!(pushed & 0x20, 0, "the accumulator was sixteen bits wide");
+
+    // And it is sixteen bits wide after the handler returns.
+    let mut registers = run.regs();
+    registers.pc = 0x9000;
+    run.cpu.set_registers(&registers);
+    run.ram.poke(0x9000, 0x40); // RTI
+    run.cpu.set_irq_line(false);
+    run.step();
+    assert_eq!(run.regs().p & 0x20, 0, "and RTI did not narrow it");
 }
 
 /// `JMP (abs,X)` reads its pointer from the program bank, not from bank zero.

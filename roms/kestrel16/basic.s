@@ -189,6 +189,12 @@ KW_DELETE_END:
 KW_FIND:
         .text "FIND"
 KW_FIND_END:
+KW_CSAVE:
+        .text "CSAVE"
+KW_CSAVE_END:
+KW_CLOAD:
+        .text "CLOAD"
+KW_CLOAD_END:
 KW_REM:
         .text "REM"
 KW_REM_END:
@@ -754,6 +760,14 @@ EXEC_TRY_LET:
         LDY.W #KW_LOAD_END - KW_LOAD
         JSR MATCHKW
         BCS DO_LOAD
+        LDX.W #(KW_CSAVE & $FFFF)
+        LDY.W #KW_CSAVE_END - KW_CSAVE
+        JSR MATCHKW
+        BCS DO_CSAVE
+        LDX.W #(KW_CLOAD & $FFFF)
+        LDY.W #KW_CLOAD_END - KW_CLOAD
+        JSR MATCHKW
+        BCS DO_CLOAD
         LDX.W #(KW_FIND & $FFFF)
         LDY.W #KW_FIND_END - KW_FIND
         JSR MATCHKW
@@ -893,6 +907,42 @@ DO_DELETE:
         JSR SAY_DELETED
         BRA EXEC_DONE
 DELETE_NONAME:
+        JSR SAY_NONAME
+        BRA EXEC_DONE
+
+; DO_CSAVE: the program store goes onto the cassette as a named block.
+DO_CSAVE:
+        JSR PARSEFN
+        BCS CSAVE_NONAME
+        REP #$20
+        LDA.W #DOSNAME
+        SEP #$20
+        JSL L_TAPESAVE
+        CMP #0
+        BNE EXEC_DONE
+        JSR SAY_SAVED
+        BRA EXEC_DONE
+CSAVE_NONAME:
+        JSR SAY_NONAME
+        BRA EXEC_DONE
+
+; DO_CLOAD: a named block on the cassette becomes the program store. The program
+; that was running is not there any more, so the line stops, as it does on LOAD.
+DO_CLOAD:
+        JSR PARSEFN
+        BCS CLOAD_NONAME
+        REP #$20
+        LDA.W #DOSNAME
+        SEP #$20
+        JSL L_TAPELOAD
+        CMP #0
+        BNE EXEC_DONE
+        LDA #3
+        STA ZP_JFLAG
+        JSR RESET_STACKS
+        JSR SAY_LOADED
+        BRA EXEC_DONE
+CLOAD_NONAME:
         JSR SAY_NONAME
         BRA EXEC_DONE
 

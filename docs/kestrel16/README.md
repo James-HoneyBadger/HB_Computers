@@ -137,6 +137,8 @@ a table at `$00:E000`, which is what a caller in bank zero uses:
 | `$E04B` | `POKEBYTE` — A = bank, X = address, Y = value |
 | `$E04E` | `GETKEY` |
 | `$E051` | `NEWLINE` |
+| `$E054` | `TAPESAVE` — A = a name; the program store goes onto the cassette as one more block |
+| `$E057` | `TAPELOAD` — A = a name; the first block of that name on the cassette becomes the program store |
 
 A `JSR` stays in the program bank on this processor, so the language in bank one
 cannot use that table. Beside it, at `$00:FF00`, is the same list again — four
@@ -195,6 +197,8 @@ THE ANSWER IS 42
 | `STR$(n)` / `VAL(A$)` | the digits of a number, and the number those digits begin with |
 | `PEEK(addr)` / `POKE addr,value` | one byte of bank zero, which is where the tube, the I/O page and the program are |
 | `FIND "NAME"` | where a file is: its directory entry, the sector it starts at, and how many it runs for |
+| `CSAVE "NAME"` | the program store onto the cassette, as one more block after what is already there |
+| `CLOAD "NAME"` | the first block of that name becomes the program store |
 | `DIM A(10)` / `DIM M(2,3)` | an array of eleven words, `A(0)` to `A(10)`, or of twelve, `M(i,j)`; one or two dimensions, and the `DIM` comes first |
 | `CLS` | Clear the screen and print the banner |
 | `REM` | A remark |
@@ -267,16 +271,17 @@ The honest list, because a manual that hides it is worse than useless:
   and no subroutines pending. A whole loop on one line, colons and all, runs;
 - **strings, in part** — a string variable holds up to thirty-one characters,
   and can be assigned, printed, compared, joined, sliced and measured;
-- **arrays, in part** — `DIM A(10)` and `A(i)`, one dimension and whole words.
-  There are no string arrays and no `DIM` of more than one subscript, and a
-  `DIM` that asks for more elements than the letter already has takes a fresh
-  run from the heap and does not give the old one back;
+- **arrays, in part** — `DIM A(10)` and `A(i)` with one or two subscripts, and
+  whole words only. There are no string arrays and no `DIM` of more than two
+  subscripts, and a `DIM` that asks for more elements than the letter already
+  has takes a fresh run from the heap and does not give the old one back;
 - **no other functions** — no `ABS`, no `DEF FN`;
 - **a filesystem** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD`, `DELETE` and `FIND`
   all work. The volume format below is fixed, so anything written against it
   keeps working;
-- **no cassette blocks** — the tape is a byte stream and the KERNAL has the
-  registers, but the block format is not written.
+- **the cassette, in part** — `CSAVE` and `CLOAD` move the program store as
+  named blocks, and a tape may hold as many as fit. There is no way to save or
+  load anything else, and no way to see what a tape holds.
 
 ---
 
@@ -360,6 +365,28 @@ only copy and `CELLOFFSET` turns them into an address. An offset kept alongside
 them drifts, and the drift shows up as text in the wrong place.
 
 [The tools page](../TOOLS.md) covers the dialect in full.
+
+
+## The cassette block format
+
+A tape is a byte stream with a play head; the blocks on it are the KERNAL's, and
+a block is all a program needs to be found again:
+
+| Offset | Bytes | What |
+| --- | --- | --- |
+| 0 | 2 | `$55` `$55`, sync: the mark a block starts at |
+| 2 | 16 | the name, upper case, space padded, as a directory entry has it |
+| 18 | 2 | the length of the data, low byte first |
+| 20 | n | the data: the program store, exactly that long |
+| 20+n | 1 | the check byte: the exclusive-or of every data byte |
+
+`CSAVE` rewinds the tape, runs it forward to the end and records a block there,
+so a tape carries as many saves as it has room for. `CLOAD` rewinds, plays, and
+takes the first block whose name matches and whose check byte adds up; a block of
+another name is skipped by its length, and a block whose check byte does not add
+up is passed over and the search goes on. A name that is not on the tape is
+`?NOT FOUND`, and a block too long for the program area is `?DISK FULL` rather
+than a store written past its end.
 
 ---
 

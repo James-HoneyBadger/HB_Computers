@@ -217,6 +217,12 @@ controller. A handler that forgot to drain the controller would leave the line
 high for ever and the machine would stop taking keys — which is why the flag is
 cleared by a write and the keys are read, not merely counted.
 
+An interrupt saves the widths the processor was running with. The flag byte it
+pushes carries the accumulator and index widths, and returning from the handler
+restores them, so a routine interrupted halfway through a sixteen-bit loop goes
+on being sixteen bits wide. A machine that narrowed them on the way in resumed
+the interrupted instruction a byte short and ran off into the middle of itself.
+
 **BREAK** is a non-maskable interrupt, and it is a warm start: the KERNAL keeps
 memory, abandons what was running, and puts the prompt back. Both KERNALs clear
 the interrupt-disable flag on the way in, so a machine that has just been
@@ -275,7 +281,20 @@ bad sector, `$82` bad command.
 
 A tape is a byte stream with a play head, which is all a tape ever was to the
 machine. The block format belongs to the KERNAL — on the Kestrel, the monitor
-ROM's `S` and `L`, with a four-byte header of load address and length.
+ROM's `S` and `L`, with a four-byte header of load address and length; on the
+Kestrel 16, `CSAVE` and `CLOAD`, with two sync bytes, the sixteen-byte name, the
+length, the data and a check byte:
+
+| Offset | Bytes | What |
+| --- | --- | --- |
+| 0 | 2 | `$55` `$55`, sync |
+| 2 | 16 | the name, upper case, space padded |
+| 18 | 2 | the data length, low byte first |
+| 20 | n | the data |
+| 20+n | 1 | the exclusive-or of the data |
+
+The device itself knows nothing of blocks: `TAPESAVE` and `TAPELOAD` are KERNAL
+services at `$00:E054` and `$00:E057`.
 
 | Tape status | Bit |
 | --- | --- |

@@ -908,6 +908,135 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
+    /// A program goes onto the tape as a named block and comes back off it on a
+    /// machine that has never seen it: two sync bytes, the name, the length, the
+    /// data and a check byte, which is the whole of the cassette format.
+    #[test]
+    fn a_1992_program_survives_the_cassette() {
+        let path = std::env::temp_dir().join("kestrel16-tape-block.tap");
+        let _ = std::fs::remove_file(&path);
+        std::fs::write(&path, Vec::new()).expect("a blank tape");
+
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_tape_image(&path).expect("a tape in the deck");
+        machine.type_line_paced("10 PRINT \"FROM THE TAPE\"");
+        machine.type_line_paced("20 PRINT 6*7");
+        machine.type_line_paced("CSAVE \"PROG\"");
+        machine.run_frames(60);
+        assert!(
+            machine.screen_text().contains("SAVED"),
+            "the machine says the tape was written:\n{}",
+            machine.screen_text()
+        );
+        machine.save_tape_image(&path).expect("the tape written back");
+
+        let image = std::fs::read(&path).expect("the tape");
+        assert_eq!(&image[0..2], &[0x55, 0x55], "the block begins with sync");
+        assert_eq!(&image[2..6], b"PROG", "then its name");
+
+        // A machine that has never seen the program, the same tape.
+        let mut again = boot(Model::Kestrel16);
+        again.mount_tape_image(&path).expect("the saved tape");
+        again.type_line_paced("NEW");
+        again.type_line_paced("CLOAD \"PROG\"");
+        again.type_line_paced("RUN");
+        again.run_frames(60);
+        let screen = again.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "FROM THE TAPE"),
+            "the program came off the tape and ran:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "42"),
+            "and ran all of it:\n{screen}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// A tape carries more than one block, in any order, and a block whose check
+    /// byte does not add up is passed over: the search goes on to the next one.
+    #[test]
+    fn a_1992_tape_holds_more_than_one_block() {
+        let path = std::env::temp_dir().join("kestrel16-tape-two.tap");
+        let _ = std::fs::remove_file(&path);
+        std::fs::write(&path, Vec::new()).expect("a blank tape");
+
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_tape_image(&path).expect("a tape in the deck");
+        machine.type_line_paced("10 PRINT 1");
+        machine.type_line_paced("CSAVE \"SAME\"");
+        machine.type_line_paced("NEW");
+        machine.type_line_paced("10 PRINT 2");
+        machine.type_line_paced("CSAVE \"SAME\"");
+        machine.run_frames(60);
+        assert!(
+            machine.screen_text().contains("SAVED"),
+            "both saves were written:\n{}",
+            machine.screen_text()
+        );
+        machine.save_tape_image(&path).expect("the tape written back");
+
+        let mut image = std::fs::read(&path).expect("the tape");
+        assert_eq!(&image[0..2], &[0x55, 0x55], "the first block begins with sync");
+        let first_len = usize::from(image[18]) | (usize::from(image[19]) << 8);
+        let second = 20 + first_len + 1;
+        assert_eq!(&image[2..6], b"SAME", "the first block's name");
+        assert_eq!(
+            &image[second..second + 2],
+            &[0x55, 0x55],
+            "the second block follows the first, sync and all"
+        );
+        assert_eq!(&image[second + 2..second + 6], b"SAME", "and has the same name");
+
+        // The first block's check byte is wrong, so the second is the one that
+        // loads.
+        image[19 + first_len] ^= 0xFF;
+        std::fs::write(&path, &image).expect("the tape with a bad check on it");
+
+        let mut again = boot(Model::Kestrel16);
+        again.mount_tape_image(&path).expect("the same tape");
+        again.type_line_paced("CLOAD \"SAME\"");
+        again.type_line_paced("RUN");
+        again.run_frames(60);
+        let screen = again.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "2"),
+            "the block that added up was loaded:\n{screen}"
+        );
+        assert!(
+            !screen.lines().any(|row| row.trim() == "1"),
+            "and the one that did not was passed over:\n{screen}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// A name that is not on the tape is refused, and a block that does not add
+    /// up is passed over rather than loaded.
+    #[test]
+    fn a_1992_tape_refuses_what_it_has_not_got() {
+        let path = std::env::temp_dir().join("kestrel16-tape-missing.tap");
+        let _ = std::fs::remove_file(&path);
+        std::fs::write(&path, Vec::new()).expect("a blank tape");
+
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_tape_image(&path).expect("a tape in the deck");
+        machine.type_line_paced("10 PRINT 1");
+        machine.type_line_paced("CSAVE \"ONE\"");
+        machine.type_line_paced("CLOAD \"TWO\"");
+        machine.run_frames(60);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.contains("SAVED"),
+            "the block was written:\n{screen}"
+        );
+        assert!(
+            screen.contains("?NOT FOUND"),
+            "and a name that is not on the tape is refused:\n{screen}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
     /// A string is thirty-one characters, an assignment that will not fit is
     /// refused and leaves the old text alone, and a number given to a string
     /// variable is named as the mistake it is.
