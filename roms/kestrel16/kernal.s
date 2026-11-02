@@ -641,15 +641,105 @@ SECTMOVE:
 ; KERNAL; until it is, a call says so rather than doing something surprising.
 ; ---------------------------------------------------------------------------
 
+; The volume format, first: sector 0 holds the signature, the name, how many
+; sectors there are and the free map. Everything else on the disk is forgotten,
+; which is what FORMAT means.
+;
+;   sector 0, offset 0   "HBDOS20" and a zero
+;   offset 8             the volume name, sixteen bytes, space padded
+;   offset 24            the sector count, low byte first
+;   offset 26            the free map: one bit per sector, a set bit is free
+;
+; A 512-byte sector and 4096 of them means the map needs 512 bytes on its own, so
+; it starts at offset 32 and runs to the end of the header.
+DOSFORMAT:
+        PHP
+        SEP #$20
+        REP #$10
+        ; The header is built in bank two, which is RAM and nobody else's.
+        LDA #2
+        STA ZP_PTR+2
+        LDA #0
+        STA ZP_PTR
+        STA ZP_PTR+1
+        LDY #0
+        LDA #0
+FMT_ZERO:
+        STA [ZP_PTR],Y
+        INY
+        CPY #512
+        BNE FMT_ZERO
+
+        ; The signature, so a later version can tell its volumes from rubbish.
+        ; The zeroing loop left Y at the end of the buffer, so start it again.
+        LDY #0
+        LDX #0
+FMT_SIG:
+        LDA FMT_SIGNATURE,X
+        STA [ZP_PTR],Y
+        INY
+        INX
+        CPX #7                  ; the signature is seven characters
+        BNE FMT_SIG
+
+        ; The name: sixteen spaces until a way to pass one exists. It starts at
+        ; offset 8 whatever the signature's length was, so say so.
+        LDY #8
+        LDX #0
+FMT_NAME:
+        LDA #32
+        STA [ZP_PTR],Y
+        INY
+        INX
+        CPX #16
+        BNE FMT_NAME
+
+        ; How many sectors the volume has: 4096, low byte first.
+        LDA #$00
+        STA [ZP_PTR],Y
+        INY
+        LDA #$10
+        STA [ZP_PTR],Y
+
+        ; Sector 0 is the header itself and the directory has not been written
+        ; yet, so a freshly formatted volume is free except for sector 0.
+        LDY #32
+        LDA #%00000001
+        STA [ZP_PTR],Y
+
+        ; Write it out, and say whether the controller agreed.
+        LDX #0
+        LDY #DISK_WRITE
+        JSR WRITESECT
+        BEQ FMT_OK
+        LDA #1
+        PLP
+        RTS
+FMT_OK:
+        LDA #0
+        PLP
+        RTS
+
+; DOSSTATUS: zero when the controller is content.
+DOSSTATUS:
+        PHP
+        SEP #$20
+        LDA IO_DISKSTAT
+        AND #DISK_ERROR
+        PLP
+        RTS
+
+; The other services are not written yet, and say so rather than guessing.
 DOSCATALOG:
 DOSFIND:
 DOSLOAD:
 DOSSAVE:
 DOSDELETE:
-DOSSTATUS:
-DOSFORMAT:
         LDA #1
         RTS
+
+FMT_SIGNATURE:
+        .text "HBDOS20"
 
 
 ; ---------------------------------------------------------------------------

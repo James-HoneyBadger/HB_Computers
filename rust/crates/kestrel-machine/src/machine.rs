@@ -476,6 +476,33 @@ mod tests {
     /// found by a second machine that mounts the same file. This runs the DOS in
     /// the ROM -- `SAVE`, `CATALOG`, `NEW`, `LOAD` -- and then boots a fresh
     /// machine from the image to prove the file outlived the first one.
+    /// The first service of Kestrel DOS 2.0: `FORMAT` writes a volume header, and
+    /// the file on the host is what says so.
+    #[test]
+    fn the_1992_machine_formats_a_volume() {
+        let path = std::env::temp_dir().join("kestrel-dos2-format.dsk");
+        std::fs::write(&path, vec![0u8; 4096 * 512]).expect("a blank volume");
+
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_disk_image(&path).expect("a disk in the drive");
+        machine.type_line_paced("FORMAT");
+        machine.run_frames(40);
+        machine.save_disk_image(&path).expect("the volume written back");
+
+        let image = std::fs::read(&path).expect("the volume");
+        assert_eq!(&image[0..7], b"HBDOS20", "the signature a version can recognise");
+        assert_eq!(image[7], 0, "and the zero that ends it");
+        assert_eq!(&image[8..24], &[32u8; 16], "a name of spaces, for now");
+        assert_eq!(
+            u16::from(image[24]) | (u16::from(image[25]) << 8),
+            4096,
+            "the sector count, low byte first"
+        );
+        assert_eq!(image[32] & 1, 1, "sector zero is the header, and it is taken");
+        assert_eq!(image[33], 0, "everything else is free");
+        let _ = std::fs::remove_file(&path);
+    }
+
     #[test]
     fn a_saved_program_outlives_the_machine_that_saved_it() {
         let path = std::env::temp_dir().join("kestrel-dos-round-trip.dsk");
