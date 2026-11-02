@@ -791,6 +791,66 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
+    /// The allocator walks the free map a sector at a time, and the map routine
+    /// hands back the *bit's* number in X rather than the sector's. A walk that
+    /// counted in X lost its place at sector eight, where the bit is nought
+    /// again: the seventh file found no room on a volume with two megabytes
+    /// free, and the ones after it were written over the volume header. Seven
+    /// one-sector files take the volume past that boundary.
+    #[test]
+    fn a_1992_volume_fills_past_its_first_page() {
+        let path = std::env::temp_dir().join("kestrel16-dos-fill.dsk");
+        std::fs::write(&path, vec![0u8; 4096 * 512]).expect("a blank volume");
+
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_disk_image(&path).expect("a disk in the drive");
+        machine.type_line_paced("FORMAT");
+        let names = ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG"];
+        for name in names {
+            machine.type_line_paced(&format!("10 PRINT \"{name}\""));
+            machine.type_line_paced(&format!("SAVE \"{name}\""));
+            machine.type_line_paced("NEW");
+        }
+        machine.run_frames(80);
+        machine.save_disk_image(&path).expect("the volume written back");
+
+        let image = std::fs::read(&path).expect("the volume");
+        let entries: Vec<(String, u16, u16)> = (0..names.len())
+            .map(|entry| {
+                let at = 512 + entry * 32;
+                let name = String::from_utf8_lossy(&image[at..at + 16]).trim_end().to_string();
+                let first = u16::from(image[at + 16]) | (u16::from(image[at + 17]) << 8);
+                let count = u16::from(image[at + 18]) | (u16::from(image[at + 19]) << 8);
+                (name, first, count)
+            })
+            .collect();
+        let wanted: Vec<(String, u16, u16)> = names
+            .iter()
+            .enumerate()
+            .map(|(index, name)| (name.to_string(), 2 + index as u16, 1))
+            .collect();
+        assert_eq!(
+            entries, wanted,
+            "each file gets the next free sector, past the volume's first page"
+        );
+        assert_eq!(
+            &image[32..34],
+            &[0b1111_1111, 0b0000_0001],
+            "and the map says the nine sectors they hold are taken"
+        );
+
+        // the last file loads and runs, so the sector it names is its own
+        machine.type_line_paced("LOAD \"GGG\"");
+        machine.type_line_paced("RUN");
+        machine.run_frames(40);
+        assert!(
+            machine.screen_text().lines().any(|row| row.trim() == "GGG"),
+            "the file at sector eight came back and ran:\n{}",
+            machine.screen_text()
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
     /// The filesystem walks the program store a byte at a time, and a program
     /// bigger than a sector makes that walk pass a page boundary -- where an
     /// eight-bit `INC` on the pointer starts the page again, so the save wrote
@@ -855,8 +915,9 @@ mod tests {
                 registers.d = 0;
                 registers.emulation = false;
                 // eight-bit accumulator, sixteen-bit index registers: the state
-                // the KERNAL's jump table expects a caller to be in
-                registers.p = 0x30;
+                // the KERNAL's jump table expects a caller to be in, and the
+                // state the language itself calls in (SEP #$20, X left wide)
+                registers.p = 0x20;
                 registers.s = 0x01F3;
                 cpu.set_registers(&registers);
             }

@@ -878,6 +878,14 @@ FOR_SKIP_REMARK:
         JSR SRC_STEP
         BRA FOR_SKIP_REMARK
 FOR_SKIP_NEXTLINE:
+        ; A FOR typed at the prompt has no next line to walk into: past the
+        ; prompt's terminator is the line buffer, not a program. The prompt holds
+        ; a loop only as far as the end of the line it is typed on.
+        REP #$20
+        LDA ZP_LINE
+        CMP.W #$FFFF
+        SEP #$20
+        BEQ FOR_SKIP_NONEXT
         REP #$20
         LDA ZP_SRC
         INC A                   ; past the terminator: the next record's number

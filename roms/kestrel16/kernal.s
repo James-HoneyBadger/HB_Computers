@@ -30,7 +30,7 @@
         jmp CURSORON            ; $E021
         jmp DOSCATALOG          ; $E024
         jmp DOSFIND             ; $E027
-        jmp DOSLOAD            ; $E02A
+        jmp DOSLOAD             ; $E02A
         jmp DOSSAVE             ; $E02D
         jmp DOSDELETE           ; $E030
         jmp DOSSTATUS           ; $E033
@@ -971,6 +971,8 @@ DOS_MAPFREE:
 ; pieces than a volume needs.
 DOS_ALLOCRUN:
         REP #$20
+        LDA ZP_DOSCOUNT
+        BEQ ALLOC_FULL          ; nothing wanted is nothing to find
         LDA.W #DOS_FIRST_DATA
         STA ZP_DOSSCAN
 ALLOC_TRY:
@@ -987,12 +989,26 @@ ALLOC_TRY:
         BCS ALLOC_FULL
         LDA ZP_DOSCOUNT
         STA ZP_DOSLEFT
-        LDX ZP_DOSSCAN
         SEP #$20
 ALLOC_SCAN:
+        ; Which sector is under the head is worked out afresh every pass, from
+        ; the sector the run starts at and how much of the run is left. `X` cannot
+        ; hold it: DOS_MAPTEST comes back with X holding the *bit's* number, as
+        ; its own contract says, so a walk that counted in X lost its place at the
+        ; first sector whose bit was not the same number as the sector -- sector
+        ; eight, where the bit is nought again. The scan then tested sectors one
+        ; onwards, and a save of anything past the first page of the volume found
+        ; no room at all, or found room that belonged to a file already there.
+        REP #$20
+        LDA ZP_DOSCOUNT
+        SEC
+        SBC ZP_DOSLEFT
+        CLC
+        ADC ZP_DOSSCAN
+        TAX
+        SEP #$20
         JSR DOS_MAPTEST
         BCC ALLOC_NEXT
-        INX
         REP #$20
         LDA ZP_DOSLEFT
         DEC A
@@ -1008,12 +1024,10 @@ ALLOC_NEXT:
         SEP #$20
         BRA ALLOC_TRY
 ALLOC_FOUND:
-        ; X is one past the run: walk it from the bottom and mark it taken
-        TXA
-        SEC
-        SBC ZP_DOSCOUNT
+        ; the run begins where this try began, and every sector in it is free
+        REP #$20
+        LDA ZP_DOSSCAN
         STA ZP_DOSFIRST
-        STA ZP_DOSSCAN
         LDA ZP_DOSCOUNT
         STA ZP_DOSLEFT
         SEP #$20

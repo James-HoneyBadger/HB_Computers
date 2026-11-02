@@ -119,7 +119,13 @@ a table at `$00:E000`, which is what a caller in bank zero uses:
 | `$E01B` | `READSECT` — X = sector, buffer at `$10` |
 | `$E01E` | `WRITESECT` |
 | `$E021` | `CURSORON` |
-| `$E024`–`$E036` | The Kestrel DOS 2.0 entry points |
+| `$E024` | `DOSCATALOG` — the volume's name, and a line for each file |
+| `$E027` | `DOSFIND` — A = a name (see below); X = its entry, `$69`/`$6A` = its first sector, carry set when the volume has no such name |
+| `$E02A` | `DOSLOAD` — A = a name; the program store becomes that file |
+| `$E02D` | `DOSSAVE` — A = a name; the program store becomes that file |
+| `$E030` | `DOSDELETE` — A = a name; its sectors go back to the free map |
+| `$E033` | `DOSSTATUS` — `0` when the disk controller is content |
+| `$E036` | `DOSFORMAT` — write a new volume over whatever is on the disk |
 | `$E039` | `SETINK` |
 | `$E03C` | `SETPAPER` |
 | `$E03F` | `SOUND` |
@@ -134,6 +140,13 @@ A `JSR` stays in the program bank on this processor, so the language in bank one
 cannot use that table. Beside it, at `$00:FF00`, is the same list again — four
 bytes an entry, `JSR` and `RTL` — and a caller in another bank reaches it with
 `JSL`. Both tables exist because the processor makes them necessary.
+
+The four services that take a name take it the same way: A is a sixteen-bit
+pointer to sixteen bytes in bank zero, upper case and padded with spaces, which
+is what a directory entry is. They return a status in A — `0` for what was asked
+for, `1` for a name that is not on the volume, `2` for a controller that would
+not, `3` for a volume with no room — and carry is set when that status is not
+zero.
 
 ### The frame
 
@@ -282,6 +295,11 @@ Sector 1 is the directory: sixteen entries of thirty-two bytes.
 `FORMAT` writes both sectors, so a freshly formatted volume is a header naming
 itself and sixteen free entries. `CATALOG` reads the header back and prints the
 volume name between brackets.
+
+A file is a run of consecutive sectors, never a chain, so a save takes the lowest
+run on the map that is long enough for it and writes the whole file in order. A
+volume that has had files deleted therefore fills its holes before it grows, and
+a file that will not fit in any hole is refused rather than split.
 
 ## Writing for the machine
 
