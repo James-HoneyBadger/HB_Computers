@@ -1,0 +1,806 @@
+E000                KERNAL          = $00E000
+E000                KERNAL_SIZE     = $2000
+E000                BASIC           = $010000
+E000                BASIC_SIZE      = $10000
+E000                BANK_BASIC      = $01
+E000                BANK_KERNAL     = $00
+E000                ZP              = $000000
+E000                STACK           = $000100
+E000                INBUF           = $000400
+E000                KEYBUF          = $000300
+E000                KEYBUF_SIZE     = 32
+E000                LINEBUF         = $000500
+E000                PROGSTART       = $000800
+E000                RAMTOP          = $007F00
+E000                SCREEN          = $008000
+E000                ATTRS           = $008FA0
+E000                COLUMNS         = 80
+E000                ROWS            = 50
+E000                CELLS           = 4000
+E000                IO              = $00A000
+E000                IO_KBDDATA      = IO+$00
+E000                IO_KBDSTAT      = IO+$01
+E000                IO_KBDCLEAR     = IO+$02
+E000                IO_CURCOL       = IO+$03
+E000                IO_CURROW       = IO+$04
+E000                IO_INK          = IO+$05
+E000                IO_PAPER        = IO+$06
+E000                IO_BORDER       = IO+$07
+E000                IO_SOUND        = IO+$08
+E000                IO_FRAMELO      = IO+$09
+E000                IO_FRAMEHI      = IO+$0A
+E000                IO_FRAMEFLAG    = IO+$0B
+E000                IO_SECTORLO     = IO+$0C
+E000                IO_SECTORHI     = IO+$0D
+E000                IO_DISKCMD      = IO+$0E
+E000                IO_DISKSTAT     = IO+$0F
+E000                IO_ADDRLO       = IO+$10
+E000                IO_ADDRHI       = IO+$11
+E000                IO_ADDRBANK     = IO+$12
+E000                IO_COUNTLO      = IO+$13
+E000                IO_COUNTHI      = IO+$14
+E000                IO_RANDOM       = IO+$15
+E000                IO_LASTKEY      = IO+$16
+E000                IO_SCROLLED     = IO+$17
+E000                IO_CURSOR       = IO+$18
+E000                IO_TAPEDATA     = IO+$19
+E000                IO_TAPESTAT     = IO+$1A
+E000                IO_TAPECTRL     = IO+$1B
+E000                DISK_READ       = 1
+E000                DISK_WRITE      = 2
+E000                DISK_FORMAT     = 3
+E000                DISK_QUERY      = 4
+E000                DISK_BUSY       = $01
+E000                DISK_ERROR      = $02
+E000                DISK_PRESENT    = $04
+E000                DISK_DONE       = $80
+E000                TAPE_PLAY       = 1
+E000                TAPE_RECORD     = 2
+E000                TAPE_STOP       = 3
+E000                TAPE_REWIND     = 4
+E000                BLACK           = $0
+E000                BLUE            = $1
+E000                RED             = $2
+E000                MAGENTA         = $3
+E000                GREEN           = $4
+E000                CYAN            = $5
+E000                YELLOW          = $6
+E000                LIGHTGREY       = $7
+E000                DARKGREY        = $8
+E000                LIGHTBLUE       = $9
+E000                LIGHTRED        = $A
+E000                LIGHTMAGENTA    = $B
+E000                LIGHTGREEN      = $C
+E000                LIGHTCYAN       = $D
+E000                LIGHTYELLOW     = $E
+E000                WHITE           = $F
+E000                KEY_RETURN      = 13
+E000                KEY_DELETE      = 8
+E000                KEY_ESCAPE      = 27
+E000                KEY_LEFT        = $9D
+E000                KEY_RIGHT       = $1D
+E000                ZP_PTR          = $10           ; a 24-bit pointer, low byte first
+E000                ZP_PTR2         = $13
+E000                ZP_COL          = $16
+E000                ZP_ROW          = $17
+E000                ZP_OFFSET       = $18           ; 16-bit: row * 80 + column
+E000                ZP_INLEN        = $1A           ; 16-bit
+E000                ZP_TMP          = $1C           ; 16-bit
+E000                ZP_TMP2         = $1E           ; 16-bit
+E000                ZP_IRQCNT       = $20
+E000                ZP_KBHEAD       = $21
+E000                ZP_KBTAIL       = $22
+E000                ZP_KBCOUNT      = $23
+E000                ZP_BLINK        = $24
+E000                ZP_CHAR         = $25
+E000                ZP_SCRATCH      = $26
+E000                ZP_SCRATCH2     = $27
+E000                ZP_SCRATCH3     = $28
+E000                ZP_MUL1         = $29           ; 16-bit scratch, for the cursor arithmetic
+E000                ZP_MUL2         = $2B
+E000                K_CHROUT        = KERNAL+$0000
+E000                K_GETIN         = KERNAL+$0003
+E000                K_CHRIN         = KERNAL+$0006
+E000                K_CLS           = KERNAL+$0009
+E000                K_HOME          = KERNAL+$000C
+E000                K_PRINT         = KERNAL+$000F
+E000                K_SCROLL        = KERNAL+$0012
+E000                K_LOCATE        = KERNAL+$0015
+E000                K_GETLINE       = KERNAL+$0018
+E000                K_READSECT      = KERNAL+$001B
+E000                K_WRITESECT     = KERNAL+$001E
+E000                K_CURSORON      = KERNAL+$0021
+E000                K_DOSCATALOG    = KERNAL+$0024
+E000                K_DOSFIND       = KERNAL+$0027
+E000                K_DOSLOAD       = KERNAL+$002A
+E000                K_DOSSAVE       = KERNAL+$002D
+E000                K_DOSDELETE     = KERNAL+$0030
+E000                K_DOSSTATUS     = KERNAL+$0033
+E000                K_DOSFORMAT     = KERNAL+$0036
+E000                K_SETINK        = KERNAL+$0039
+E000                K_SETPAPER      = KERNAL+$003C
+E000                K_SOUND         = KERNAL+$003F
+E000                K_FRAMES        = KERNAL+$0042
+E000                K_MEMTOP        = KERNAL+$0045
+E000                K_PEEK          = KERNAL+$0048
+E000                K_POKE          = KERNAL+$004B
+E000                K_GETKEY        = KERNAL+$004E
+E000                K_NEWLINE       = KERNAL+$0051
+E000                L_CHROUT      = KERNAL+$1F00+0*4
+E000                L_GETIN       = KERNAL+$1F00+1*4
+E000                L_CHRIN       = KERNAL+$1F00+2*4
+E000                L_CLS         = KERNAL+$1F00+3*4
+E000                L_HOME        = KERNAL+$1F00+4*4
+E000                L_PRINT       = KERNAL+$1F00+5*4
+E000                L_SCROLL      = KERNAL+$1F00+6*4
+E000                L_LOCATE      = KERNAL+$1F00+7*4
+E000                L_GETLINE     = KERNAL+$1F00+8*4
+E000                L_READSECT    = KERNAL+$1F00+9*4
+E000                L_WRITESECT   = KERNAL+$1F00+10*4
+E000                L_CURSORON    = KERNAL+$1F00+11*4
+E000                L_DOSCATALOG  = KERNAL+$1F00+12*4
+E000                L_DOSFIND     = KERNAL+$1F00+13*4
+E000                L_DOSLOAD     = KERNAL+$1F00+14*4
+E000                L_DOSSAVE     = KERNAL+$1F00+15*4
+E000                L_DOSDELETE   = KERNAL+$1F00+16*4
+E000                L_DOSSTATUS   = KERNAL+$1F00+17*4
+E000                L_DOSFORMAT   = KERNAL+$1F00+18*4
+E000                L_SETINK      = KERNAL+$1F00+19*4
+E000                L_SETPAPER    = KERNAL+$1F00+20*4
+E000                L_SOUND       = KERNAL+$1F00+21*4
+E000                L_FRAMES      = KERNAL+$1F00+22*4
+E000                L_MEMTOP      = KERNAL+$1F00+23*4
+E000                L_PEEKBYTE    = KERNAL+$1F00+24*4
+E000                L_POKEBYTE    = KERNAL+$1F00+25*4
+E000                L_GETKEY      = KERNAL+$1F00+26*4
+E000                L_NEWLINE     = KERNAL+$1F00+27*4
+E000                        .org KERNAL
+E000  4C 79 E1              jmp CHROUT              ; $E000
+E003  4C 45 E1              jmp GETIN               ; $E003
+E006  4C 6A E1              jmp CHRIN               ; $E006
+E009  4C 82 E2              jmp CLS                 ; $E009
+E00C  4C B0 E2              jmp HOME                ; $E00C
+E00F  4C D2 E2              jmp PRINT               ; $E00F
+E012  4C 36 E2              jmp SCROLL              ; $E012
+E015  4C C1 E2              jmp LOCATE              ; $E015
+E018  4C 49 E3              jmp GETLINE             ; $E018
+E01B  4C 98 E3              jmp READSECT            ; $E01B
+E01E  4C 9D E3              jmp WRITESECT           ; $E01E
+E021  4C EA E2              jmp CURSORON            ; $E021
+E024  4C D2 E3              jmp DOSCATALOG          ; $E024
+E027  4C D2 E3              jmp DOSFIND             ; $E027
+E02A  4C D2 E3              jmp DOSLOAD            ; $E02A
+E02D  4C D2 E3              jmp DOSSAVE             ; $E02D
+E030  4C D2 E3              jmp DOSDELETE           ; $E030
+E033  4C D2 E3              jmp DOSSTATUS           ; $E033
+E036  4C D2 E3              jmp DOSFORMAT           ; $E036
+E039  4C F2 E2              jmp SETINK              ; $E039
+E03C  4C FA E2              jmp SETPAPER            ; $E03C
+E03F  4C 02 E3              jmp SOUND               ; $E03F
+E042  4C 0A E3              jmp FRAMES              ; $E042
+E045  4C 1C E3              jmp MEMTOP              ; $E045
+E048  4C 24 E3              jmp PEEKBYTE            ; $E048
+E04B  4C 36 E3              jmp POKEBYTE            ; $E04B
+E04E  4C 76 E1              jmp GETKEY              ; $E04E
+E051  4C E8 E1              jmp NEWLINE             ; $E051
+E054  FF FF FF FF FF FF FF FF FF FF FF FF           .org KERNAL+$60
+E060                RESET:
+E060  78                    SEI
+E061  D8                    CLD
+E062  A2 FF                 LDX.B #$FF              ; emulation mode: the stack pointer is a byte
+E064  9A                    TXS
+E065  18                    CLC
+E066  FB                    XCE                     ; native mode: the machine is a 65816
+E067  C2 30                 REP #$30
+E069  A2 FF 01              LDX.W #$01FF
+E06C  9A                    TXS
+E06D  A9 00 00              LDA.W #0
+E070  5B                    TCD                     ; direct page at zero
+E071  E2 20                 SEP #$20                ; characters are bytes, addresses are words
+E073  A9 00                 LDA #0
+E075  48                    PHA
+E076  AB                    PLB                     ; data bank zero
+E077  C2 10                 REP #$10                ; sixteen-bit index registers from here on
+E079  A9 00                 LDA #0
+E07B  85 16                 STA ZP_COL
+E07D  85 17                 STA ZP_ROW
+E07F  85 1A                 STA ZP_INLEN
+E081  85 1B                 STA ZP_INLEN+1
+E083  85 21                 STA ZP_KBHEAD
+E085  85 22                 STA ZP_KBTAIL
+E087  85 23                 STA ZP_KBCOUNT
+E089  85 20                 STA ZP_IRQCNT
+E08B  85 24                 STA ZP_BLINK
+E08D  85 18                 STA ZP_OFFSET
+E08F  85 19                 STA ZP_OFFSET+1
+E091  8D 18 A0              STA IO_CURSOR
+E094  8D 0B A0              STA IO_FRAMEFLAG
+E097  A9 09                 LDA #LIGHTBLUE
+E099  8D 07 A0              STA IO_BORDER
+E09C  A9 07                 LDA #LIGHTGREY
+E09E  8D 05 A0              STA IO_INK
+E0A1  A9 00                 LDA #BLACK
+E0A3  8D 06 A0              STA IO_PAPER
+E0A6  20 82 E2              JSR CLS
+E0A9  58                    CLI
+E0AA  20 B1 E0              JSR BANNER
+E0AD  5C 00 00 01           JML BASIC
+E0B1                BANNER:
+E0B1  A9 C7                 LDA #<BANNER_TEXT
+E0B3  85 10                 STA ZP_PTR
+E0B5  A9 E0                 LDA #>BANNER_TEXT
+E0B7  85 11                 STA ZP_PTR+1
+E0B9  A9 00                 LDA #BANK_KERNAL
+E0BB  85 12                 STA ZP_PTR+2
+E0BD  A2 10 00              LDX #BANNER_LENGTH
+E0C0  20 D2 E2              JSR PRINT
+E0C3  20 E8 E1              JSR NEWLINE
+E0C6  60                    RTS
+E0C7                BANNER_TEXT:
+E0C7  4B 65 73 74 72 65 6C 20 31 36 20 20 31 39 39 32           .text "Kestrel 16  1992"
+E0D7                BANNER_END:
+E0D7                BANNER_LENGTH = BANNER_END - BANNER_TEXT
+E0D7                IRQ:
+E0D7  08                    PHP
+E0D8  E2 20                 SEP #$20
+E0DA  48                    PHA
+E0DB  DA                    PHX
+E0DC  5A                    PHY
+E0DD  AD 0B A0              LDA IO_FRAMEFLAG
+E0E0  F0 1F                 BEQ IRQ_KEYS
+E0E2  A9 00                 LDA #0
+E0E4  8D 0B A0              STA IO_FRAMEFLAG
+E0E7  A5 16                 LDA ZP_COL
+E0E9  8D 03 A0              STA IO_CURCOL
+E0EC  A5 17                 LDA ZP_ROW
+E0EE  8D 04 A0              STA IO_CURROW
+E0F1  E6 20                 INC ZP_IRQCNT
+E0F3  A5 20                 LDA ZP_IRQCNT
+E0F5  29 1F                 AND #31
+E0F7  D0 08                 BNE IRQ_KEYS
+E0F9  AD 18 A0              LDA IO_CURSOR
+E0FC  49 80                 EOR #$80
+E0FE  8D 18 A0              STA IO_CURSOR
+E101                IRQ_KEYS:
+E101  AD 01 A0              LDA IO_KBDSTAT
+E104  10 08                 BPL IRQ_DONE
+E106  AD 00 A0              LDA IO_KBDDATA
+E109  20 22 E1              JSR KBPUSH
+E10C  80 F3                 BRA IRQ_KEYS
+E10E                IRQ_DONE:
+E10E  7A                    PLY
+E10F  FA                    PLX
+E110  68                    PLA
+E111  28                    PLP
+E112  40                    RTI
+E113                NMI:
+E113  58                    CLI                     ; interrupts were masked on the way in; the machine
+E114  20 E8 E1              JSR NEWLINE             ; needs them back to see its keyboard
+E117  5C 00 00 01           JML BASIC
+E11B                BRK_HANDLER:
+E11B  20 E8 E1              JSR NEWLINE
+E11E  5C 00 00 01           JML BASIC
+E122                KBPUSH:
+E122  08                    PHP
+E123  E2 20                 SEP #$20
+E125  85 25                 STA ZP_CHAR
+E127  C2 10                 REP #$10
+E129  A5 23                 LDA ZP_KBCOUNT
+E12B  C9 20                 CMP #KEYBUF_SIZE
+E12D  B0 14                 BCS KBPUSH_DONE
+E12F  A2 00 00              LDX.W #0
+E132  A5 21                 LDA ZP_KBHEAD
+E134  AA                    TAX
+E135  A5 25                 LDA ZP_CHAR
+E137  9D 00 03              STA KEYBUF,X
+E13A  A5 21                 LDA ZP_KBHEAD
+E13C  1A                    INC A
+E13D  29 1F                 AND #(KEYBUF_SIZE-1)
+E13F  85 21                 STA ZP_KBHEAD
+E141  E6 23                 INC ZP_KBCOUNT
+E143                KBPUSH_DONE:
+E143  28                    PLP
+E144  60                    RTS
+E145                GETIN:
+E145  08                    PHP
+E146  E2 20                 SEP #$20
+E148  C2 10                 REP #$10
+E14A  A5 23                 LDA ZP_KBCOUNT
+E14C  F0 18                 BEQ GETIN_NONE
+E14E  A2 00 00              LDX.W #0
+E151  A5 22                 LDA ZP_KBTAIL
+E153  AA                    TAX
+E154  BD 00 03              LDA KEYBUF,X
+E157  85 25                 STA ZP_CHAR
+E159  A5 22                 LDA ZP_KBTAIL
+E15B  1A                    INC A
+E15C  29 1F                 AND #(KEYBUF_SIZE-1)
+E15E  85 22                 STA ZP_KBTAIL
+E160  C6 23                 DEC ZP_KBCOUNT
+E162  A5 25                 LDA ZP_CHAR
+E164  80 02                 BRA GETIN_DONE
+E166                GETIN_NONE:
+E166  A9 00                 LDA #0
+E168                GETIN_DONE:
+E168  28                    PLP
+E169  60                    RTS
+E16A                CHRIN:
+E16A  08                    PHP
+E16B  E2 20                 SEP #$20
+E16D                CHRIN_LOOP:
+E16D  20 45 E1              JSR GETIN
+E170  C9 00                 CMP #0
+E172  F0 F9                 BEQ CHRIN_LOOP
+E174  28                    PLP
+E175  60                    RTS
+E176                GETKEY:
+E176  4C 6A E1              JMP CHRIN
+E179                CHROUT:
+E179  08                    PHP
+E17A  E2 20                 SEP #$20
+E17C  C2 10                 REP #$10
+E17E  C9 0D                 CMP #KEY_RETURN
+E180  F0 0D                 BEQ CHROUT_NEWLINE
+E182  C9 08                 CMP #KEY_DELETE
+E184  F0 0E                 BEQ CHROUT_BACK
+E186  C9 20                 CMP #32
+E188  90 0D                 BCC CHROUT_DONE
+E18A  20 99 E1              JSR PUTCHAR
+E18D  80 08                 BRA CHROUT_DONE
+E18F                CHROUT_NEWLINE:
+E18F  20 E8 E1              JSR NEWLINE
+E192  80 03                 BRA CHROUT_DONE
+E194                CHROUT_BACK:
+E194  20 C6 E1              JSR BACKSPACE
+E197                CHROUT_DONE:
+E197  28                    PLP
+E198  60                    RTS
+E199                PUTCHAR:
+E199  08                    PHP
+E19A  E2 20                 SEP #$20
+E19C  C2 10                 REP #$10
+E19E  DA                    PHX
+E19F  5A                    PHY
+E1A0  85 25                 STA ZP_CHAR
+E1A2  20 06 E2              JSR CELLOFFSET
+E1A5  A5 25                 LDA ZP_CHAR
+E1A7  9D 00 80              STA SCREEN,X
+E1AA  AD 05 A0              LDA IO_INK
+E1AD  0A                    ASL A
+E1AE  0A                    ASL A
+E1AF  0A                    ASL A
+E1B0  0A                    ASL A
+E1B1  0D 06 A0              ORA IO_PAPER
+E1B4  9D A0 8F              STA ATTRS,X
+E1B7  E6 16                 INC ZP_COL
+E1B9  A5 16                 LDA ZP_COL
+E1BB  C9 50                 CMP #COLUMNS
+E1BD  90 03                 BCC PUTCHAR_DONE
+E1BF  20 E8 E1              JSR NEWLINE
+E1C2                PUTCHAR_DONE:
+E1C2  7A                    PLY
+E1C3  FA                    PLX
+E1C4  28                    PLP
+E1C5  60                    RTS
+E1C6                BACKSPACE:
+E1C6  08                    PHP
+E1C7  E2 20                 SEP #$20
+E1C9  C2 10                 REP #$10
+E1CB  A5 16                 LDA ZP_COL
+E1CD  F0 17                 BEQ BACKSPACE_DONE
+E1CF  C6 16                 DEC ZP_COL
+E1D1  20 06 E2              JSR CELLOFFSET
+E1D4  A9 20                 LDA #32
+E1D6  9D 00 80              STA SCREEN,X
+E1D9  AD 05 A0              LDA IO_INK
+E1DC  0A                    ASL A
+E1DD  0A                    ASL A
+E1DE  0A                    ASL A
+E1DF  0A                    ASL A
+E1E0  0D 06 A0              ORA IO_PAPER
+E1E3  9D A0 8F              STA ATTRS,X
+E1E6                BACKSPACE_DONE:
+E1E6  28                    PLP
+E1E7  60                    RTS
+E1E8                NEWLINE:
+E1E8  08                    PHP
+E1E9  E2 20                 SEP #$20
+E1EB  C2 10                 REP #$10
+E1ED  85 25                 STA ZP_CHAR
+E1EF  A9 00                 LDA #0
+E1F1  85 16                 STA ZP_COL
+E1F3  E6 17                 INC ZP_ROW
+E1F5  A5 17                 LDA ZP_ROW
+E1F7  C9 32                 CMP #ROWS
+E1F9  90 07                 BCC NEWLINE_ROW_OK
+E1FB  20 36 E2              JSR SCROLL
+E1FE  A9 31                 LDA #ROWS-1
+E200  85 17                 STA ZP_ROW
+E202                NEWLINE_ROW_OK:
+E202  A5 25                 LDA ZP_CHAR
+E204  28                    PLP
+E205  60                    RTS
+E206                CELLOFFSET:
+E206  08                    PHP
+E207  E2 20                 SEP #$20
+E209  C2 20                 REP #$20
+E20B  A5 17                 LDA ZP_ROW
+E20D  29 FF 00              AND.W #$00FF
+E210  85 29                 STA ZP_MUL1
+E212  0A                    ASL A
+E213  0A                    ASL A
+E214  0A                    ASL A
+E215  0A                    ASL A
+E216  85 2B                 STA ZP_MUL2
+E218  A5 29                 LDA ZP_MUL1
+E21A  0A                    ASL A
+E21B  0A                    ASL A
+E21C  0A                    ASL A
+E21D  0A                    ASL A
+E21E  0A                    ASL A
+E21F  0A                    ASL A
+E220  18                    CLC
+E221  65 2B                 ADC ZP_MUL2             ; row * 80
+E223  85 29                 STA ZP_MUL1
+E225  E2 20                 SEP #$20
+E227  A5 16                 LDA ZP_COL
+E229  C2 20                 REP #$20
+E22B  29 FF 00              AND.W #$00FF
+E22E  18                    CLC
+E22F  65 29                 ADC ZP_MUL1
+E231  AA                    TAX
+E232  E2 20                 SEP #$20
+E234  28                    PLP
+E235  60                    RTS
+E236                SCROLL:
+E236  08                    PHP
+E237  E2 20                 SEP #$20
+E239  C2 30                 REP #$30
+E23B  A9 4F 0F              LDA.W #((ROWS-1)*COLUMNS-1)
+E23E  A2 50 80              LDX.W #(SCREEN+COLUMNS)
+E241  A0 00 80              LDY.W #SCREEN
+E244  54 00 00              MVN $00,$00
+E247  A9 4F 0F              LDA.W #((ROWS-1)*COLUMNS-1)
+E24A  A2 F0 8F              LDX.W #(ATTRS+COLUMNS)
+E24D  A0 A0 8F              LDY.W #ATTRS
+E250  54 00 00              MVN $00,$00
+E253  E2 20                 SEP #$20
+E255  AD 05 A0              LDA IO_INK
+E258  0A                    ASL A
+E259  0A                    ASL A
+E25A  0A                    ASL A
+E25B  0A                    ASL A
+E25C  0D 06 A0              ORA IO_PAPER
+E25F  A2 50 0F              LDX.W #((ROWS-1)*COLUMNS)
+E262                SCROLL_ATTRS:
+E262  9D A0 8F              STA ATTRS,X
+E265  E8                    INX
+E266  E0 A0 0F              CPX #CELLS
+E269  90 F7                 BCC SCROLL_ATTRS
+E26B  A9 20                 LDA #32
+E26D  A2 50 0F              LDX.W #((ROWS-1)*COLUMNS)
+E270                SCROLL_SPACES:
+E270  9D 00 80              STA SCREEN,X
+E273  E8                    INX
+E274  E0 A0 0F              CPX #CELLS
+E277  90 F7                 BCC SCROLL_SPACES
+E279  A9 80                 LDA #$80
+E27B  8D 17 A0              STA IO_SCROLLED
+E27E  E2 30                 SEP #$30
+E280  28                    PLP
+E281  60                    RTS
+E282                CLS:
+E282  08                    PHP
+E283  E2 20                 SEP #$20
+E285  C2 10                 REP #$10
+E287  A9 20                 LDA #32
+E289  A2 00 00              LDX.W #0
+E28C                CLS_SPACES:
+E28C  9D 00 80              STA SCREEN,X
+E28F  E8                    INX
+E290  E0 A0 0F              CPX.W #CELLS
+E293  90 F7                 BCC CLS_SPACES
+E295  AD 05 A0              LDA IO_INK
+E298  0A                    ASL A
+E299  0A                    ASL A
+E29A  0A                    ASL A
+E29B  0A                    ASL A
+E29C  0D 06 A0              ORA IO_PAPER
+E29F  A2 00 00              LDX.W #0
+E2A2                CLS_ATTRS:
+E2A2  9D A0 8F              STA ATTRS,X
+E2A5  E8                    INX
+E2A6  E0 A0 0F              CPX.W #CELLS
+E2A9  90 F7                 BCC CLS_ATTRS
+E2AB  20 B0 E2              JSR HOME
+E2AE  28                    PLP
+E2AF  60                    RTS
+E2B0                HOME:
+E2B0  08                    PHP
+E2B1  E2 20                 SEP #$20
+E2B3  A9 00                 LDA #0
+E2B5  85 16                 STA ZP_COL
+E2B7  85 17                 STA ZP_ROW
+E2B9  8D 03 A0              STA IO_CURCOL
+E2BC  8D 04 A0              STA IO_CURROW
+E2BF  28                    PLP
+E2C0  60                    RTS
+E2C1                LOCATE:
+E2C1  08                    PHP
+E2C2  E2 20                 SEP #$20
+E2C4  C2 10                 REP #$10
+E2C6  E2 10                 SEP #$10
+E2C8  8A                    TXA
+E2C9  85 16                 STA ZP_COL
+E2CB  98                    TYA
+E2CC  85 17                 STA ZP_ROW
+E2CE  C2 10                 REP #$10
+E2D0  28                    PLP
+E2D1  60                    RTS
+E2D2                PRINT:
+E2D2  08                    PHP
+E2D3  E2 20                 SEP #$20
+E2D5  C2 10                 REP #$10
+E2D7  86 1C                 STX ZP_TMP
+E2D9  A0 00 00              LDY #0
+E2DC                PRINT_LOOP:
+E2DC  C4 1C                 CPY ZP_TMP
+E2DE  B0 08                 BCS PRINT_DONE
+E2E0  B7 10                 LDA [ZP_PTR],Y
+E2E2  20 79 E1              JSR CHROUT
+E2E5  C8                    INY
+E2E6  80 F4                 BRA PRINT_LOOP
+E2E8                PRINT_DONE:
+E2E8  28                    PLP
+E2E9  60                    RTS
+E2EA                CURSORON:
+E2EA  08                    PHP
+E2EB  E2 20                 SEP #$20
+E2ED  8D 18 A0              STA IO_CURSOR
+E2F0  28                    PLP
+E2F1  60                    RTS
+E2F2                SETINK:
+E2F2  08                    PHP
+E2F3  E2 20                 SEP #$20
+E2F5  8D 05 A0              STA IO_INK
+E2F8  28                    PLP
+E2F9  60                    RTS
+E2FA                SETPAPER:
+E2FA  08                    PHP
+E2FB  E2 20                 SEP #$20
+E2FD  8D 06 A0              STA IO_PAPER
+E300  28                    PLP
+E301  60                    RTS
+E302                SOUND:
+E302  08                    PHP
+E303  E2 20                 SEP #$20
+E305  8D 08 A0              STA IO_SOUND
+E308  28                    PLP
+E309  60                    RTS
+E30A                FRAMES:
+E30A  08                    PHP
+E30B  E2 20                 SEP #$20
+E30D  AD 09 A0              LDA IO_FRAMELO
+E310  85 25                 STA ZP_CHAR
+E312  AD 0A A0              LDA IO_FRAMEHI
+E315  C2 10                 REP #$10
+E317  AA                    TAX
+E318  A5 25                 LDA ZP_CHAR
+E31A  28                    PLP
+E31B  60                    RTS
+E31C                MEMTOP:
+E31C  08                    PHP
+E31D  C2 10                 REP #$10
+E31F  A2 00 7F              LDX.W #RAMTOP
+E322  28                    PLP
+E323  60                    RTS
+E324                PEEKBYTE:
+E324  08                    PHP
+E325  8B                    PHB
+E326  E2 20                 SEP #$20
+E328  48                    PHA
+E329  68                    PLA
+E32A  AB                    PLB
+E32B  C2 20                 REP #$20
+E32D  8A                    TXA
+E32E  AA                    TAX
+E32F  E2 20                 SEP #$20
+E331  B5 00                 LDA $0000,X
+E333  AB                    PLB
+E334  28                    PLP
+E335  60                    RTS
+E336                POKEBYTE:
+E336  08                    PHP
+E337  8B                    PHB
+E338  E2 20                 SEP #$20
+E33A  48                    PHA
+E33B  68                    PLA
+E33C  AB                    PLB
+E33D  C2 20                 REP #$20
+E33F  8A                    TXA
+E340  AA                    TAX
+E341  E2 20                 SEP #$20
+E343  98                    TYA
+E344  95 00                 STA $0000,X
+E346  AB                    PLB
+E347  28                    PLP
+E348  60                    RTS
+E349                GETLINE:
+E349  08                    PHP
+E34A  E2 20                 SEP #$20
+E34C  C2 10                 REP #$10
+E34E  A9 00                 LDA #0
+E350  85 1A                 STA ZP_INLEN
+E352  85 1B                 STA ZP_INLEN+1
+E354                GETLINE_LOOP:
+E354  20 6A E1              JSR CHRIN
+E357  C9 0D                 CMP #KEY_RETURN
+E359  F0 2C                 BEQ GETLINE_DONE
+E35B  C9 08                 CMP #KEY_DELETE
+E35D  F0 15                 BEQ GETLINE_BACK
+E35F  C9 20                 CMP #32
+E361  90 F1                 BCC GETLINE_LOOP
+E363  48                    PHA                     ; CHROUT uses the accumulator, so keep the key
+E364  20 79 E1              JSR CHROUT
+E367  68                    PLA
+E368  A4 1A                 LDY ZP_INLEN
+E36A  97 10                 STA [ZP_PTR],Y
+E36C  C2 20                 REP #$20
+E36E  E6 1A                 INC ZP_INLEN
+E370  E2 20                 SEP #$20
+E372  80 E0                 BRA GETLINE_LOOP
+E374                GETLINE_BACK:
+E374  C2 20                 REP #$20
+E376  A5 1A                 LDA ZP_INLEN
+E378  F0 09                 BEQ GETLINE_BACK_DONE
+E37A  C6 1A                 DEC ZP_INLEN
+E37C  E2 20                 SEP #$20
+E37E  20 C6 E1              JSR BACKSPACE
+E381  80 D1                 BRA GETLINE_LOOP
+E383                GETLINE_BACK_DONE:
+E383  E2 20                 SEP #$20
+E385  80 CD                 BRA GETLINE_LOOP
+E387                GETLINE_DONE:
+E387  A4 1A                 LDY ZP_INLEN
+E389  A9 00                 LDA #0
+E38B  97 10                 STA [ZP_PTR],Y
+E38D  C2 20                 REP #$20
+E38F  A6 1A                 LDX ZP_INLEN
+E391  E2 20                 SEP #$20
+E393  20 E8 E1              JSR NEWLINE
+E396  28                    PLP
+E397  60                    RTS
+E398                READSECT:
+E398  A0 01 00              LDY #DISK_READ
+E39B  80 03                 BRA SECTMOVE
+E39D                WRITESECT:
+E39D  A0 02 00              LDY #DISK_WRITE
+E3A0                SECTMOVE:
+E3A0  08                    PHP
+E3A1  E2 20                 SEP #$20
+E3A3  86 1C                 STX ZP_TMP
+E3A5  8A                    TXA
+E3A6  8D 0C A0              STA IO_SECTORLO
+E3A9  A5 1D                 LDA ZP_TMP+1
+E3AB  8D 0D A0              STA IO_SECTORHI
+E3AE  A5 10                 LDA ZP_PTR
+E3B0  8D 10 A0              STA IO_ADDRLO
+E3B3  A5 11                 LDA ZP_PTR+1
+E3B5  8D 11 A0              STA IO_ADDRHI
+E3B8  A5 12                 LDA ZP_PTR+2
+E3BA  8D 12 A0              STA IO_ADDRBANK
+E3BD  A9 01                 LDA #1
+E3BF  8D 13 A0              STA IO_COUNTLO
+E3C2  A9 00                 LDA #0
+E3C4  8D 14 A0              STA IO_COUNTHI
+E3C7  98                    TYA
+E3C8  8D 0E A0              STA IO_DISKCMD
+E3CB  AD 0F A0              LDA IO_DISKSTAT
+E3CE  29 02                 AND #DISK_ERROR
+E3D0  28                    PLP
+E3D1  60                    RTS
+E3D2                DOSCATALOG:
+E3D2                DOSFIND:
+E3D2                DOSLOAD:
+E3D2                DOSSAVE:
+E3D2                DOSDELETE:
+E3D2                DOSSTATUS:
+E3D2                DOSFORMAT:
+E3D2  A9 01                 LDA #1
+E3D4  60                    RTS
+E3D5  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF           .org KERNAL+$1F00
+FF00                K2_CHROUT:
+FF00  20 79 E1              JSR CHROUT
+FF03  6B                    RTL
+FF04                K2_GETIN:
+FF04  20 45 E1              JSR GETIN
+FF07  6B                    RTL
+FF08                K2_CHRIN:
+FF08  20 6A E1              JSR CHRIN
+FF0B  6B                    RTL
+FF0C                K2_CLS:
+FF0C  20 82 E2              JSR CLS
+FF0F  6B                    RTL
+FF10                K2_HOME:
+FF10  20 B0 E2              JSR HOME
+FF13  6B                    RTL
+FF14                K2_PRINT:
+FF14  20 D2 E2              JSR PRINT
+FF17  6B                    RTL
+FF18                K2_SCROLL:
+FF18  20 36 E2              JSR SCROLL
+FF1B  6B                    RTL
+FF1C                K2_LOCATE:
+FF1C  20 C1 E2              JSR LOCATE
+FF1F  6B                    RTL
+FF20                K2_GETLINE:
+FF20  20 49 E3              JSR GETLINE
+FF23  6B                    RTL
+FF24                K2_READSECT:
+FF24  20 98 E3              JSR READSECT
+FF27  6B                    RTL
+FF28                K2_WRITESECT:
+FF28  20 9D E3              JSR WRITESECT
+FF2B  6B                    RTL
+FF2C                K2_CURSORON:
+FF2C  20 EA E2              JSR CURSORON
+FF2F  6B                    RTL
+FF30                K2_DOSCATALOG:
+FF30  20 D2 E3              JSR DOSCATALOG
+FF33  6B                    RTL
+FF34                K2_DOSFIND:
+FF34  20 D2 E3              JSR DOSFIND
+FF37  6B                    RTL
+FF38                K2_DOSLOAD:
+FF38  20 D2 E3              JSR DOSLOAD
+FF3B  6B                    RTL
+FF3C                K2_DOSSAVE:
+FF3C  20 D2 E3              JSR DOSSAVE
+FF3F  6B                    RTL
+FF40                K2_DOSDELETE:
+FF40  20 D2 E3              JSR DOSDELETE
+FF43  6B                    RTL
+FF44                K2_DOSSTATUS:
+FF44  20 D2 E3              JSR DOSSTATUS
+FF47  6B                    RTL
+FF48                K2_DOSFORMAT:
+FF48  20 D2 E3              JSR DOSFORMAT
+FF4B  6B                    RTL
+FF4C                K2_SETINK:
+FF4C  20 F2 E2              JSR SETINK
+FF4F  6B                    RTL
+FF50                K2_SETPAPER:
+FF50  20 FA E2              JSR SETPAPER
+FF53  6B                    RTL
+FF54                K2_SOUND:
+FF54  20 02 E3              JSR SOUND
+FF57  6B                    RTL
+FF58                K2_FRAMES:
+FF58  20 0A E3              JSR FRAMES
+FF5B  6B                    RTL
+FF5C                K2_MEMTOP:
+FF5C  20 1C E3              JSR MEMTOP
+FF5F  6B                    RTL
+FF60                K2_PEEKBYTE:
+FF60  20 24 E3              JSR PEEKBYTE
+FF63  6B                    RTL
+FF64                K2_POKEBYTE:
+FF64  20 36 E3              JSR POKEBYTE
+FF67  6B                    RTL
+FF68                K2_GETKEY:
+FF68  20 76 E1              JSR GETKEY
+FF6B  6B                    RTL
+FF6C                K2_NEWLINE:
+FF6C  20 E8 E1              JSR NEWLINE
+FF6F  6B                    RTL
+FF70  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF           .org KERNAL+$1FE4
+FFE4  1B E1                 .word BRK_HANDLER       ; COP
+FFE6  1B E1                 .word BRK_HANDLER       ; BRK
+FFE8  1B E1                 .word BRK_HANDLER       ; ABORT
+FFEA  13 E1                 .word NMI               ; NMI
+FFEC  1B E1                 .word BRK_HANDLER       ; unused
+FFEE  D7 E0                 .word IRQ               ; IRQ
+FFF0  FF FF FF FF FF FF FF FF FF FF           .org KERNAL+$1FFA
+FFFA  13 E1                 .word NMI
+FFFC  60 E0                 .word RESET
+FFFE  D7 E0                 .word IRQ

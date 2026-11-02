@@ -80,6 +80,9 @@ struct App {
     last: Instant,
     /// What the window last said, so a message can be read without leaving.
     message: String,
+    /// The file a disk image came from, so what the machine writes can go back
+    /// where it came from.
+    disk_path: Option<PathBuf>,
     /// A PNG to write and then leave, which is what a headless run wants: the
     /// machine photographs itself once the banner is complete.
     shot: Option<PathBuf>,
@@ -104,6 +107,7 @@ impl App {
             speed,
             last: Instant::now(),
             message: String::new(),
+            disk_path: None,
             shot: None,
             frames_run: 0,
         })
@@ -157,10 +161,17 @@ impl App {
     }
 
     /// A file dropped on the window goes where its size says it belongs: a
-    /// cartridge is the profile's cartridge size, a socket ROM the language's,
-    /// and anything else is a tape.
-    fn accept_dropped(&mut self, bytes: &[u8], name: &str) {
+    /// cartridge is the profile's cartridge size, a socket ROM the language's, a
+    /// disk is the whole volume, and anything else is a tape.
+    fn accept_dropped(&mut self, bytes: &[u8], name: &str, path: Option<PathBuf>) {
         let profile = self.machine.bus.profile;
+        if bytes.len() == self.machine.bus.disk.image_size() {
+            if self.machine.bus.disk.load(bytes) {
+                self.disk_path = path;
+                self.message = format!("{name} in the drive");
+            }
+            return;
+        }
         if bytes.len() == profile.cartridge_size as usize {
             match self.machine.bus.cartridge.as_mut() {
                 Some(slot) => {
@@ -309,6 +320,24 @@ impl App {
                         }
                     });
                 }
+                ui.menu_button("Disk", |ui| {
+                    match &self.disk_path {
+                        Some(path) => {
+                            let label = format!("Write {} back", path.display());
+                            if ui.button(label).clicked() {
+                                match self.machine.bus.disk.image().to_vec().as_slice() {
+                                    image => match std::fs::write(path, image) {
+                                        Ok(()) => self.message = "the volume was written back".to_string(),
+                                        Err(error) => self.message = format!("{}: {error}", path.display()),
+                                    },
+                                }
+                            }
+                        }
+                        None => {
+                            ui.label(egui::RichText::new("drop a disk image on the window").weak());
+                        }
+                    }
+                });
                 ui.menu_button("Tape", |ui| {
                     if ui.button("Stop").clicked() {
                         self.machine.bus.tape.stop();
@@ -438,7 +467,7 @@ impl eframe::App for App {
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_else(|| path.display().to_string());
             match file.bytes() {
-                Ok(bytes) => self.accept_dropped(&bytes, &name),
+                Ok(bytes) => self.accept_dropped(&bytes, &name, Some(path.clone())),
                 Err(error) => self.message = format!("{name}: {error}"),
             }
         }
