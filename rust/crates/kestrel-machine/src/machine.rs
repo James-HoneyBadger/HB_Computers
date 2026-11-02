@@ -466,6 +466,40 @@ mod tests {
         }
     }
 
+    /// A malformed statement is collected to the end of the line and then
+    /// reported once. Each of the failing paths used to return to the start of
+    /// the same statement, so the machine said `?WHAT?` for every character it
+    /// could not use.
+    #[test]
+    fn the_1992_machine_complains_once_a_line() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced("X=*");
+        machine.run_frames(20);
+        let screen = machine.screen_text();
+        assert_eq!(
+            screen.matches("?WHAT?").count(),
+            1,
+            "one error for one line:\n{screen}"
+        );
+    }
+
+    /// An error ends the run, not just the line it was on. The machine used to
+    /// clear the report and carry on with the next line of the program.
+    #[test]
+    fn the_1992_machine_stops_a_program_at_its_first_error() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced("10 X=*");
+        machine.type_line_paced("20 PRINT 777");
+        machine.type_line_paced("RUN");
+        machine.run_frames(60);
+        let screen = machine.screen_text();
+        assert!(screen.contains("?WHAT?"), "the error was reported:\n{screen}");
+        assert!(
+            !screen.lines().any(|row| row.trim() == "777"),
+            "the line after the error did not run:\n{screen}"
+        );
+    }
+
     /// A disk in the drive is a file on the host, and what the machine wrote to
     /// it is there when it is mounted again. The controller has no DOS on it yet,
     /// so the write is made through the device rather than through BASIC.

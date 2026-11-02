@@ -524,7 +524,9 @@ SAY_WHAT:
         STA ZP_PTR+2
         LDX.W #TXT_WHAT_END - TXT_WHAT
         JSL L_PRINT
-        RTS
+        LDA #3                  ; an error ends the line, and the program with
+        STA ZP_JFLAG            ; it: the rest of it is not read, and the next
+        RTS                     ; statement is not run
 
 ; ---------------------------------------------------------------------------
 ; Reading the line
@@ -663,6 +665,8 @@ EXEC_SEQ:
         JSR SRC_STEP
         BRA EXEC_SEQ
 EXEC_SEQ_ONE:
+        LDA #0                  ; what the last statement could not read is not
+        STA ZP_BAD              ; this one's business
         JSR EXEC_STMT
         LDA ZP_JFLAG
         BNE EXEC_CONTROL
@@ -1038,7 +1042,7 @@ DEF_COPY_END:
         JMP EXEC_DONE
 DEF_BAD:
         JSR SAY_WHAT
-        JMP EXEC_DONE
+        JMP DO_REM
 
 ; DEF_ENTRYADDR: ZP_CH = a function's letter. X = its entry in the table.
 DEF_ENTRYADDR:
@@ -1217,7 +1221,7 @@ DO_ASSIGN:
         CMP #'='
         BEQ ASSIGN_STORE
         JSR SAY_WHAT
-        RTS
+        JMP DO_REM              ; one error for the line, not one per letter
 ASSIGN_STR:
         JSR SRC_STEP            ; past the dollar
         JSR SKIPSP
@@ -1227,7 +1231,7 @@ ASSIGN_STR:
         CMP #'('                ; `A$(3)="text"` writes one element of one
         BEQ ASSIGN_STR_ELEM
         JSR SAY_WHAT
-        RTS
+        JMP DO_REM
 ASSIGN_STR_STORE:
         JSR SRC_STEP            ; past the equals
         JSR PARSE_STR
@@ -2760,12 +2764,15 @@ EXPR_ARITH:
         JSR TERM
         PHX
 EXPR_LOOP:
+        LDA ZP_BAD
+        BNE EXPR_DONE
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #'+'
         BEQ EXPR_ADD
         CMP #'-'
         BEQ EXPR_SUB
+EXPR_DONE:
         PLX
         RTS
 EXPR_ADD:
@@ -2801,12 +2808,15 @@ TERM:
         JSR FACTOR
         PHX
 TERM_LOOP:
+        LDA ZP_BAD              ; a factor that was not one has already been
+        BNE TERM_DONE           ; named, and reading on would name it again
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #'*'
         BEQ TERM_MUL
         CMP #'/'
         BEQ TERM_DIV
+TERM_DONE:
         PLX
         RTS
 TERM_MUL:
