@@ -235,7 +235,7 @@ and the beginnings of a machine that a decade of software could have grown on.
 | Directory | What is in it |
 | --- | --- |
 | [samples/kestrel](../samples/kestrel) | twelve BASIC programs: a sieve, Fibonacci, factorials, strings, arrays, subroutines, `POKE`, colour and sound |
-| [samples/kestrel16](../samples/kestrel16) | six sets of direct statements, which is what the 1992 language takes today |
+| [samples/kestrel16](../samples/kestrel16) | eleven programs: sixteen-bit arithmetic, branches and loops, strings, arrays, and functions of the program's own |
 
 Each sample has a `.expected` file beside it holding the lines the machine must
 put on the screen. the samples suite runs every one of them, so a sample
