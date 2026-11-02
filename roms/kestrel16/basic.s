@@ -70,6 +70,7 @@ ENTRY:
         JSR SAY_NEWLINE          ; the banner has no newline of its own
 MAIN_LOOP:
         JSR SAY_READY
+MAIN_QUIET:
         JSR SAY_NEWLINE          ; the line is typed on the one below READY.
         LDA #<LINEBUF
         STA ZP_PTR
@@ -91,7 +92,7 @@ MAIN_LOOP:
         CMP #'9'+1
         BCS MAIN_EXECUTE
         JSR STORE_INPUT
-        BRA MAIN_LOOP
+        BRA MAIN_QUIET          ; storing a line is not a command: no prompt
 MAIN_EXECUTE:
         JSR EXEC_LINE
         BRA MAIN_LOOP

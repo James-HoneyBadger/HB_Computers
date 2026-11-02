@@ -50,7 +50,9 @@ is a colon, not a statement separator.
 `RUN` starts the program, `LIST` prints it, `LIST 20` prints from line 20, `NEW`
 throws it away, and `DELETE 20` or `DELETE 10,30` removes lines.
 
-A blank line is nothing at all; the machine just prints its prompt again.
+A line that starts with a number is stored and nothing is printed: the prompt
+marks a command that has finished, and a line of program is not a command. A
+blank line is nothing at all; the machine just prints its prompt again.
 
 ---
 

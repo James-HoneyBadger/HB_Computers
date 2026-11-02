@@ -384,7 +384,9 @@ STORE_INSTALL_DONE:
         LDA B_TMPP+1
         STA B_VARTAB+1
         JSR LINKPROG
-        JMP BASIC_WARM
+        ; Storing or deleting a line is not a command, and the prompt is what
+        ; says a command has finished. Back to the reader without it.
+        JMP BASIC_LOOP
 
 ; STORE_EMIT_NEW: the new line goes into the scratch, unless it is a deletion.
 STORE_EMIT_NEW:
@@ -2277,7 +2279,9 @@ DELETE_DONE:
         LDA B_TMPP2+1
         STA B_VARTAB+1
         JSR LINKPROG
-        JMP BASIC_WARM
+        ; Storing or deleting a line is not a command, and the prompt is what
+        ; says a command has finished. Back to the reader without it.
+        JMP BASIC_LOOP
 
 ; ---------------------------------------------------------------------------
 ; READ and DATA

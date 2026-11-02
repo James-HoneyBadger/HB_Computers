@@ -622,6 +622,35 @@ mod tests {
     /// BASIC held the line open after `;` and never closed it again once a value
     /// had been printed, so `PRINT "X ";6*7` ran into the prompt -- the extra
     /// newline the old prompt printed was hiding it.
+    /// Storing a line is not a command, so it does not announce itself: the
+    /// prompt is what says a command has finished, and a numbered line only goes
+    /// into the program. The power-on `READY.` is counted first, so only the
+    /// prompts this typing earns are the ones under test.
+    #[test]
+    fn storing_a_line_does_not_echo_the_prompt() {
+        for model in [Model::Kestrel, Model::Kestrel16] {
+            let mut machine = boot(model);
+            let prompts = |text: &str| text.matches("READY.").count();
+            let at_boot = prompts(&machine.screen_text());
+
+            machine.type_line_paced("10 REM A STORED LINE");
+            let after_store = machine.screen_text();
+            assert_eq!(
+                prompts(&after_store),
+                at_boot,
+                "storing a line said READY. on {model:?}:\n{after_store}"
+            );
+
+            machine.type_line_paced("PRINT 7");
+            let after_command = machine.screen_text();
+            assert_eq!(
+                prompts(&after_command),
+                at_boot + 1,
+                "a command says READY. once on {model:?}:\n{after_command}"
+            );
+        }
+    }
+
     #[test]
     fn a_print_statement_finishes_its_line() {
         let mut machine = boot(Model::Kestrel16);

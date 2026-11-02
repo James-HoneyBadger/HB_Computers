@@ -193,6 +193,12 @@ THE KESTREL SAYS5
 READY.
 ```
 
+Note that nothing was printed after any of the numbered lines: `READY.` appeared
+once, when `RUN` had finished. The prompt is what says a *command* has finished,
+and a numbered line is not a command — it goes into the program and the machine
+waits, silently, for the next line. Both machines behave this way, so a listing
+typed in at the keyboard is a column of lines with no prompt between them.
+
 `LIST` shows what is stored, `NEW` throws it away, and `BREAK` abandons a program
 that is running without losing it.
 
