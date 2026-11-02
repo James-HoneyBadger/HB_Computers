@@ -310,7 +310,7 @@ fn usage() {
          \x20 --speed   how fast the host clocks it\n\
          \x20 --frames  frames run after each line typed (default 20)\n\
          \x20 --type    a line to type before the session starts; may be repeated\n\
-         \x20 --roms    where the assembled images are (default build/generated)\n\
+         \x20 --roms    images to load from disk instead of assembling the ROMs\n\
          \n\
          Inside a session, a line beginning with / is a command: /help lists them."
     );

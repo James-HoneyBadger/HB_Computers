@@ -472,6 +472,43 @@ mod tests {
 
     /// A tape is a byte stream, so any length is a tape, and it comes back out
     /// byte for byte.
+    /// The whole point of a virtual disk: a program saved on one machine is
+    /// found by a second machine that mounts the same file. This runs the DOS in
+    /// the ROM -- `SAVE`, `CATALOG`, `NEW`, `LOAD` -- and then boots a fresh
+    /// machine from the image to prove the file outlived the first one.
+    #[test]
+    fn a_saved_program_outlives_the_machine_that_saved_it() {
+        let path = std::env::temp_dir().join("kestrel-dos-round-trip.dsk");
+        let size = 512 * 256;
+        std::fs::write(&path, vec![0u8; size]).expect("a blank volume");
+
+        let mut machine = boot(Model::Kestrel);
+        machine.mount_disk_image(&path).expect("a disk in the drive");
+        machine.type_line_paced("10 PRINT \"SAVED OK\"");
+        machine.type_line_paced("SAVE \"TEST\"");
+        machine.run_frames(40);
+        machine.save_disk_image(&path).expect("the volume written back");
+
+        // A different machine, the same disk.
+        let mut again = boot(Model::Kestrel);
+        again.mount_disk_image(&path).expect("the saved volume");
+        again.type_line_paced("CATALOG");
+        assert!(
+            again.screen_text().contains("TEST"),
+            "the catalogue knows the file:\n{}",
+            again.screen_text()
+        );
+        again.type_line_paced("NEW");
+        again.type_line_paced("LOAD \"TEST\"");
+        again.type_line_paced("RUN");
+        assert!(
+            again.screen_text().lines().any(|row| row.trim() == "SAVED OK"),
+            "and the program still runs:\n{}",
+            again.screen_text()
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
     #[test]
     fn a_tape_image_goes_in_and_comes_back_out() {
         let mut machine = boot(Model::Kestrel16);
