@@ -436,6 +436,45 @@ fn irq() {
     assert_eq!(run.regs().p & IRQ_DISABLE, IRQ_DISABLE);
 }
 
+/// `LDX`, `LDY`, `STX`, `STY` and the memory forms of `CPX`/`CPY` are as wide as
+/// the index registers, not as wide as the accumulator. Reading them M-wide cost
+/// the KERNAL the high byte of every sector number above 255, so a disk read went
+/// to sector zero.
+#[test]
+fn index_width_operands_follow_the_index_flag() {
+    // Sixteen-bit index, eight-bit accumulator: STX writes both bytes.
+    let mut run = Run::new(ORIGIN, &[0x8E, 0x00, 0x30]); // STX $3000
+    run.set(|r| {
+        r.x = 0x1234;
+        r.p = MEMORY_8;
+    });
+    run.step();
+    assert_eq!(run.ram.peek(0x3000), 0x34);
+    assert_eq!(run.ram.peek(0x3001), 0x12, "the high byte went too");
+
+    // And LDX reads both.
+    let mut run = Run::new(ORIGIN, &[0xAE, 0x00, 0x30]); // LDX $3000
+    run.ram.poke(0x3000, 0x78);
+    run.ram.poke(0x3001, 0x56);
+    run.set(|r| r.p = MEMORY_8);
+    run.step();
+    assert_eq!(run.regs().x, 0x5678);
+
+    // An eight-bit index sees only the low byte, and STY leaves the byte above
+    // it alone.
+    let mut run = Run::new(ORIGIN, &[0x84, 0x30, 0x8C, 0x00, 0x30]); // STY $30 ; STY $3000
+    run.ram.poke(0x3001, 0xAA);
+    run.ram.poke(0x0031, 0xBB);
+    run.set(|r| {
+        r.y = 0x1234;
+        r.p = MEMORY_8 | INDEX_8;
+    });
+    run.step();
+    run.step();
+    assert_eq!(run.ram.peek(0x3000), 0x34);
+    assert_eq!(run.ram.peek(0x3001), 0xAA, "nothing above the byte was written");
+}
+
 #[test]
 fn the_table_is_the_cpp_table() {
     // Every opcode the C++ map names, at the cycle count it names.

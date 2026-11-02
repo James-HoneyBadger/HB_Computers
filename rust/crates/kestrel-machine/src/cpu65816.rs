@@ -628,6 +628,27 @@ impl Cpu65816 {
         low | (high << 8)
     }
 
+    /// An operand of the index file: eight or sixteen bits, decided by X and
+    /// never by M. `LDX`, `LDY`, `STX`, `STY` and the memory forms of `CPX`/`CPY`
+    /// are the instructions that use it, and getting it wrong loses the high byte
+    /// of every address above `$FF` they touch.
+    fn read_index(&self, bus: &mut dyn Bus, address: u32) -> u16 {
+        if self.x8() {
+            return u16::from(self.read8(bus, address));
+        }
+        let low = u16::from(self.read8(bus, address));
+        let high = u16::from(self.read8(bus, (address & 0xFF_0000) | ((address + 1) & 0xFFFF)));
+        low | (high << 8)
+    }
+
+    fn write_index(&self, bus: &mut dyn Bus, address: u32, value: u16) {
+        self.write8(bus, address, value as u8);
+        if !self.x8() {
+            let high = (address & 0xFF_0000) | ((address + 1) & 0xFFFF);
+            self.write8(bus, high, (value >> 8) as u8);
+        }
+    }
+
     fn write_data(&self, bus: &mut dyn Bus, address: u32, value: u16) {
         self.write8(bus, address, value as u8);
         if !self.m8() {
@@ -1090,7 +1111,7 @@ impl Cpu65816 {
                 let value = if mode == Mode::ImmX {
                     self.fetch_operand_index(bus)
                 } else {
-                    self.read_data(bus, ea)
+                    self.read_index(bus, ea)
                 };
                 let mask: u16 = if self.x8() { 0x00FF } else { 0xFFFF };
                 let difference = i32::from(register & mask) - i32::from(value & mask);
@@ -1173,7 +1194,7 @@ impl Cpu65816 {
                 let value = if mode == Mode::ImmX {
                     self.fetch_operand_index(bus)
                 } else {
-                    self.read_data(bus, ea)
+                    self.read_index(bus, ea)
                 };
                 self.store_x(value);
             }
@@ -1181,7 +1202,7 @@ impl Cpu65816 {
                 let value = if mode == Mode::ImmX {
                     self.fetch_operand_index(bus)
                 } else {
-                    self.read_data(bus, ea)
+                    self.read_index(bus, ea)
                 };
                 self.store_y(value);
             }
@@ -1189,8 +1210,8 @@ impl Cpu65816 {
                 let value = self.c & acc_mask;
                 self.write_data(bus, ea, value);
             }
-            Op::Stx => self.write_data(bus, ea, self.x),
-            Op::Sty => self.write_data(bus, ea, self.y),
+            Op::Stx => self.write_index(bus, ea, self.x),
+            Op::Sty => self.write_index(bus, ea, self.y),
             Op::Stz => self.write_data(bus, ea, 0),
             Op::Tsb => {
                 let value = self.read_data(bus, ea);
