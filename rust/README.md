@@ -47,6 +47,7 @@ What it has not carried over from the Qt window, and why:
 | `kestrel-cli` | `tools/kestrel_emu.cpp` | done, the `kestrel_emu` binary |
 | `kestrel-app` | `app/main.cpp` and `model1982/window.cpp`, in egui | done, the `kestrel_computers` binary |
 | `kestrel-asm` | `tools/kestrel_asm.cpp` | done, the `kestrel_asm` binary; the same bytes out as the C++ tool for all three ROMs |
+| `kestrel16-asm` | `tools/kestrel16_asm.cpp` | done, the `kestrel16_asm` binary; the same bytes out as the C++ tool for both ROMs |
 
 ## What proves it
 

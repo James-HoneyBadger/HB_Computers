@@ -1,0 +1,14 @@
+[package]
+name = "kestrel16-asm"
+description = "The 65816 assembler that turns the Kestrel 16's ROM sources into the images it boots"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "kestrel16_asm"
+path = "src/lib.rs"
+
+[[bin]]
+name = "kestrel16_asm"
+path = "src/main.rs"

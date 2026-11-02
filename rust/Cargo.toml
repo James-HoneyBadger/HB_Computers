@@ -8,6 +8,7 @@ members = [
     "crates/kestrel-cli",
     "crates/kestrel-app",
     "crates/kestrel-asm",
+    "crates/kestrel16-asm",
 ]
 
 [workspace.package]

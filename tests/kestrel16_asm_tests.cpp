@@ -32,8 +32,10 @@ struct Case {
 
 const std::vector<Case>& cases() {
     static const std::vector<Case> all{
-        // Immediates. Without a suffix an immediate is sixteen bits, because
-        // that is what native mode runs; `.B` and `.W` say otherwise.
+        // Immediates. The two register files default differently, which is the
+        // ROMs' own convention: an accumulator immediate is a byte unless `.W`
+        // says otherwise, and an index immediate is a word unless `.B` does.
+        // `REP`/`SEP` take a status byte whatever else is going on.
         {"LDA #$12", {0xA9, 0x12}, "immediate, a byte by default"},
         {"LDA.W #$1234", {0xA9, 0x34, 0x12}, "immediate, forced word"},
         {"LDA.B #$12", {0xA9, 0x12}, "immediate, byte"},
