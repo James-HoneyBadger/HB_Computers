@@ -279,8 +279,8 @@ and the beginnings of a machine that a decade of software could have grown on.
 
 | Directory | What is in it |
 | --- | --- |
-| [samples/kestrel](../samples/kestrel) | twelve BASIC programs: a sieve, Fibonacci, factorials, strings, arrays, subroutines, `POKE`, colour and sound |
-| [samples/kestrel16](../samples/kestrel16) | eleven programs: sixteen-bit arithmetic, branches and loops, strings, arrays, and functions of the program's own |
+| [samples/kestrel](../samples/kestrel) | twenty-two BASIC programs: a sieve, Fibonacci, factorials, strings, arrays, subroutines, `POKE`, colour and sound, and then a game, a utility and a business program apiece |
+| [samples/kestrel16](../samples/kestrel16) | twenty programs: sixteen-bit arithmetic, branches and loops, strings, arrays, functions of the program's own, and the same spread of games, utilities and business programs |
 
 Each sample has a `.expected` file beside it holding the lines the machine must
 put on the screen. The samples suite runs every one of them, so a sample
@@ -291,6 +291,27 @@ Run one at a time:
 ```bash
 ./start.sh cli --model kestrel16 --file samples/kestrel16/03-division.bas
 ```
+
+## The cartridges
+
+A cartridge is software on a board, sold in a box: it goes in the slot and the
+machine starts it instead of its language. [cartridges/](../cartridges) holds the
+ones this repository ships, as sources that are assembled when they are fitted.
+
+| Cartridge | Machine | What it is |
+| --- | --- | --- |
+| `monitor` | Kestrel | Kestrel Machine Monitor: `D` dumps memory, `M` changes it, `J` runs it, `B` goes back to BASIC |
+| `tutor` | Kestrel | Kestrel Tutor: the multiplication tables, marked, with a score |
+| `colours` | Kestrel 16 | Kestrel 16 Colour Demonstration: the tube filled with texture and colour |
+
+```bash
+./start.sh cli --cart monitor          # the monitor, in a Kestrel that was switched on with it
+./start.sh kestrel --cart monitor      # the same in the window
+```
+
+The window fits one from **Cartridge** in its settings sheet, or from the
+**Cartridge** menu, and ejects it there too: fitting a cartridge starts the
+machine again, which is what a cartridge always needed.
 
 ## If something goes wrong
 

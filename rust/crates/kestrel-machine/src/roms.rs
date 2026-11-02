@@ -76,6 +76,65 @@ fn assemble(model: Model) -> Result<ShippedRoms, String> {
     }
 }
 
+/// Where the cartridge sources are: `cartridges/`, beside `roms/` in the
+/// repository, or `KESTREL_CARTRIDGES` when that is set.
+pub fn cartridge_directory() -> Result<PathBuf, String> {
+    if let Some(path) = std::env::var_os("KESTREL_CARTRIDGES") {
+        return Ok(PathBuf::from(path));
+    }
+    Ok(source_directory()?.with_file_name("cartridges"))
+}
+
+fn cartridge_folder(model: Model) -> &'static str {
+    match model {
+        Model::Kestrel => "kestrel",
+        Model::Kestrel16 => "kestrel16",
+    }
+}
+
+/// The cartridges this machine could have been sold, by name: every source in
+/// its folder, which is the catalogue the host shows and `--cart` takes.
+pub fn shipped_cartridges(model: Model) -> Result<Vec<String>, String> {
+    let directory = cartridge_directory()?.join(cartridge_folder(model));
+    let entries = std::fs::read_dir(&directory)
+        .map_err(|error| format!("{}: {error}", directory.display()))?;
+    let mut names: Vec<String> = entries
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "s"))
+        .filter_map(|path| path.file_stem().map(|stem| stem.to_string_lossy().into_owned()))
+        .collect();
+    names.sort();
+    Ok(names)
+}
+
+/// One cartridge, assembled into the image the slot takes: the whole of the
+/// slot, so a small program still fills a cartridge the way a real one did.
+pub fn cartridge(model: Model, name: &str) -> Result<Vec<u8>, String> {
+    let root = cartridge_directory()?;
+    let folder = cartridge_folder(model);
+    let profile = match model {
+        Model::Kestrel => &KESTREL,
+        Model::Kestrel16 => &KESTREL16,
+    };
+    match model {
+        Model::Kestrel => assemble_6502(
+            &root,
+            folder,
+            name,
+            profile.cartridge_base,
+            profile.cartridge_size,
+        ),
+        Model::Kestrel16 => assemble_65816(
+            &root,
+            folder,
+            name,
+            profile.cartridge_base,
+            profile.cartridge_size,
+        ),
+    }
+}
+
 fn assemble_6502(
     root: &std::path::Path,
     directory: &str,

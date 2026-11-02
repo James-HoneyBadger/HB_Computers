@@ -11,6 +11,12 @@ BASIC_SIZE      = $10000
 BANK_BASIC      = $01
 BANK_KERNAL     = $00
 
+; The cartridge: 128 KiB, of which the first 8 KiB answers in bank zero.
+CART            = $00C000
+CART_SIZE       = $020000
+CART_ID         = CART+0    ; 'K','S','T','L', which the reset looks for
+CART_VECTOR     = CART+4    ; and where it goes when it finds them
+
 ; Bank zero's RAM.
 ZP              = $000000
 STACK           = $000100

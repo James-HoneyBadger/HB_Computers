@@ -111,6 +111,32 @@ impl Emulator {
         Ok(())
     }
 
+    /// A cartridge in the slot: a name from `cartridges/`, or the path of an
+    /// image. The reset is what fits one, so the machine is reset afterwards.
+    fn mount_cartridge(&mut self, which: &str) -> Result<(), String> {
+        let path = std::path::PathBuf::from(which);
+        if path.is_file() {
+            self.machine
+                .mount_cartridge(&path)
+                .map_err(|error| error.to_string())?;
+        } else {
+            self.machine
+                .mount_assembled_cartridge(which)
+                .map_err(|error| error.to_string())?;
+        }
+        self.machine.reset();
+        self.machine.run_frames(20);
+        Ok(())
+    }
+
+    /// Which cartridge is in the slot, or that there is none.
+    fn cartridge_status(&self) -> String {
+        match self.machine.bus.cartridge.is_some() {
+            true => "a cartridge is in the slot".to_string(),
+            false => "the slot is empty".to_string(),
+        }
+    }
+
     /// Type one line and let the machine answer. The keys go in at the speed the
     /// machine could be typed at: a line pushed in at once overflows the
     /// controller and loses the tail, the Return included.
@@ -190,6 +216,7 @@ fn help(frames: i32) {
          \x20 /run [N]                  run N frames (default 50)\n\
          \x20 /break                    the BREAK key\n\
          \x20 /rom basic|monitor        the Kestrel's socket ROM\n\
+         \x20 /cart [NAME|FILE]         fit a cartridge, or say which one is in\n\
          \x20 /disk [FILE]              mount a volume, or write the one in the drive back\n\
          \x20 /tape [FILE]              insert a cassette, or write the one in the deck back\n\
          \x20 /screen                   draw the tube\n\
@@ -295,6 +322,16 @@ fn command(emulator: &mut Emulator, line: &str, quit: &mut bool) -> bool {
                 }
             }
         },
+        "cart" => {
+            if argument.is_empty() {
+                println!("kestrel_emu: {}", emulator.cartridge_status());
+            } else {
+                match emulator.mount_cartridge(argument) {
+                    Ok(()) => emulator.draw(false),
+                    Err(message) => println!("kestrel_emu: {message}"),
+                }
+            }
+        }
         "rom" => match emulator.mount_socket_rom(argument) {
             Ok(()) => emulator.draw(false),
             Err(message) => println!("kestrel_emu: {message}"),
@@ -324,7 +361,7 @@ fn usage() {
     println!(
         "usage: kestrel-emu [--model kestrel|kestrel16] [--speed 1|2|4|8|turbo]\n\
          \x20                  [--frames N] [--type \"LINE\"]... [--rom basic|monitor]\n\
-         \x20                  [--roms DIR]\n\
+         \x20                  [--roms DIR] [--cart NAME|FILE]\n\
          \n\
          \x20 --model   which machine to power on; without it, it asks\n\
          \x20 --speed   noted for the session; a session runs frames, not a clock\n\
@@ -332,6 +369,7 @@ fn usage() {
          \x20 --type    a line to type before the session starts; may be repeated\n\
          \x20 --rom     which ROM is in the Kestrel's socket: basic or monitor\n\
          \x20 --roms    images to load from disk instead of assembling the ROMs\n\
+         \x20 --cart    a cartridge to fit, by name from cartridges/ or as an image\n\
          \n\
          Inside a session, a line beginning with / is a command: /help lists them."
     );
@@ -344,6 +382,7 @@ fn main() -> ExitCode {
     let mut lines: Vec<String> = Vec::new();
     let mut images_arg: Option<PathBuf> = None;
     let mut rom: Option<String> = None;
+    let mut cartridge: Option<String> = None;
 
     let mut index = 0;
     while index < arguments.len() {
@@ -388,6 +427,13 @@ fn main() -> ExitCode {
                 }
             },
             "--roms" => images_arg = value(&mut index).map(PathBuf::from),
+            "--cart" => match value(&mut index) {
+                Some(which) => cartridge = Some(which),
+                None => {
+                    eprintln!("kestrel_emu: --cart needs a name or an image");
+                    return ExitCode::from(2);
+                }
+            },
             "--help" | "-h" => {
                 usage();
                 return ExitCode::SUCCESS;
@@ -420,6 +466,12 @@ fn main() -> ExitCode {
         };
     if let Some(id) = &rom {
         if let Err(message) = emulator.mount_socket_rom(id) {
+            eprintln!("kestrel_emu: {message}");
+            return ExitCode::from(2);
+        }
+    }
+    if let Some(which) = &cartridge {
+        if let Err(message) = emulator.mount_cartridge(which) {
             eprintln!("kestrel_emu: {message}");
             return ExitCode::from(2);
         }

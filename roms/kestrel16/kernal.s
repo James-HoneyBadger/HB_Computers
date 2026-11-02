@@ -92,8 +92,30 @@ RESET:
         STA IO_PAPER
         JSR CLS
         CLI
+        JSR CART_SCAN           ; a cartridge in the slot starts instead
         JSR BANNER
         JML BASIC
+
+; CART_SCAN: the reset's one question. A cartridge that carries the four letters
+; is a program and is started; one that does not, or an empty slot, leaves the
+; machine to its language. It never returns when it finds a cartridge.
+CART_SCAN:
+        SEP #$20
+        LDA CART_ID+0
+        CMP #$4B                ; K
+        BNE CART_SCAN_NONE
+        LDA CART_ID+1
+        CMP #$53                ; S
+        BNE CART_SCAN_NONE
+        LDA CART_ID+2
+        CMP #$54                ; T
+        BNE CART_SCAN_NONE
+        LDA CART_ID+3
+        CMP #$4C                ; L
+        BNE CART_SCAN_NONE
+        JMP (CART_VECTOR)
+CART_SCAN_NONE:
+        RTS
 
 BANNER:
         LDA #<BANNER_TEXT

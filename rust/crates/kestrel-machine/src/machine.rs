@@ -204,6 +204,29 @@ impl Machine {
         Ok(())
     }
 
+    /// A cartridge in the slot. The image has to be the whole of the slot, so a
+    /// file of another size is refused rather than half-fitted.
+    pub fn mount_cartridge(&mut self, path: &Path) -> Result<(), RomError> {
+        let bytes = read_image(path)?;
+        let wanted = self.bus.profile.cartridge_size as usize;
+        if bytes.len() != wanted {
+            return Err(RomError::WrongSize {
+                wanted,
+                got: bytes.len(),
+            });
+        }
+        self.bus.cartridge = Some(bytes);
+        Ok(())
+    }
+
+    /// One of the cartridges the repository ships, assembled from its source at
+    /// the address and size the slot answers to.
+    pub fn mount_assembled_cartridge(&mut self, name: &str) -> Result<(), RomError> {
+        let image = crate::roms::cartridge(self.model(), name).map_err(RomError::Unreadable)?;
+        self.bus.cartridge = Some(image);
+        Ok(())
+    }
+
     /// Write the volume back out, which is what a disk in a drive means: what the
     /// machine wrote is there the next time it is mounted.
     pub fn save_disk_image(&self, path: &Path) -> std::io::Result<()> {

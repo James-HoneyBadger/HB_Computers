@@ -135,6 +135,8 @@ READY.
 | `--file FILE` | Type every line of a file, in order, before any `--type` line |
 | `--rom basic\|monitor` | Which ROM is in the Kestrel's socket (see below) |
 | `--roms DIR` | Load the assembled images from `DIR` instead of assembling them |
+| `--cart NAME\|FILE` | Fit a cartridge: a name from `cartridges/`, assembled from its source, or the path of an image |
+| `--cartridges` | List the cartridges shipped for the model and exit |
 | `--disk IMAGE` | Put a volume in the drive; it is written back when the run ends |
 | `--tape IMAGE` | Put a cassette in the deck; the machine gets a blank one otherwise |
 | `--no-screen` | Print nothing |
@@ -230,6 +232,7 @@ noise when nobody is watching.
 | `--frames` | frames run after each line typed |
 | `--rom basic\|monitor` | which ROM is in the Kestrel's socket |
 | `--roms DIR` | images to load from disk instead of assembling the ROMs |
+| `--cart NAME\|FILE` | the cartridge in the slot, by name or as an image |
 | `--type "LINE"` | type a line before the prompt appears; may be repeated |
 
 ---

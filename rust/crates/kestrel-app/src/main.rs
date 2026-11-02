@@ -367,6 +367,7 @@ struct App {
     disk_path: Option<PathBuf>,
     tape_path: Option<PathBuf>,
     cartridge_path: Option<PathBuf>,
+    shipped_cartridge: String,
     /// A PNG to write and then leave, which is what a headless run wants: the
     /// machine photographs itself once the banner is complete.
     shot: Option<PathBuf>,
@@ -393,6 +394,7 @@ impl App {
             disk_path: None,
             tape_path: None,
             cartridge_path: None,
+            shipped_cartridge: String::new(),
             shot: None,
             frames_run: 0,
             running: true,
@@ -406,6 +408,52 @@ impl App {
 
     fn set_message(&mut self, text: impl Into<String>) {
         self.message = text.into();
+    }
+
+    /// A cartridge in the slot. The reset is what fits one: the KERNAL looks at
+    /// the slot once, on the way up, so fitting one means starting the machine
+    /// again, which is also what a person did with the power switch.
+    fn fit_cartridge(&mut self, bytes: Vec<u8>, name: String, path: Option<PathBuf>) {
+        self.machine.bus.cartridge = Some(bytes);
+        self.cartridge_path = path;
+        self.machine.reset();
+        self.set_message(format!("{name} in the cartridge slot"));
+    }
+
+    /// The `--cart` argument: a name the repository ships, or an image.
+    fn fit_cartridge_argument(&mut self, which: &str) {
+        let path = PathBuf::from(which);
+        if path.is_file() {
+            self.fit_cartridge_file(&path);
+            return;
+        }
+        match kestrel_machine::roms::cartridge(self.machine.model(), which) {
+            Ok(bytes) => self.fit_cartridge(bytes, which.to_string(), None),
+            Err(error) => self.set_message(format!("cartridge {which}: {error}")),
+        }
+    }
+
+    /// A cartridge image from the host, checked against the size of the slot.
+    fn fit_cartridge_file(&mut self, path: &Path) {
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.display().to_string());
+        match std::fs::read(path) {
+            Ok(bytes) => {
+                let wanted = self.machine.bus.profile.cartridge_size as usize;
+                if bytes.len() == wanted {
+                    self.remember(path);
+                    self.fit_cartridge(bytes, name, Some(path.to_path_buf()));
+                } else {
+                    self.set_message(format!(
+                        "{name}: {} bytes, not the {wanted} a cartridge is",
+                        bytes.len()
+                    ));
+                }
+            }
+            Err(error) => self.set_message(format!("{}: {error}", path.display())),
+        }
     }
 
     fn settings_open(&self) -> bool {
@@ -515,12 +563,10 @@ impl App {
             return;
         }
         if bytes.len() == profile.cartridge_size as usize {
-            self.machine.bus.cartridge = Some(bytes.to_vec());
             if let Some(path) = path.clone() {
                 self.remember(&path);
             }
-            self.cartridge_path = path;
-            self.set_message(format!("{name} in the cartridge slot"));
+            self.fit_cartridge(bytes.to_vec(), name.to_string(), path);
         } else if bytes.len() == profile.basic_size as usize && self.machine.model() == Model::Kestrel
         {
             match self.machine.mount_basic(bytes) {
@@ -1129,9 +1175,42 @@ impl App {
                 if ui.button("Eject").clicked() {
                     self.machine.bus.cartridge = None;
                     self.cartridge_path = None;
+                    self.machine.reset();
                     self.set_message("cartridge out");
                 }
             });
+        });
+        group(ui, "Cartridges this machine was sold", |ui| {
+            let names = kestrel_machine::roms::shipped_cartridges(self.machine.model())
+                .unwrap_or_default();
+            if names.is_empty() {
+                field(ui, "Catalogue", "none in cartridges/");
+                return;
+            }
+            if self.shipped_cartridge.is_empty() {
+                self.shipped_cartridge = names[0].clone();
+            }
+            ui.horizontal(|ui| {
+                egui::ComboBox::from_id_salt("shipped-cartridge")
+                    .selected_text(self.shipped_cartridge.clone())
+                    .show_ui(ui, |ui| {
+                        for name in &names {
+                            ui.selectable_value(
+                                &mut self.shipped_cartridge,
+                                name.clone(),
+                                name,
+                            );
+                        }
+                    });
+                if ui.button("Fit").clicked() {
+                    let name = self.shipped_cartridge.clone();
+                    match kestrel_machine::roms::cartridge(self.machine.model(), &name) {
+                        Ok(bytes) => self.fit_cartridge(bytes, name, None),
+                        Err(error) => self.set_message(format!("{name}: {error}")),
+                    }
+                }
+            });
+            field(ui, "Sources", "cartridges/");
         });
     }
 
@@ -1531,23 +1610,7 @@ impl App {
                     Err(error) => self.set_message(format!("{}: {error}", path.display())),
                 }
             }
-            FileKind::Cartridge => match std::fs::read(&path) {
-                Ok(bytes) => {
-                    let wanted = self.machine.bus.profile.cartridge_size as usize;
-                    if bytes.len() == wanted {
-                        self.remember(&path);
-                        self.machine.bus.cartridge = Some(bytes);
-                        self.cartridge_path = Some(path);
-                        self.set_message(format!("{name} in the cartridge slot"));
-                    } else {
-                        self.set_message(format!(
-                            "{name}: {} bytes, not the {wanted} a cartridge is",
-                            bytes.len()
-                        ));
-                    }
-                }
-                Err(error) => self.set_message(format!("{}: {error}", path.display())),
-            },
+            FileKind::Cartridge => self.fit_cartridge_file(&path),
             FileKind::Roms => {
                 self.roms = Some(path.clone());
                 self.remember(&path);
@@ -2123,6 +2186,7 @@ fn main() -> eframe::Result<()> {
     let mut model = Model::Kestrel;
     let mut images_arg: Option<PathBuf> = None;
     let mut shot: Option<PathBuf> = None;
+    let mut cartridge: Option<String> = None;
     let mut index = 0;
     while index < arguments.len() {
         match arguments[index].as_str() {
@@ -2141,6 +2205,10 @@ fn main() -> eframe::Result<()> {
                 index += 1;
                 images_arg = arguments.get(index).map(PathBuf::from);
             }
+            "--cart" => {
+                index += 1;
+                cartridge = arguments.get(index).cloned();
+            }
             "--shot" => {
                 index += 1;
                 shot = arguments.get(index).map(PathBuf::from);
@@ -2151,6 +2219,7 @@ fn main() -> eframe::Result<()> {
                      \n\
                      \x20 --model   which machine to power on (default kestrel)\n\
                      \x20 --roms    where the assembled images are (default build/generated)\n\
+                     \x20 --cart    a cartridge to fit, by name from cartridges/ or as an image\n\
                      \x20 --shot    write a PNG of the window once it has settled, then leave"
                 );
                 return Ok(());
@@ -2177,6 +2246,9 @@ fn main() -> eframe::Result<()> {
             std::process::exit(1);
         }
     };
+    if let Some(which) = &cartridge {
+        app.fit_cartridge_argument(which);
+    }
     app.shot = shot.clone();
     eframe::run_native(
         "Kestrel Computers",

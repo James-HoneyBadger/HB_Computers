@@ -60,9 +60,10 @@ cargo build --release
 cargo test
 ```
 
-One hundred tests: the two assemblers, the two processors, the bus and its
-devices, both machines booting their assemblers' ROMs and answering at the
-keyboard, every sample program in [samples/](samples), the socket ROM the
+A hundred and nine tests: the two assemblers, the two processors, the bus and
+its devices, both machines booting their assemblers' ROMs and answering at the
+keyboard, every sample program in [samples/](samples), every cartridge in
+[cartridges/](cartridges) starting in place of the language, the socket ROM the
 command line can choose, and the emulator's own front end.
 
 `./start.sh` builds what is out of date and starts a machine:
@@ -109,6 +110,7 @@ rust/                          the emulator and its tools, in five crates:
 roms/kestrel/                  the Kestrel's 6502 machine code
 roms/kestrel16/                the Kestrel 16's 65816 machine code
 samples/                       programs to type, run and learn from, and their expected output
+cartridges/                    the programs that were sold on a board, one folder to a machine
 docs/                          the manuals, the references and the machines' own books
 start.sh                       build what is out of date, then start a machine
 Vagrantfile                    the same in a clean Ubuntu 22.04 build machine

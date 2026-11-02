@@ -103,6 +103,23 @@ The cursor registers in the I/O page (`$03`, `$04`) are the KERNAL's idea of
 where it is; a program that writes the screen directly should either keep them in
 step or not use the KERNAL's printing afterwards.
 
+### A cartridge instead of a ROM
+
+A cartridge is the same idea as a ROM with a shorter life: a program in the
+machine from the moment it is switched on, which the reset starts instead of the
+language. The KERNAL's `CART_SCAN` looks at the bottom of the slot for the four
+letters `KSTL` and jumps to the word after them, so a cartridge is an image with a
+six-byte header and no other ceremony. `cartridges/README.md` has the header, the
+slot sizes for both machines, and the catalogue of what is already there.
+
+Two things are worth knowing before the first one is written. A cartridge keeps
+its state in RAM and not in the zero page, because every call to the KERNAL is
+allowed to use every cell of the zero page — `CHROUT` loads the screen pointer
+into `ZP_PTR` for each character it prints. And the image has to be exactly the
+size of the slot: the machine refuses anything else rather than half-fitting it,
+which is why the sources are assembled to the full size with the rest left as
+`$FF`.
+
 ## Writing for the Kestrel 16
 
 ### Banks
@@ -254,6 +271,7 @@ Every crate carries the tests for what it is:
 | `kestrel16-asm` | every 65816 addressing mode and width rule, byte for byte |
 | `kestrel-machine` (`cpu65816`) | the 65816: widths, banks, the direct page, jumps, arithmetic, cycles |
 | `kestrel-cli` (`samples`) | every program in `samples/`, against its `.expected` file |
+| `kestrel-cli` (`cartridges`) | every cartridge's image, and the reset starting the one that is fitted |
 | `kestrel-cli` (`emulator`) | the emulator's front end: the model flag chooses the machine, a session switches models, and a command that is not one is refused |
 
 ```bash

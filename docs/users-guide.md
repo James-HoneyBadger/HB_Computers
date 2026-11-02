@@ -20,6 +20,7 @@ Kestrel, and the error names are the ones the ROM holds.
 - [Variables and arrays](#variables-and-arrays)
 - [Errors](#errors)
 - [The monitor ROM](#the-monitor-rom)
+- [Cartridges](#cartridges)
 - [Kestrel DOS](#kestrel-dos)
 - [Kestrel 16 BASIC](#kestrel-16-basic)
 - [Worked examples](#worked-examples)
@@ -311,6 +312,56 @@ The monitor's prompt is a full stop, and the `A.` on the last line is the
 character the routine printed followed by that prompt coming back.
 
 `A9 41` loads `'A'`, `20 00 E0` calls `CHROUT` at `$E000`, and `60` returns.
+
+---
+
+## Cartridges
+
+A cartridge is a program on a board: it goes in the slot at the side of the
+machine and, from 1982, the machine starts it instead of its language. Nothing
+has to be typed and nothing has to be loaded — the machine is switched on and the
+cartridge is running, which is why the cartridge was the way software was sold to
+people who did not want to learn a language first.
+
+The reset looks at the bottom of the slot once, on the way up. Four letters,
+`KSTL`, and the address after them, are the whole of the agreement: a cartridge
+that carries them is started, and a cartridge that does not is left in the slot
+and the language starts as usual.
+
+| | Kestrel, 1982 | Kestrel 16, 1992 |
+| --- | --- | --- |
+| The slot | `$9000`–`$9FFF`, 4 KiB | `$00:C000`–`$00:DFFF`, with the whole 128 KiB image across banks `$04`–`$07` |
+| The four letters | `$9000` | `$00:C000` |
+| Where it goes | the word at `$9004` | the word at `$00:C004`, an address in bank zero |
+
+### The cartridges in this repository
+
+They are sources, like the ROMs, and they are assembled when they are fitted.
+`cartridges/README.md` is the catalogue and the notes on writing one.
+
+| Cartridge | Machine | What it is |
+| --- | --- | --- |
+| `monitor` | Kestrel | Kestrel Machine Monitor: `D` dumps, `M` changes, `J` runs, `B` goes back to BASIC |
+| `tutor` | Kestrel | Kestrel Tutor: the multiplication tables, marked, with a score |
+| `colours` | Kestrel 16 | Kestrel 16 Colour Demonstration: the tube filled with texture and colour |
+
+### Fitting one
+
+```sh
+./start.sh cli --cart monitor                  # by name, assembled from its source
+./start.sh cli --cart monitor.bin              # or from an image already assembled
+./start.sh cli --model kestrel16 --cart colours
+./start.sh kestrel --cart monitor              # the window, fitted before it starts
+./start.sh cli --cartridges                    # what the machine could be sold
+```
+
+The window emulator fits one from **Cartridge** in its settings sheet, or from
+the **Cartridge** menu, and takes any image of exactly the slot's size. `--cart`
+with no machine named fits it to the Kestrel.
+
+A cartridge may hand the machine back: on the Kestrel, `JMP COLD_START` — the
+monitor's `B` — starts the language as though the machine had just been switched
+on.
 
 ---
 

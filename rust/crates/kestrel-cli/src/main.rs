@@ -8,8 +8,8 @@
 // not the machine.
 //
 //   kestrel [--model kestrel|kestrel16] [--frames N] [--type "LINE"]...
-//           [--file PATH] [--rom basic|monitor] [--roms DIR] [--disk IMAGE]
-//           [--tape IMAGE] [--no-screen]
+//           [--file PATH] [--rom basic|monitor] [--roms DIR] [--cart NAME|FILE]
+//           [--disk IMAGE] [--tape IMAGE] [--no-screen]
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -23,6 +23,7 @@ struct Options {
     lines: Vec<String>,
     rom: Option<String>,
     roms: Option<PathBuf>,
+    cartridge: Option<String>,
     screen: bool,
     disk: Option<PathBuf>,
     tape: Option<PathBuf>,
@@ -32,7 +33,8 @@ fn usage() {
     println!(
         "usage: kestrel [--model kestrel|kestrel16] [--frames N] [--type \"LINE\"]...\n\
          \x20              [--file PATH] [--rom basic|monitor] [--roms DIR]\n\
-         \x20              [--disk IMAGE] [--tape IMAGE] [--no-screen]\n\
+         \x20              [--cart NAME|FILE] [--disk IMAGE] [--tape IMAGE]\n\
+         \x20              [--no-screen]\n\
          \n\
          \x20 --model    which machine to power on (default kestrel)\n\
          \x20 --frames   frames to run before and after typing (default 40)\n\
@@ -41,6 +43,9 @@ fn usage() {
          \x20 --rom      which ROM to put in the Kestrel's socket: basic or monitor\n\
          \x20 --roms     a directory of assembled images; without it the ROMs are\n\
          \x20            assembled from roms/*.s when the machine starts\n\
+         \x20 --cart     a cartridge to fit: one of the names `--cartridges` lists,\n\
+         \x20            assembled from cartridges/*.s, or a file holding an image\n\
+         \x20 --cartridges  list the cartridges the repository ships for the model\n\
          \x20 --disk     a disk image to put in the drive; it is written back at exit\n\
          \x20 --tape     a tape image to put in the deck\n\
          \x20 --no-screen  run without printing the tube"
@@ -54,6 +59,7 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
         lines: Vec::new(),
         rom: None,
         roms: None,
+        cartridge: None,
         screen: true,
         disk: None,
         tape: None,
@@ -92,6 +98,18 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
             }
             "--rom" => options.rom = Some(value()?),
             "--roms" => options.roms = Some(PathBuf::from(value()?)),
+            "--cart" => options.cartridge = Some(value()?),
+            "--cartridges" => {
+                let names = kestrel_machine::roms::shipped_cartridges(options.model)
+                    .map_err(|error| error.to_string())?;
+                if names.is_empty() {
+                    println!("no cartridges for this model");
+                }
+                for name in names {
+                    println!("{name}");
+                }
+                return Err(String::new());
+            }
             "--disk" => options.disk = Some(PathBuf::from(value()?)),
             "--tape" => options.tape = Some(PathBuf::from(value()?)),
             "--no-screen" => options.screen = false,
@@ -132,6 +150,20 @@ fn run(options: &Options) -> Result<(), String> {
         machine
             .mount_tape_image(path)
             .map_err(|error| format!("{}: {error}", path.display()))?;
+    }
+    if let Some(cartridge) = &options.cartridge {
+        let path = PathBuf::from(cartridge);
+        if path.is_file() {
+            machine
+                .mount_cartridge(&path)
+                .map_err(|error| format!("{}: {error}", path.display()))?;
+        } else {
+            machine
+                .mount_assembled_cartridge(cartridge)
+                .map_err(|error| format!("cartridge {cartridge}: {error}"))?;
+        }
+        // The reset is what fits a cartridge: it is looked at once, on the way up.
+        machine.reset();
     }
     machine.run_frames(options.frames);
 

@@ -340,6 +340,32 @@ The reset vector is `$FFFC` on the Kestrel. On the Kestrel 16 the processor read
 its vectors from the top of bank zero, and leaves reset in emulation mode; the
 KERNAL's first few instructions leave emulation behind.
 
+### The cartridge, and the reset's one question
+
+A cartridge is a program in the machine from the moment it is switched on, and
+the reset is what starts it. Before either KERNAL starts its language it reads the
+first four bytes of the cartridge slot. `KSTL` there means a cartridge, and the
+word after the letters is where the machine goes; anything else means an empty
+slot, and the language starts as usual.
+
+| | Kestrel | Kestrel 16 |
+| --- | --- | --- |
+| The slot answers at | `$9000`–`$9FFF` | `$00:C000`–`$00:DFFF` |
+| The image | 4096 bytes | 131 072 bytes |
+| The whole image also answers | — | banks `$04`–`$07`, as the cartridge's own RAM |
+| The check | `CART_SCAN`, called from `RESET` in `roms/kestrel/kernal.s` | `CART_SCAN`, called from `RESET` in `roms/kestrel16/kernal.s` |
+| Where it goes | the word at `$9004` | the word at `$00:C004`, an address in bank zero |
+
+An empty slot reads as zero in bank zero, which is neither `K` nor a letter that
+could be mistaken for one, so a machine with nothing fitted has one branch to take
+and takes it. The image has to be the whole of the slot: a file of any other size
+is refused rather than half-fitted, because a cartridge that answered for part of
+its address range would be a machine fault that looked like a program fault.
+
+The sources are in `cartridges/`, one folder to a machine, and are assembled when
+they are fitted — by name on the command line, from the window's **Cartridge**
+page, or as an image already assembled. `cartridges/README.md` is the catalogue.
+
 ## The processors
 
 Both are used whole. Neither is interchangeable with the other: the machine

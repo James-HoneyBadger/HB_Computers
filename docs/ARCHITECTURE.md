@@ -85,6 +85,7 @@ tests prove it by typing at the machine and reading the screen back.
 | `kestrel-machine`, `cpu65816` | The 65816: widths, banks, the direct page, arithmetic, cycles |
 | `kestrel-machine`, `machine` | The Kestrel 16: its ROMs assemble, boot, and typing works |
 | `kestrel-cli`, `samples` | Every program in `samples/` runs, and prints what its `.expected` file says |
+| `kestrel-cli`, `cartridges` | Every cartridge assembles into the whole of its slot, and the reset starts the one that is fitted |
 | `kestrel-cli`, `emulator` | The emulator's front end: the model flag, switching models in a session, and the refusals |
 
 `./start.sh test` runs all of them.
