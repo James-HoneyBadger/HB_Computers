@@ -123,8 +123,8 @@ typed in lower case lists back the way it was typed.
 ## The window
 
 The window is the machine on a bench: the tube in the middle, a menu bar above
-it, and a status line below it that says what is fitted — the clock, the frame,
-the cycle count, and a lamp each for the disk, the tape and the cartridge.
+it, and a status line below it that says what is fitted — the clock, and a lamp
+each for the disk, the tape and the cartridge.
 
 | Menu | What it holds |
 | --- | --- |

@@ -717,29 +717,16 @@ impl App {
     fn status_bar(&mut self, ui: &mut egui::Ui) {
         let profile = self.machine.bus.profile;
         ui.horizontal(|ui| {
-            ui.label(
-                RichText::new(format!("{} MHz", profile.clock_hz / 1_000_000))
-                    .small()
-                    .color(TEXT),
-            );
-            dot(ui);
-            ui.label(
-                RichText::new(self.settings.speed.label())
-                    .small()
-                    .color(MUTED),
-            );
-            dot(ui);
-            ui.label(
-                RichText::new(format!("frame {}", self.machine.bus.frame_counter))
-                    .small()
-                    .color(MUTED),
-            );
-            dot(ui);
-            ui.label(
-                RichText::new(format!("{} cycles", self.machine.cpu.cycles()))
-                    .small()
-                    .color(MUTED),
-            );
+            // The clock, and the speed only when it is not the machine's own:
+            // two bare numbers for the same thing read as a mistake.
+            let clock = profile.clock_hz / 1_000_000;
+            let own = Speed::at_hertz(profile.clock_hz);
+            let clock_text = if self.settings.speed == own {
+                format!("{clock} MHz")
+            } else {
+                format!("{clock} MHz ({})", self.settings.speed.label())
+            };
+            ui.label(RichText::new(clock_text).small().color(TEXT));
             dot(ui);
             lamp(
                 ui,
