@@ -74,7 +74,7 @@ case "${1:-}" in
         exec "$root/rust/target/release/kestrel_computers" "$@"
         ;;
     kestrel|kestrel16|kestrel-16)
-        local model=$1
+        model=$1
         shift
         build_it release
         exec "$root/rust/target/release/kestrel_computers" --model "$model" "$@"
