@@ -4,6 +4,7 @@
 #
 #   ./start.sh                     the window, on the Kestrel
 #   ./start.sh kestrel16           the window, on the Kestrel 16
+#   ./start.sh window [args...]    the window, arguments passed through
 #   ./start.sh emu [arguments...]  the interactive emulator, either machine
 #   ./start.sh cli [arguments...]  the command line, arguments passed through
 #   ./start.sh test                every suite
@@ -66,9 +67,16 @@ case "${1:-}" in
         build_it release
         exec "$root/rust/target/release/kestrel_emu" "$@"
         ;;
-    kestrel|kestrel16|kestrel-16)
+    window)
+        shift
         build_it release
-        exec "$root/rust/target/release/kestrel_computers" --model "$1"
+        exec "$root/rust/target/release/kestrel_computers" "$@"
+        ;;
+    kestrel|kestrel16|kestrel-16)
+        local model=$1
+        shift
+        build_it release
+        exec "$root/rust/target/release/kestrel_computers" --model "$model" "$@"
         ;;
     "")
         build_it release
