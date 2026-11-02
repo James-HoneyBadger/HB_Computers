@@ -367,6 +367,7 @@ than its predecessor, and honest about it:
 | `GOSUB n` / `RETURN` | sixteen levels of subroutine |
 | `FOR v=a TO b` [`STEP s`] … `NEXT v` | a loop; `s` defaults to `1` and may be negative, but not zero |
 | `FORMAT` / `CATALOG` | write a volume, or list what is on it |
+| `FIND "NAME"` | entry, first sector and sector count of a file on the volume |
 | `SAVE "NAME"` / `LOAD "NAME"` / `DELETE "NAME"` | the program store and Kestrel DOS 2.0 |
 | `CLS` | clears the screen and prints the banner |
 | `REM` | a remark |
@@ -413,8 +414,8 @@ PRINT A$
 - **arrays, in part** — `DIM A(10)` and `A(i)` with one dimension, and whole
   words only: no string arrays, and no `DIM A(2,3)`;
 - **no other functions** — no `ABS`, no `DEF FN`;
-- **a filesystem, in part** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD` and `DELETE`
-  work; there is no `FIND` statement;
+- **a filesystem** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD`, `DELETE` and `FIND`
+  all work;
 - **no cassette blocks** — the tape is a byte stream and the block format is not
   written.
 

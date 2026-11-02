@@ -37,8 +37,8 @@ STRNUM          = $030438       ; the digits of a STR$: a sign and five more
 ; The arrays, in the same bank: a table of twenty-six entries, four bytes each
 ; -- where a letter's run starts and how many elements it has -- and a heap
 ; above the table that a DIM takes from and nothing gives back.
-ARRAYS          = $030500       ; twenty-six entries, four bytes each
-ARR_TOP         = $030568       ; two bytes: the heap's first free offset
+ARRAYS          = $030500       ; twenty-six entries, eight bytes each
+ARR_TOP         = $0305D0       ; two bytes: the heap's first free offset
 ARR_HEAP        = $1000         ; where the heap begins, as an offset in bank three
 ARR_LIMIT       = $FF00         ; and the first offset past the end of it
 ARR_MAX         = 4000          ; the longest run a DIM may ask for

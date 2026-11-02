@@ -186,6 +186,9 @@ KW_LOAD_END:
 KW_DELETE:
         .text "DELETE"
 KW_DELETE_END:
+KW_FIND:
+        .text "FIND"
+KW_FIND_END:
 KW_REM:
         .text "REM"
 KW_REM_END:
@@ -309,6 +312,12 @@ TXT_TOOLONG_END:
 TXT_SUBSCRIPT:
         .text "?SUBSCRIPT"
 TXT_SUBSCRIPT_END:
+TXT_NOTFOUND:
+        .text "?NOT FOUND"
+TXT_NOTFOUND_END:
+TXT_DISKERR:
+        .text "?DISK"
+TXT_DISKERR_END:
 
 SAY_BANNER:
         LDA #<TXT_BANNER
@@ -405,6 +414,28 @@ SAY_TOOLONG:
         LDA #BANK_BASIC
         STA ZP_PTR+2
         LDX.W #TXT_TOOLONG_END - TXT_TOOLONG
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_NOTFOUND:
+        LDA #<TXT_NOTFOUND
+        STA ZP_PTR
+        LDA #>TXT_NOTFOUND
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_NOTFOUND_END - TXT_NOTFOUND
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_DISKERR:
+        LDA #<TXT_DISKERR
+        STA ZP_PTR
+        LDA #>TXT_DISKERR
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_DISKERR_END - TXT_DISKERR
         JSL L_PRINT
         JSR SAY_NEWLINE
         RTS
@@ -723,6 +754,10 @@ EXEC_TRY_LET:
         LDY.W #KW_LOAD_END - KW_LOAD
         JSR MATCHKW
         BCS DO_LOAD
+        LDX.W #(KW_FIND & $FFFF)
+        LDY.W #KW_FIND_END - KW_FIND
+        JSR MATCHKW
+        BCS DO_FIND
         LDX.W #(KW_DELETE & $FFFF)
         LDY.W #KW_DELETE_END - KW_DELETE
         JSR MATCHKW
@@ -861,6 +896,55 @@ DELETE_NONAME:
         JSR SAY_NONAME
         BRA EXEC_DONE
 
+; DO_FIND: `FIND "NAME"` asks the filesystem where a name is and prints what it
+; says: the directory entry, the sector the file starts at, and how many sectors
+; it runs for. A program has to be told these, because the language has no way
+; of keeping a number the filesystem handed back.
+DO_FIND:
+        JSR PARSEFN
+        BCS FIND_NONAME
+        REP #$20
+        LDA.W #DOSNAME
+        SEP #$20
+        JSL L_DOSFIND
+        CMP #0
+        BEQ FIND_FOUND
+        CMP #1                  ; nought for a name that is there, one for a
+        BEQ FIND_MISSING        ; name that is not, two for a disk that would not
+        JSR SAY_DISKERR
+        BRA EXEC_DONE
+FIND_MISSING:
+        JSR SAY_NOTFOUND
+        BRA EXEC_DONE
+FIND_FOUND:
+        ; Each number is read out of the DOS's own zero page as it is printed:
+        ; PRINT's arithmetic uses every byte of the language's.
+        REP #$20
+        TXA
+        AND.W #$00FF
+        TAX
+        SEP #$20
+        JSR PRNUM
+        LDA #' '
+        JSL L_CHROUT
+        REP #$20
+        LDA ZP_DOSFIRST
+        TAX
+        SEP #$20
+        JSR PRNUM
+        LDA #' '
+        JSL L_CHROUT
+        REP #$20
+        LDA ZP_DOSCOUNT
+        TAX
+        SEP #$20
+        JSR PRNUM
+        JSR SAY_NEWLINE
+        BRA EXEC_DONE
+FIND_NONAME:
+        JSR SAY_NONAME
+        BRA EXEC_DONE
+
 ; PARSEFN: the quoted name after SAVE, LOAD or DELETE goes to DOSNAME, upper
 ; case and padded with spaces to the sixteen bytes the directory holds. Carry is
 ; set when there was no quoted name at all.
@@ -964,15 +1048,32 @@ ASSIGN_MISMATCH:
         RTS
 ASSIGN_ARRAY:
         JSR SRC_STEP            ; past the opening bracket
-        JSR EXPR                ; X = the subscript
+        JSR EXPR                ; X = the first subscript
+        PHX
+        REP #$20
+        LDA.W #0
+        STA ZP_B                ; no second subscript yet
+        SEP #$20
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #','
+        BNE ASSIGN_ARRAY_CLOSE
+        JSR SRC_STEP
+        JSR EXPR
+        REP #$20
+        TXA
+        STA ZP_B
+        SEP #$20
+ASSIGN_ARRAY_CLOSE:
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #')'
         BNE ASSIGN_SUBSCRIPT
         JSR SRC_STEP
-        LDA ZP_VAR              ; the letter, which the subscript cannot take
+        LDA ZP_VAR              ; the letter, which the subscripts cannot take
         STA ZP_ARR
-        JSR ARR_ELEM            ; ZP_SDST = the element, and X survives it
+        PLX
+        JSR ARR_ELEM            ; ZP_SDST = the element
         BCS ASSIGN_SUBSCRIPT
         JSR SKIPSP
         LDA [ZP_SRC]
@@ -1769,49 +1870,68 @@ STR_STORE_LONG:
 
 ; ARR_ENTRY: ZP_ARR = a letter's number. X = that letter's entry in the table.
 ; The letter has a byte of its own because the expressions of a DIM and a
-; subscript use every other scratch there is: ZP_CH is the digit of a number and
-; the letter of a variable, and it is gone by the time the table is wanted.
+; subscript use every other scratch there is.
 ;
-; Its callers are on both sides of a REP: the arithmetic of a DIM is sixteen
-; bits wide, so the width it was entered with has to be the width it leaves --
-; an eight-bit return from here turned the `CMP.W` after it into two bytes and a
-; stray opcode, which the processor took as a reset.
+; An entry is eight bytes: where the run starts in bank three, how many elements
+; it has, how many rows, and how many columns. A one-dimensional array is a
+; column of one, which is what lets one rule index both: the element at `(i,j)`
+; is `i + j * rows`, counting from nought, with the first subscript varying
+; fastest -- the order every BASIC since the first one has used.
 ARR_ENTRY:
         PHP
         REP #$20
         LDA ZP_ARR
         AND.W #$00FF
         ASL A
-        ASL A                   ; four bytes an entry
+        ASL A
+        ASL A                   ; eight bytes an entry
         TAX
         PLP                     ; the caller's widths, and its flags, come back
         RTS
 
-; ARR_ELEM: X = a subscript, ZP_ARR = the letter. ZP_SDST = that element in bank
-; three. Carry set, and nothing written, when the letter has no array or the
-; subscript is outside it.
+; ARR_ELEM: X = the first subscript, ZP_B = the second (nought for a one-
+; dimensional array), ZP_ARR = the letter. ZP_SDST = that element in bank three.
+; Carry set, and nothing written, when the letter has no array or a subscript is
+; outside it.
 ARR_ELEM:
         REP #$20
         TXA
         BMI ARR_ELEM_BAD        ; below nought
-        STA ZP_A                ; the subscript
-        LDA ZP_ARR
-        AND.W #$00FF
-        ASL A
-        ASL A
-        TAX                     ; the entry, in X: there is no long,Y to index by
-        LDA.L ARRAYS+2,X        ; how many elements the letter's array has
+        STA ZP_TMP16            ; the first subscript
+        JSR ARR_ENTRY
+        LDA.L ARRAYS+4,X        ; how many rows
         BEQ ARR_ELEM_BAD        ; nought: DIM never made one
-        CMP ZP_A
-        BEQ ARR_ELEM_BAD        ; the end is one past the last element
+        CMP ZP_TMP16
+        BEQ ARR_ELEM_BAD        ; the end is one past the last
         BCC ARR_ELEM_BAD
+        LDA.L ARRAYS+6,X        ; and how many columns
+        CMP ZP_B
+        BEQ ARR_ELEM_BAD
+        BCC ARR_ELEM_BAD
+        LDA ZP_B                ; the element is i + j * rows
+        BEQ ARR_ELEM_FIRST_ROW
+        STA ZP_A
+        LDA.L ARRAYS+4,X
+        STA ZP_B
+        JSR UMUL16              ; ZP_A = j * rows
+        REP #$20                ; the product is a word, so read it as one
+        LDA ZP_A
+        CLC
+        ADC ZP_TMP16
+        STA ZP_A
+        BRA ARR_ELEM_ADDRESS
+ARR_ELEM_FIRST_ROW:
+        LDA ZP_TMP16
+        STA ZP_A
+ARR_ELEM_ADDRESS:
+        JSR ARR_ENTRY           ; X again: the multiply used Y
         LDA.L ARRAYS,X          ; where the run starts
         STA ZP_B
         LDA ZP_A
         ASL A                   ; two bytes an element
         CLC
         ADC ZP_B
-        STA ZP_SDST             ; the element's offset in bank three
+        STA ZP_SDST
         SEP #$20
         LDA #BANK_STR
         STA ZP_SDST+2
@@ -1823,7 +1943,9 @@ ARR_ELEM_BAD:
         RTS
 
 ; DO_DIM: `DIM A(10)` gives A eleven elements, nought to ten, which is what the
-; 1982 machine's automatic eleven meant. One dimension, one letter, one line.
+; 1982 machine's automatic eleven meant; `DIM A(2,3)` gives twelve, indexed
+; `A(i,j)` with the first subscript varying fastest and each counting from
+; nought. One letter, one line, and the DIM comes before the use.
 DO_DIM:
         JSR SKIPSP
         JSR IS_ALPHA
@@ -1832,7 +1954,7 @@ DO_DIM:
         JSR TO_UPPER
         SEC
         SBC #'A'
-        STA ZP_VAR              ; kept there: the bound is an expression
+        STA ZP_VAR              ; kept there: the bounds are expressions
         STA ZP_ARR
         JSR SRC_STEP
         JSR SKIPSP
@@ -1840,7 +1962,25 @@ DO_DIM:
         CMP #'('
         BNE DIM_BAD
         JSR SRC_STEP
-        JSR EXPR
+        JSR EXPR                ; X = the first bound
+        PHX                     ; it waits on the stack: the second bound is an
+        JSR SKIPSP              ; expression too, and expressions use every byte
+        LDA [ZP_SRC]            ; of the scratch this could have been kept in
+        CMP #','
+        BEQ DIM_SECOND
+        REP #$20
+        LDA.W #1
+        STA ZP_B                ; one column, until a second bound says otherwise
+        PLX                     ; the rows come back
+        BRA DIM_CHECK
+DIM_SECOND:
+        JSR SRC_STEP
+        JSR EXPR                ; X = the second bound
+        REP #$20
+        TXA
+        STA ZP_B                ; the columns, waiting their turn to be checked
+        PLX                     ; and the rows
+DIM_CHECK:
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #')'
@@ -1852,37 +1992,72 @@ DO_DIM:
         CMP.W #ARR_MAX
         BCS DIM_BAD_WIDE
         INC A
-        STA ZP_CNT              ; the elements, nought included
+        STA ZP_TMP16            ; the rows, nought included
+        LDA ZP_B
+        BMI DIM_BAD_WIDE
+        CMP.W #ARR_MAX
+        BCS DIM_BAD_WIDE
+        INC A
+        STA ZP_CNT2             ; and the columns
+        ; from here nothing parses an expression, so the shape stays put
+        LDA ZP_TMP16
+        STA ZP_A
+        LDA ZP_CNT2
+        STA ZP_B
+        ; the elements are rows times columns, added up rather than multiplied:
+        ; the sum stops the moment it passes what the heap could ever hold, and
+        ; a product that would overflow sixteen bits stops it even sooner.
+        LDA.W #0
+        STA ZP_CNT              ; the elements so far
+DIM_TIMES:
+        LDA ZP_B                ; columns still to add
+        BEQ DIM_TIMES_DONE
+        LDA ZP_CNT
+        CLC
+        ADC ZP_A                ; one more column's worth of rows
+        CMP.W #ARR_MAX
+        BCS DIM_BAD_WIDE
+        STA ZP_CNT
+        DEC ZP_B
+        BRA DIM_TIMES
+DIM_TIMES_DONE:
+        LDA ZP_CNT
+        BNE DIM_HAVE_SIZE       ; an array of nothing is not an array
+        BRA DIM_BAD_WIDE
+DIM_HAVE_SIZE:
         LDA ZP_VAR
-        STA ZP_ARR              ; the bound may have been an array element itself
+        STA ZP_ARR              ; the bounds may have been array elements
         JSR ARR_ENTRY
         ; a run of the same size or less is already the letter's, and stays so
         LDA.L ARRAYS,X
         BEQ DIM_TAKE            ; never dimensioned: it needs a run
-        LDA.L ARRAYS+2,X        ; how many it has now
+        LDA.L ARRAYS+2,X        ; how many elements it has now
         CMP ZP_CNT
         BCC DIM_TAKE            ; smaller than the new one: a new run
         LDA ZP_CNT
         STA.L ARRAYS+2,X        ; as many as were asked for, same place
-        SEP #$20
-        RTS
+        BRA DIM_SHAPE
 DIM_TAKE:
         LDA.L ARR_TOP           ; where the heap is
-        STA ZP_A
+        STA ZP_B                ; the run will begin there
         LDA ZP_CNT
         ASL A                   ; two bytes an element
         CLC
-        ADC ZP_A
+        ADC ZP_B
         CMP.W #ARR_LIMIT
         BCS DIM_NOROOM
         STA.L ARR_TOP           ; the heap has grown
-        LDA ZP_VAR
-        STA ZP_ARR
         JSR ARR_ENTRY
-        LDA ZP_A
+        LDA ZP_B
         STA.L ARRAYS,X          ; where the run starts
         LDA ZP_CNT
-        STA.L ARRAYS+2,X        ; and how long it is
+        STA.L ARRAYS+2,X        ; and how many elements it holds
+DIM_SHAPE:
+        JSR ARR_ENTRY
+        LDA ZP_TMP16
+        STA.L ARRAYS+4,X        ; the rows
+        LDA ZP_CNT2
+        STA.L ARRAYS+6,X        ; and the columns
         SEP #$20
         RTS
 DIM_NOROOM:
@@ -2609,11 +2784,26 @@ FACTOR_VAR:
         SEP #$20
         RTS
 FACTOR_ARRAY:
-        LDA ZP_CH               ; the letter, which the subscript cannot take
+        LDA ZP_CH               ; the letter, which the subscripts cannot take
         STA ZP_ARR
         JSR SRC_STEP            ; past the opening bracket
-        JSR EXPR                ; X = the subscript
+        JSR EXPR                ; X = the first subscript
         PHX
+        REP #$20
+        LDA.W #0
+        STA ZP_B                ; no second subscript yet
+        SEP #$20
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #','
+        BNE FACTOR_ARRAY_CLOSE
+        JSR SRC_STEP
+        JSR EXPR                ; X = the second
+        REP #$20
+        TXA
+        STA ZP_B
+        SEP #$20
+FACTOR_ARRAY_CLOSE:
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #')'

@@ -841,6 +841,73 @@ mod tests {
         );
     }
 
+    /// `DIM M(2,2)` gives three rows of three, indexed `M(i,j)` with the first
+    /// subscript varying fastest, which is the order every BASIC has used since
+    /// the first one.
+    #[test]
+    fn a_1992_array_can_have_two_subscripts() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 DIM M(2,2)",
+            "20 FOR I=0 TO 2",
+            "30 FOR J=0 TO 2",
+            "40 M(I,J)=I*10+J",
+            "50 NEXT J",
+            "60 NEXT I",
+            "70 FOR I=0 TO 2",
+            "80 PRINT M(I,0)+M(I,1)+M(I,2);\" \";",
+            "90 NEXT I",
+            "100 PRINT",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(80);
+
+        assert!(
+            machine.screen_text().lines().any(|row| row.trim() == "3 33 63"),
+            "each row of the matrix came back:\n{}",
+            machine.screen_text()
+        );
+
+        machine.type_line_paced("PRINT M(3,0)");
+        machine.type_line_paced("PRINT M(0,3)");
+        machine.run_frames(40);
+        assert!(
+            machine.screen_text().matches("?SUBSCRIPT").count() >= 2,
+            "a subscript past the end is refused, either side:\n{}",
+            machine.screen_text()
+        );
+    }
+
+    /// `FIND "NAME"` prints what the filesystem knows: the directory entry, the
+    /// sector the file starts at, and how many sectors it runs for.
+    #[test]
+    fn a_1992_find_says_where_a_file_is() {
+        let path = std::env::temp_dir().join("kestrel16-dos-find-statement.dsk");
+        std::fs::write(&path, vec![0u8; 4096 * 512]).expect("a blank volume");
+
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_disk_image(&path).expect("a disk in the drive");
+        machine.type_line_paced("FORMAT");
+        machine.type_line_paced("10 PRINT 1");
+        machine.type_line_paced("SAVE \"TEST\"");
+        machine.type_line_paced("FIND \"TEST\"");
+        machine.type_line_paced("FIND \"NOPE\"");
+        machine.run_frames(60);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "0 2 1"),
+            "the entry, the first sector and the count:\n{screen}"
+        );
+        assert!(
+            screen.contains("?NOT FOUND"),
+            "and a name that is not there is named:\n{screen}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
     /// A string is thirty-one characters, an assignment that will not fit is
     /// refused and leaves the old text alone, and a number given to a string
     /// variable is named as the mistake it is.

@@ -194,7 +194,8 @@ THE ANSWER IS 42
 | `CHR$(n)` / `ASC(A$)` | the character with that number, and the number of the first character |
 | `STR$(n)` / `VAL(A$)` | the digits of a number, and the number those digits begin with |
 | `PEEK(addr)` / `POKE addr,value` | one byte of bank zero, which is where the tube, the I/O page and the program are |
-| `DIM A(10)` | an array of eleven words, `A(0)` to `A(10)`; one dimension, and the `DIM` comes first |
+| `FIND "NAME"` | where a file is: its directory entry, the sector it starts at, and how many it runs for |
+| `DIM A(10)` / `DIM M(2,3)` | an array of eleven words, `A(0)` to `A(10)`, or of twelve, `M(i,j)`; one or two dimensions, and the `DIM` comes first |
 | `CLS` | Clear the screen and print the banner |
 | `REM` | A remark |
 | `END` | Finish the line |
@@ -271,9 +272,9 @@ The honest list, because a manual that hides it is worse than useless:
   `DIM` that asks for more elements than the letter already has takes a fresh
   run from the heap and does not give the old one back;
 - **no other functions** — no `ABS`, no `DEF FN`;
-- **a filesystem, in part** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD` and `DELETE`
-  work; there is no `FIND` statement. The volume format below is fixed, so
-  anything written against it keeps working;
+- **a filesystem** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD`, `DELETE` and `FIND`
+  all work. The volume format below is fixed, so anything written against it
+  keeps working;
 - **no cassette blocks** — the tape is a byte stream and the KERNAL has the
   registers, but the block format is not written.
 

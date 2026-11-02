@@ -91,12 +91,14 @@ CLEAR_ARRAYS:
 CLEAR_ARRAYS_LOOP:
         LDA.W #0
         STA.L ARRAYS,X          ; the run's offset, both bytes of it
-        STA.L ARRAYS+2,X        ; and its count: four bytes an entry, not two
+        STA.L ARRAYS+2,X        ; its count of elements, and
+        STA.L ARRAYS+4,X        ; the rows and columns it was given:
+        STA.L ARRAYS+6,X        ; eight bytes an entry, not four
         TXA
         CLC
-        ADC.W #4
+        ADC.W #8
         TAX
-        CPX.W #(26*4)
+        CPX.W #(26*8)
         BCC CLEAR_ARRAYS_LOOP
         LDA.W #ARR_HEAP
         STA.L ARR_TOP
