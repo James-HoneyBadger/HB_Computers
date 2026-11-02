@@ -24,6 +24,7 @@ READY.
 | Frame | 50 Hz, so 160 000 cycles a frame |
 | RAM | 1 MiB, spread over banks `$00`–`$0F` under the ROM and I/O windows |
 | ROM | an 8 KiB KERNAL at the top of bank zero; a 64 KiB language ROM in bank one |
+| Cartridge | 128 KiB across an 8 KiB window at `$00:C000` and banks `$04`–`$07` |
 | Tube | 80 × 50 cells, sixteen colours for ink and sixteen for paper |
 | Keyboard | a 32-key controller buffer |
 | Sound | one latch byte, as on the Kestrel |
@@ -331,6 +332,19 @@ A file is a run of consecutive sectors, never a chain, so a save takes the lowes
 run on the map that is long enough for it and writes the whole file in order. A
 volume that has had files deleted therefore fills its holes before it grows, and
 a file that will not fit in any hole is refused rather than split.
+
+## The ROMs, and what was sold for it
+
+The Kestrel 16 has no language socket. Its language is one whole bank, and a
+machine of 1992 sold its extra software on a cartridge instead of on a chip, so
+the bank holds what the machine was switched on with — Kestrel 16 BASIC 2.0 — and
+everything else lives in [the cartridge catalogue](../cartridges/README.md). The
+1982 machine, by contrast, has a socket and a series of ROMs for it: see
+[the ROM catalogue](../../roms/README.md).
+
+`--languages` says what a machine's ROM folder holds, and on the Kestrel 16 that
+is one name; asking for another prints the list it does have rather than failing
+obscurely.
 
 ## Writing for the machine
 
