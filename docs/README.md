@@ -8,7 +8,7 @@ to be read; the references are for looking things up.
 | [Instruction Manual](instruction-manual.md) | you have just unboxed the machines | what they are, how to build and start them, the keyboard, the window, the media, your first session, what to do when it goes wrong |
 | [User Guide](users-guide.md) | you want to write a program | Kestrel BASIC from `PRINT` to `DEF FN`, the monitor ROM, Kestrel DOS, Kestrel 16 BASIC, errors, worked examples, the samples |
 | [Technical Reference](technical-reference.md) | you need an address, a register or a format | both memory maps, both I/O pages, the colours, the bus decode order, interrupts and the frame, the disk layouts, the cassette, the ROM images, the processors |
-| [Programmer's Guide](programmers-guide.md) | you are writing for the machines, or changing the emulator | the assemblers' pitfalls, the KERNAL's two tables, the C++ API, adding a register, the eight test suites, the build, the house rules |
+| [Programmer's Guide](programmers-guide.md) | you are writing for the machines, or changing the emulator | the assemblers' pitfalls, the KERNAL's two tables, the emulator's API, adding a register, the test suites, the build, the house rules |
 | [The tools](TOOLS.md) | you need an option rather than an explanation | both assemblers' full dialect and options, the command line, the window, the build targets |
 | [Architecture](ARCHITECTURE.md) | you are finding your way around the source | the libraries, the machine's parts, which file holds what |
 
@@ -25,12 +25,12 @@ chapters:
 Documentation is part of this machine, not a description of it. Every table in
 these books is written against a source in the tree:
 
-- **maps and registers** — `include/kestrel/model1982/map.hpp` and
-  `include/kestrel/model1992/map.hpp`, and the `.inc` files beside the ROMs;
-- **behaviour** — the ROMs themselves, and the suites that type at them:
-  `tests/kestrel_machine_tests.cpp`, `tests/kestrel16_machine_tests.cpp`;
-- **the processors** — `tests/kestrel_cpu_tests.cpp`,
-  `tests/kestrel16_cpu_tests.cpp`;
+- **maps and registers** — `rust/crates/kestrel-machine/src/bus.rs`, and the
+  `.inc` files beside the ROMs;
+- **behaviour** — the ROMs themselves, and the tests that type at them:
+  `rust/crates/kestrel-machine/src/machine.rs`;
+- **the processors** — `rust/crates/kestrel-machine/src/cpu6502.rs` and
+  `cpu65816.rs`, and their tests;
 - **the samples** — `samples/`, with a `.expected` file beside each program.
 
 If a book and a machine disagree, one of them is a bug. The rule in this tree is

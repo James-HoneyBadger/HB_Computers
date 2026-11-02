@@ -26,7 +26,7 @@ the same goes for every number in the source.
 | `--size` | The size of the image; the rest is filled |
 | `--fill` | The fill byte, `$FF` for an erased EPROM by default |
 | `--bin` | Write the image |
-| `--header` | Write a C++ header of the bytes, which is what the build uses |
+| `--header` | Write a C header of the bytes, for a host that wants them as C |
 | `--symbols` | Write every label's address |
 | `--listing` | Write the listing: addresses, bytes and source |
 
@@ -110,7 +110,7 @@ One executable, two models. It powers a machine on, runs it, types at it and
 prints the screen.
 
 ```bash
-$ ./build/kestrel --model kestrel --type "PRINT 2+2"
+$ ./start.sh cli --model kestrel --type "PRINT 2+2"
 *** KESTREL BASIC V2.0 ROM ***
 64K RAM SYSTEM
 (C) 1982 HONEYBADGER SYSTEMS
@@ -138,7 +138,7 @@ before the next. Pasting a whole line in at once overruns the sixteen-key buffer
 and loses characters, Return included — which welds two program lines into one.
 
 ```bash
-$ ./build/kestrel --rom monitor --type "S 0900 0902" --type "L"
+$ ./start.sh cli --rom monitor --type "S 0900 0902" --type "L"
 ```
 
 `--rom monitor` boots the machine with the monitor in the socket instead of BASIC,
@@ -149,8 +149,8 @@ the speed a person could type them, so a numbered line is stored and a `RUN`
 afterwards runs it.
 
 ```bash
-$ ./build/kestrel --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
-$ ./build/kestrel --model kestrel16 --file samples/kestrel16/03-division.bas
+$ ./start.sh cli --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
+$ ./start.sh cli --model kestrel16 --file samples/kestrel16/03-division.bas
 ```
 
 ---
@@ -163,7 +163,7 @@ are sitting at.
 
 ```bash
 ./start.sh emu                    # asks which machine when there is a keyboard
-./build/kestrel_emu --model kestrel16
+./start.sh emu --model kestrel16
 ```
 
 ```text
@@ -225,9 +225,9 @@ noise when nobody is watching.
 The same machines with a tube you can watch and a keyboard you can use.
 
 ```bash
-./build/kestrel_computers                    # the Kestrel
-./build/kestrel_computers --model kestrel16  # the Kestrel 16
-./build/kestrel_computers --shot tube.png    # photograph it and exit, for CI
+./start.sh                    # the Kestrel
+./start.sh --model kestrel16  # the Kestrel 16
+./start.sh --shot tube.png    # photograph it and exit, for CI
 ```
 
 The window offers the machine's speed, its ROM socket and cartridge (on the 1982
@@ -239,20 +239,19 @@ on.
 ## The build
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-ctest --test-dir build --output-on-failure
+cd rust
+cargo build --release    # the three programs, in rust/target/release
+cargo test               # every suite
 ```
 
-| Target | Builds |
+| Crate | Builds |
 | --- | --- |
-| `kestrel_roms` | The Kestrel's ROM images, as headers |
-| `kestrel16_roms` | The Kestrel 16's ROM images |
-| `kestrel_machine` | The machine, both models |
-| `kestrel` | The command line |
-| `kestrel_computers` | The window, if Qt 6 Widgets is found |
-| `kestrel_*_tests` | The eight suites |
+| `kestrel-machine` | the library: profile, devices, bus, both processors, the machine |
+| `kestrel-asm` | `kestrel_asm`, the Kestrel's assembler |
+| `kestrel16-asm` | `kestrel16_asm`, the Kestrel 16's assembler |
+| `kestrel-cli` | `kestrel` and `kestrel_emu` |
+| `kestrel-app` | `kestrel_computers`, the window |
 
-Each ROM is assembled by a custom command into `build/generated/`, with a header
-of the bytes and a listing beside it. A change to a `.s` file rebuilds the image,
-the header and everything that includes it.
+There is no ROM build step: the programs assemble `roms/*.s` when they start, with
+the same two assemblers, once per process. A change to a `.s` file is therefore in
+the next run, and a test can never be run against yesterday's ROM.

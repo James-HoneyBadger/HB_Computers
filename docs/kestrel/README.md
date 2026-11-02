@@ -55,7 +55,7 @@ READY.
 | `$E000`–`$FFFF` | The KERNAL |
 | `$FFFA`–`$FFFF` | The 6502's interrupt vectors |
 
-The map is written twice — `include/kestrel/model1982/map.hpp` for the emulator
+The map is written twice — `rust/crates/kestrel-machine/src/bus.rs` for the emulator
 and `roms/kestrel/kestrel.inc` for the ROMs — and the two are changed together.
 
 ### The I/O page
@@ -365,11 +365,19 @@ The honest list, because a manual that hides it is worse than useless:
 
 The language is `roms/kestrel/basic.s`; the KERNAL is `roms/kestrel/kernal.s`;
 Kestrel DOS is `roms/kestrel/dos.s`; the map and the constants are
-`roms/kestrel/kestrel.inc`. `kestrel_asm` assembles them, and the build does it
-for you:
+`roms/kestrel/kestrel.inc`. `kestrel_asm` assembles them, and the machine does it
+for you when it starts:
 
 ```bash
-cmake --build build --target kestrel_roms
+./start.sh cli --type "PRINT 2+2"
+```
+
+To assemble an image by hand:
+
+```bash
+cd roms/kestrel
+../../rust/target/release/kestrel_asm basic.s --name basic \
+    --origin 0xA000 --size 16384 --fill 0xFF --bin basic.bin --listing basic.lst
 ```
 
 A program you write in assembly is assembled into a ROM image and either put in
@@ -380,7 +388,7 @@ that is already in memory. [The tools page](../TOOLS.md) covers both assemblers.
 
 ## Colophon
 
-The machine is `kestrel::Machine` built for `Model::Kestrel`. Its tests type at it
-and read the screen back — `kestrel_cpu_tests` for the processor,
-`kestrel_machine_tests` for the machine and its ROMs, `kestrel_asm_tests` for the
-dialect. The 1992 machine is [the Kestrel 16](../kestrel16/README.md).
+The machine is `Machine` built for `Model::Kestrel`. Its tests type at it and read
+the screen back — `cpu6502.rs` for the processor, `machine.rs` for the machine and
+its ROMs, `kestrel-asm` for the dialect. The 1992 machine is
+[the Kestrel 16](../kestrel16/README.md).

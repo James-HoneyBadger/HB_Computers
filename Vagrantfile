@@ -7,10 +7,10 @@
 #   vagrant halt        # stop it
 #   vagrant destroy -f  # throw it away
 #
-# The guest is Ubuntu 22.04: g++ 12 (C++20), CMake 3.22, and Qt 6 Widgets, which
-# is everything the tree asks for. The window needs a display, so it is built and
-# its tests are run, but it is not started -- the command line emulator and the
-# seven suites are what the provisioning proves.
+# The guest is Ubuntu 22.04 with a Rust toolchain and the libraries egui needs to
+# build (an X11/wayland client, and the usual dev headers). The window needs a
+# display, so it is built and its tests are run, but it is not started -- the
+# command line, the emulator and the suites are what the provisioning proves.
 #
 # With libvirt rather than VirtualBox:
 #
@@ -28,7 +28,13 @@ $packages = <<~SHELL
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
   apt-get install -y --no-install-recommends \
-      build-essential cmake ninja-build qt6-base-dev
+      build-essential pkg-config libx11-dev libxi-dev libgl1-mesa-dev \
+      libxkbcommon-dev libwayland-dev curl ca-certificates
+  # rustup installs a toolchain for the person who runs it, which is why the
+  # provisioning below is done as the vagrant user and not as root.
+  if [ ! -x /home/vagrant/.cargo/bin/cargo ]; then
+      sudo -u vagrant sh -c 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal'
+  fi
 SHELL
 
 # Run as the vagrant user, not as root: the tree is the synced folder, and a
@@ -36,9 +42,10 @@ SHELL
 $build = <<~SHELL
   set -euo pipefail
   cd /vagrant
-  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
-  cmake --build build -j "$(nproc)"
-  ctest --test-dir build --output-on-failure
+  export PATH="$HOME/.cargo/bin:$PATH"
+  cd rust
+  cargo build --release
+  cargo test
 
   echo
   echo "The machines are built. From here:"

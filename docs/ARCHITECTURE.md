@@ -19,34 +19,35 @@ One emulator, two models, and two assemblers. Everything else is a ROM image.
 
 ## The libraries
 
-| Target | What it is | Needs Qt |
-| --- | --- | --- |
-| `kestrel_machine` | The machine: both processors, the bus, the tube, the keyboard, the disk, the tape | no |
-| `kestrel` | The command line: `--model kestrel\|kestrel16`, type at it, print the screen | no |
-| `kestrel_emu` | The interactive emulator: choose a machine, type at it, `/model` to switch | no |
-| `kestrel_computers` | The window | Qt 6 Widgets |
+| Crate | What it is |
+| --- | --- |
+| `kestrel-machine` | The machine: both processors, the bus, the tube, the keyboard, the disk, the tape, and the ROMs assembled from source |
+| `kestrel-asm`, `kestrel16-asm` | The two assemblers, as libraries and as the `kestrel_asm`/`kestrel16_asm` programs |
+| `kestrel-cli` | `kestrel`, the command line, and `kestrel_emu`, the interactive emulator |
+| `kestrel-app` | `kestrel_computers`, the window, in egui |
 
-Apart from Qt for the window, there are no other dependencies: the machine, the
-tools and the tests are C++20 and the standard library.
+Apart from egui and the windowing it pulls in, there are no dependencies beyond
+the standard library.
 
 ## The machine
 
-`kestrel::Machine` is built for a `kestrel::Model`. The profile table in
-`src/kestrel/machine.cpp` says what that model is, and the bus decodes against
+`Machine` is built for a `Model`. The profile table in
+`rust/crates/kestrel-machine/src/profile.rs` says what that model is, and the bus decodes against
 it: RAM, the ROM windows, the cartridge, the tube's two arrays and the I/O page.
 
 | File | Part |
 | --- | --- |
-| `src/kestrel/machine.cpp` | The profiles, the address decode, the I/O page, the frame, the disk commands |
-| `src/kestrel/devices.cpp` | The tube, the keyboard, the disk and the tape, parameterised by the profile |
-| `src/kestrel/model1982/cpu6502.cpp` | The Kestrel's processor, whole |
-| `src/kestrel/model1992/cpu65816.cpp` | The Kestrel 16's processor, whole |
-| `src/kestrel/model1982/roms.cpp` | The table of ROMs the 1982 machine can be given |
+| `rust/crates/kestrel-machine/src/profile.rs` | What each model is, in one table |
+| `rust/crates/kestrel-machine/src/bus.rs` | The address decode, the I/O page and its states, the disk commands |
+| `rust/crates/kestrel-machine/src/machine.rs` | The processor joined to the bus: frames, typing, reading the tube |
+| `rust/crates/kestrel-machine/src/devices.rs` | The tube, the keyboard, the disk and the tape, parameterised by the profile |
+| `rust/crates/kestrel-machine/src/cpu6502.rs` | The Kestrel's processor, whole |
+| `rust/crates/kestrel-machine/src/cpu65816.rs` | The Kestrel 16's processor, whole |
+| `rust/crates/kestrel-machine/src/roms.rs` | The ROMs, assembled from `roms/*.s` at start-up |
 
-The two processors are not interchangeable and the machine never substitutes one
-for the other: `cpu6502()` and `cpu65816()` are separate accessors over separate
-classes, and only the one the model has is stepped, so a fault in one cannot
-show up as a fault in the other.
+The two processors are not interchangeable: they are separate types, and the
+`Cpu` enum the machine holds is decided once at power-on, so only the one the
+model has is ever stepped. A fault in one cannot show up as a fault in the other.
 
 ### The two models
 
@@ -58,14 +59,14 @@ show up as a fault in the other.
 | Language | socket ROM at `$A000` | bank `$01` |
 | Disk | 512 x 256 | 4096 x 512 |
 
-Each model's map has exactly one home — `include/kestrel/model1982/map.hpp` and
-`include/kestrel/model1992/map.hpp` — and `roms/kestrel/kestrel.inc` and
+Each model's map has exactly one home — `rust/crates/kestrel-machine/src/bus.rs` and
+`rust/crates/kestrel-machine/src/bus.rs` — and `roms/kestrel/kestrel.inc` and
 `roms/kestrel16/kestrel16.inc` repeat them for the ROMs. The pairs are changed
 together, in the same commit.
 
 ## The ROMs
 
-The languages are not C++: they are `roms/kestrel/*.s` and `roms/kestrel16/*.s`,
+The languages are not Rust: they are `roms/kestrel/*.s` and `roms/kestrel16/*.s`,
 assembled at build time by `kestrel_asm` and `kestrel16_asm` into headers of
 bytes that the machine is given. A change to a ROM is a change to the machine,
 and the machine tests prove it by typing at the machine and reading the screen
@@ -75,13 +76,15 @@ back.
 
 | Suite | What it proves |
 | --- | --- |
-| `kestrel_asm_tests` | The dialect the 6502 ROMs are written in |
-| `kestrel_cpu_tests` | The 6502: addressing, arithmetic, flags, cycles, interrupts |
-| `kestrel_machine_tests` | The Kestrel: its ROMs boot, and typing at it works |
-| `kestrel16_asm_tests` | Every 65816 addressing mode and width rule, byte for byte |
-| `kestrel16_cpu_tests` | The 65816: widths, banks, the direct page, arithmetic, cycles |
-| `kestrel16_machine_tests` | The Kestrel 16: its ROMs boot, and typing at it works |
-| `kestrel_samples_tests` | Every program in `samples/` runs, and prints what its `.expected` file says |
-| `kestrel_emu_tests` | The emulator's front end: the model flag, switching models in a session, and the refusals |
+| Where | Proves |
+| --- | --- |
+| `kestrel-asm` | The dialect the 6502 ROMs are written in |
+| `kestrel-machine`, `cpu6502` | The 6502: addressing, arithmetic, flags, cycles, interrupts |
+| `kestrel-machine`, `machine` | The Kestrel: its ROMs assemble, boot, and typing works |
+| `kestrel16-asm` | Every 65816 addressing mode and width rule, byte for byte |
+| `kestrel-machine`, `cpu65816` | The 65816: widths, banks, the direct page, arithmetic, cycles |
+| `kestrel-machine`, `machine` | The Kestrel 16: its ROMs assemble, boot, and typing works |
+| `kestrel-cli`, `samples` | Every program in `samples/` runs, and prints what its `.expected` file says |
+| `kestrel-cli`, `emulator` | The emulator's front end: the model flag, switching models in a session, and the refusals |
 
-`ctest --test-dir build` runs all of them.
+`./start.sh test` runs all of them.

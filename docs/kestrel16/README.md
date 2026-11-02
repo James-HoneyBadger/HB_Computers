@@ -54,7 +54,7 @@ rather than one page. Bank zero keeps the shape the Kestrel had.
 A megabyte is all sixteen banks; what the table above lists as ROM, cartridge and
 I/O is what stands in front of it.
 
-The map is written twice — `include/kestrel/model1992/map.hpp` for the emulator
+The map is written twice — `rust/crates/kestrel-machine/src/bus.rs` for the emulator
 and `roms/kestrel16/kestrel16.inc` for the ROMs — and the two are changed
 together.
 
@@ -234,10 +234,19 @@ The honest list, because a manual that hides it is worse than useless:
 The interpreter is `roms/kestrel16/basic.s`; the KERNAL is
 `roms/kestrel16/kernal.s`; the map and the services are
 `roms/kestrel16/kestrel16.inc`. All three are assembled by `kestrel16_asm`, and
-the build does it:
+the machine does it when it starts:
 
 ```bash
-cmake --build build --target kestrel16_roms
+./start.sh cli --model kestrel16 --type "PRINT 2+2"
+```
+
+To assemble an image by hand -- into a file you can look at, or put on a
+cartridge:
+
+```bash
+cd roms/kestrel16
+../../rust/target/release/kestrel16_asm basic.s --name basic \
+    --origin 65536 --size 65536 --fill 0xFF --bin basic.bin --listing basic.lst
 ```
 
 ### Two rules the ROMs follow
@@ -259,7 +268,7 @@ them drifts, and the drift shows up as text in the wrong place.
 
 ## Colophon
 
-The machine is `kestrel::Machine` built for `Model::Kestrel16`. Its tests type at
-it and read the screen back: `kestrel16_cpu_tests` for the processor,
-`kestrel16_machine_tests` for the machine and its ROMs, `kestrel16_asm_tests` for
+The machine is `Machine` built for `Model::Kestrel16`. Its tests type at
+it and read the screen back: the tests in `cpu65816.rs` for the processor,
+`machine.rs` for the machine and its ROMs, `kestrel16-asm` for
 the dialect. The 1982 machine is [the Kestrel](../kestrel/README.md).

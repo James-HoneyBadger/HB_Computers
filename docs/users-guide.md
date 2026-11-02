@@ -448,7 +448,7 @@ with a beep.
 
 ## The samples
 
-Every file in [samples/](../samples) is typed by `kestrel_samples_tests` and
+Every file in [samples/](../samples) is typed by the samples suite and
 compared with the `.expected` file beside it, so these programs run as written.
 
 | Kestrel | What it shows |
@@ -479,6 +479,6 @@ compared with the `.expected` file beside it, so these programs run as written.
 Run one:
 
 ```bash
-./build/kestrel --model kestrel --file samples/kestrel/03-fibonacci.bas --type RUN
-./build/kestrel --model kestrel16 --file samples/kestrel16/03-division.bas
+./start.sh cli --model kestrel --file samples/kestrel/03-fibonacci.bas --type RUN
+./start.sh cli --model kestrel16 --file samples/kestrel16/03-division.bas
 ```

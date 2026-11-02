@@ -11,11 +11,12 @@ runs both.
 
 Both are real machines, not pictures of machines. The host supplies a processor, a
 bus, a tube, a keyboard and a disk; everything on the glass is machine code
-assembled into a ROM image and executed. Neither machine has an interpreter
-written for it in C++.
+assembled into a ROM image and executed -- on both machines by an assembler in
+this tree, from the sources beside them. Neither machine has an interpreter
+written for it in Rust.
 
 ```
-$ ./build/kestrel --model kestrel --type "PRINT 2+2"
+$ ./start.sh cli --model kestrel --type "PRINT 2+2"
 *** KESTREL BASIC V2.0 ROM ***
 64K RAM SYSTEM
 (C) 1982 HONEYBADGER SYSTEMS
@@ -25,7 +26,7 @@ PRINT 2+2
 4
 READY.
 
-$ ./build/kestrel --model kestrel16 --type "PRINT 2+2"
+$ ./start.sh cli --model kestrel16 --type "PRINT 2+2"
 KESTREL 16 BASIC 2.0
 READY> PRINT 2+2
 4
@@ -33,7 +34,7 @@ READY> PRINT 2+2
 
 ## One machine, two models
 
-`kestrel::Machine` is built for a `Model`, and a profile table says what that
+`Machine` is built for a `Model`, and a profile table says what that
 model is: its clock and its frame, how much RAM it answers for, where its screen
 and its registers are, how big its ROMs are and how its disk is divided. The two
 processors are the parts the machines really had, and each is used whole.
@@ -49,32 +50,36 @@ processors are the parts the machines really had, and each is used whole.
 
 ## Building
 
-A C++20 compiler and CMake 3.20. The window needs Qt 6 Widgets; without it the
-machine, the tools and the tests still build.
+A Rust toolchain, and a desktop for the window. Everything is in
+[rust/](rust); the ROMs need no build of their own because the programs assemble
+them from [roms/](roms) when they start.
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-ctest --test-dir build --output-on-failure
+cd rust
+cargo build --release
+cargo test
 ```
 
-Eight suites: the two assemblers, the two processors, the two machines booting
-their ROMs and answering at the keyboard, every sample program in
-[samples/](samples), and the emulator's own front end.
+Forty-three tests: the two assemblers, the two processors, the bus and its
+devices, both machines booting their assemblers' ROMs and answering at the
+keyboard, every sample program in [samples/](samples), and the emulator's own
+front end.
 
-`./start.sh` does the same three steps and then starts a machine:
+`./start.sh` builds what is out of date and starts a machine:
 
 ```bash
-./start.sh            # build, then the Kestrel's window
-./start.sh kestrel16  # build, then the Kestrel 16's window
+./start.sh            # the Kestrel's window
+./start.sh kestrel16  # the Kestrel 16's window
 ./start.sh emu        # the interactive emulator
-./start.sh test       # build, then every suite
+./start.sh cli --type "PRINT 2+2"
+./start.sh test       # every suite
 ```
 
 ### In a virtual machine
 
-A `Vagrantfile` in the root makes an Ubuntu 22.04 build machine -- g++ 12,
-CMake, Ninja and Qt 6 -- and builds and tests the tree as the `vagrant` user:
+A `Vagrantfile` in the root makes an Ubuntu 22.04 build machine -- a Rust
+toolchain and an X server -- and builds and tests the tree as the `vagrant`
+user:
 
 ```bash
 vagrant up      # provision, build, and run the suites
@@ -84,12 +89,12 @@ vagrant ssh     # the tree is at /vagrant
 ## Running
 
 ```bash
-./build/kestrel --model kestrel --type "PRINT 2+2"   # on a shell
-./build/kestrel --model kestrel16 --frames 20        # the 1992 machine
-./build/kestrel_computers                            # the window
-./build/kestrel_computers --model kestrel16          # the 1992 machine's window
-./build/kestrel_emu                                  # either machine, interactively
-./build/kestrel --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
+./start.sh cli --model kestrel --type "PRINT 2+2"   # on a shell
+./start.sh cli --model kestrel16 --frames 20        # the 1992 machine
+./start.sh                            # the window
+./start.sh --model kestrel16          # the 1992 machine's window
+./start.sh emu                                  # either machine, interactively
+./start.sh cli --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
 ```
 
 ## What is in the tree
@@ -117,7 +122,7 @@ Four books, two references and the machines' own manuals; [the index](docs/READM
 | [Instruction Manual](docs/instruction-manual.md) | The box: both machines, building, switching on, the keyboard, the window, the media, first sessions, troubleshooting |
 | [User Guide](docs/users-guide.md) | The software: Kestrel BASIC, the monitor ROM, Kestrel DOS, Kestrel 16 BASIC, errors, worked examples, the samples |
 | [Technical Reference](docs/technical-reference.md) | The hardware: both maps, the I/O pages, the colours, the bus, interrupts, the disk and tape formats, the ROM images, the processors |
-| [Programmer's Guide](docs/programmers-guide.md) | Writing for the machines and changing the emulator: the assemblers' pitfalls, the KERNAL's tables, the C++ API, the tests, the build |
+| [Programmer's Guide](docs/programmers-guide.md) | Writing for the machines and changing the emulator: the assemblers' pitfalls, the KERNAL's tables, the emulator's API, the tests, the build |
 | [The tools](docs/TOOLS.md) | Both assemblers, the command line, the window, the build targets |
 | [Architecture](docs/ARCHITECTURE.md) | How the code is put together, for people changing it |
 

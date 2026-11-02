@@ -3,15 +3,15 @@
 The machines as a programmer meets them: the memory maps, the registers, the
 formats on the media, the way the processors behave, and the order in which the
 bus answers. Every table here is written against the sources named beside it, and
-the maps exist twice on purpose — once in C++ for the emulator, once in assembly
+the maps exist twice on purpose — once in Rust for the emulator, once in assembly
 for the ROMs — so the two are changed together.
 
 | Fact | Written in |
 | --- | --- |
-| The 1982 map and registers | `include/kestrel/model1982/map.hpp`, `roms/kestrel/kestrel.inc` |
-| The 1992 map and registers | `include/kestrel/model1992/map.hpp`, `roms/kestrel16/kestrel16.inc` |
-| The profile table, the decode, the devices | `src/kestrel/machine.cpp`, `src/kestrel/devices.cpp` |
-| The processors | `src/kestrel/model1982/cpu6502.cpp`, `src/kestrel/model1992/cpu65816.cpp` |
+| The 1982 map and registers | `rust/crates/kestrel-machine/src/bus.rs`, `roms/kestrel/kestrel.inc` |
+| The 1992 map and registers | `rust/crates/kestrel-machine/src/bus.rs`, `roms/kestrel16/kestrel16.inc` |
+| The profile table, the decode, the devices | `src/kestrel/machine.rs`, `rust/crates/kestrel-machine/src/devices.rs` |
+| The processors | `rust/crates/kestrel-machine/src/cpu6502.rs`, `cpu65816.rs` |
 
 ---
 
@@ -36,7 +36,7 @@ for the ROMs — so the two are changed together.
 ## The two profiles
 
 Everything that differs between the machines is one table, `makeProfile` in
-`src/kestrel/machine.cpp`. Nothing else in the emulator knows which machine it
+`src/kestrel/machine.rs`. Nothing else in the emulator knows which machine it
 is running.
 
 | | Kestrel | Kestrel 16 |
@@ -180,7 +180,7 @@ that suits each machine's decade.
 ## The bus, and the order it answers in
 
 A read or a write is decoded in one order, and the order matters where regions
-abut. `Machine::read` and `Machine::write` in `src/kestrel/machine.cpp` are the
+abut. `Machine::read` and `Machine::write` in `src/kestrel/machine.rs` are the
 whole of it.
 
 **The Kestrel**, in order:
@@ -299,11 +299,13 @@ ROM's `S` and `L`, with a four-byte header of load address and length.
 | Monitor | Kestrel | 16384 | `$A000` | `roms/kestrel/monitor.s` |
 | BASIC | Kestrel 16 | 65536 | `$01:0000` | `roms/kestrel16/basic.s` |
 
-Each assembler writes a header of bytes into `build/generated/` at build time;
-the machine is given those bytes and nothing else. The Kestrel's socket takes one
-of `basic` or `monitor` — `kestrel --rom monitor`, or **Machine ▸ ROM socket** in
-the window — and changing it cold-boots the machine, because the reset vector in
-the new image is where the processor starts.
+Each assembler writes an image of bytes from its `.s` file, and the machine is
+given those bytes and nothing else. The programs assemble them when they start,
+so there is no separate build for a ROM; `kestrel_asm` and `kestrel16_asm` will
+also write one to a file with `--bin`, which is what a cartridge or a socket ROM
+of your own is made with. The Kestrel's socket takes one of `basic` or `monitor` —
+**Machine ▸ ROM socket** in the window — and changing it cold-boots the machine,
+because the reset vector in the new image is where the processor starts.
 
 The reset vector is `$FFFC` on the Kestrel. On the Kestrel 16 the processor reads
 its vectors from the top of bank zero, and leaves reset in emulation mode; the

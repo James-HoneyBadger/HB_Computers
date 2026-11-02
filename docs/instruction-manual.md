@@ -34,16 +34,16 @@ assembled into a ROM image and executed.
 
 ## What you need
 
-- a C++20 compiler and CMake 3.20 or newer;
-- Qt 6 Widgets, if you want the window. Without it the machines, the two
-  assemblers, the command line and the tests all still build;
-- a terminal, and a display for the window.
+- a Rust toolchain (`cargo` and `rustc`);
+- a display, if you want the window. Without one the machines, the two
+  assemblers, the command line, the emulator and the tests all still work;
+- a terminal.
 
 ## Unpacking
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cd rust
+cargo build --release
 ```
 
 Or, with the start script in the root of the tree:
@@ -75,8 +75,8 @@ given one, and the suites do not need it.
 **In the window**
 
 ```bash
-./build/kestrel_computers                    # the Kestrel
-./build/kestrel_computers --model kestrel16  # the Kestrel 16
+./start.sh                    # the Kestrel
+./start.sh --model kestrel16  # the Kestrel 16
 ```
 
 **Interactively** — either machine, chosen at the prompt, with a session around
@@ -91,8 +91,8 @@ it; `/model` changes machine without leaving:
 the samples are run:
 
 ```bash
-./build/kestrel --model kestrel --type "PRINT 2+2"
-./build/kestrel --model kestrel16 --type "PRINT 2+2"
+./start.sh cli --model kestrel --type "PRINT 2+2"
+./start.sh cli --model kestrel16 --type "PRINT 2+2"
 ```
 
 The banner is not decoration. On the Kestrel it is printed by the KERNAL's
@@ -200,7 +200,7 @@ Try a program from [samples/kestrel](../samples/kestrel), or run one from a
 shell:
 
 ```bash
-./build/kestrel --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
+./start.sh cli --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
 ```
 
 ## Your first session: the Kestrel 16
@@ -232,13 +232,13 @@ and the beginnings of a machine that a decade of software could have grown on.
 | [samples/kestrel16](../samples/kestrel16) | six sets of direct statements, which is what the 1992 language takes today |
 
 Each sample has a `.expected` file beside it holding the lines the machine must
-put on the screen. `kestrel_samples_tests` runs every one of them, so a sample
+put on the screen. the samples suite runs every one of them, so a sample
 that stops working is a failing suite rather than a stale page.
 
 Run one at a time:
 
 ```bash
-./build/kestrel --model kestrel16 --file samples/kestrel16/03-division.bas
+./start.sh cli --model kestrel16 --file samples/kestrel16/03-division.bas
 ```
 
 ## If something goes wrong

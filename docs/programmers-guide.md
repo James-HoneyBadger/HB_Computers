@@ -50,7 +50,7 @@ which brings the machine back to the prompt. This is the whole development
 cycle a 1982 person had, and it still works here:
 
 ```bash
-./build/kestrel --rom monitor --type ": 0900 A9 41 20 00 E0 60" --type "G 0900"
+./start.sh cli --rom monitor --type ": 0900 A9 41 20 00 E0 60" --type "G 0900"
 ```
 
 ### Calling the KERNAL
@@ -161,20 +161,21 @@ source line side by side, and `--symbols` writes every label's address.
 ### The shape of it
 
 ```
-   kestrel (CLI)     kestrel_computers (window)
-            \        /
-          kestrel_machine          <- include/kestrel/machine.hpp, src/kestrel/machine.cpp
+   kestrel (CLI)     kestrel_computers (window)     kestrel_emu
+            \        /                            /
+             kestrel-machine  <- machine.rs, bus.rs
             /            \
      devices (shared)    the two processors
-     include/kestrel/devices.hpp       model1982/cpu6502.cpp
-                                       model1992/cpu65816.cpp
+     devices.rs           cpu6502.rs
+                          cpu65816.rs
 ```
 
-`kestrel::Machine` is built for a `kestrel::Model`, and a profile table says what
-that model is. The bus decodes against the profile; the devices are parameterised
-by it; the processors are separate types with separate accessors. There is no
-common processor interface on purpose: asking a 6502 machine for its 65816 is a
-mistake the type system should catch.
+One library serves the three programs. The bus decodes against the profile; the
+devices are parameterised by it; the processors are separate types behind a
+`Cpu` enum, chosen once when the machine is powered on. The processors are
+separate on purpose: asking a 6502 machine for its 65816 is a mistake the type
+system should catch, and the enum keeps that true without making the machine
+generic over its processor.
 
 ### The API a host uses
 
@@ -198,73 +199,78 @@ its own would be the thing these machines exist not to be.
 A register is a device address, and it exists in four places. Change them in one
 commit:
 
-1. the model's `map.hpp`: the `Register` enum, and the header comment's map;
+1. the kind in `rust/crates/kestrel-machine/src/bus.rs`: the `Register` enum and
+   the two layout tables beside it;
 2. the model's `.inc` for the ROMs;
-3. `Machine::layOutRegisters` and the read/write cases in `machine.cpp`;
+3. `read_register` and `write_register` in the same file;
 4. [the technical reference](technical-reference.md#the-io-pages).
 
-A test belongs with it: `kestrel_machine_tests` pokes each register through the
-address the ROM uses, which is how the pair of maps is kept honest.
+A test belongs with it: the machine's tests poke each register through the address
+the ROM uses, which is how the pair of maps is kept honest.
 
 ### Adding a device
 
-`src/kestrel/devices.cpp` holds the tube, the keyboard, the disk and the cassette.
-A device owns its state and knows nothing about addresses; the machine's decode
-decides what a read or a write means, and calls the device. Keeping that line
-where it is, is what lets the same cassette serve two machines with different
-register layouts.
+`rust/crates/kestrel-machine/src/devices.rs` holds the tube, the keyboard, the
+disk and the cassette. A device owns its state and knows nothing about addresses;
+the bus decides what a read or a write means and calls the device. Keeping that
+line where it is, is what lets the same cassette serve two machines with
+different register layouts.
 
 ## The tests
 
-| Suite | Proves |
+Every crate carries the tests for what it is:
+
+| Crate | Proves |
 | --- | --- |
-| `kestrel_asm_tests` | the 6502 dialect: every addressing mode, the three ways of writing hex, labels, the long-branch expansion, and the refusals |
-| `kestrel_cpu_tests` | the 6502: addressing, arithmetic, decimal mode, flags, cycles, interrupts |
-| `kestrel_machine_tests` | the Kestrel: its ROMs boot, typing works, the disk, the tape, the monitor, the language |
-| `kestrel16_asm_tests` | every 65816 addressing mode and width rule, byte for byte |
-| `kestrel16_cpu_tests` | the 65816: widths, banks, the direct page, jumps, arithmetic, cycles |
-| `kestrel16_machine_tests` | the Kestrel 16: its ROMs boot, and typing at it works |
-| `kestrel_samples_tests` | every program in `samples/`, against its `.expected` file |
-| `kestrel_emu_tests` | the emulator's front end: the model flag chooses the machine, a session switches models, and a command that is not one is refused |
+| `kestrel-asm` | the 6502 dialect: every addressing mode, the three ways of writing hex, labels, the long-branch expansion, and the refusals |
+| `kestrel-machine` (`cpu6502`) | the 6502: addressing, arithmetic, decimal mode, flags, cycles, interrupts |
+| `kestrel-machine` (`bus`, `devices`) | the decode order of both machines, the I/O page, the disk's two controllers, the tube and the keys |
+| `kestrel-machine` (`machine`) | both machines: the ROMs are assembled from `roms/`, boot, and answer at the keyboard |
+| `kestrel16-asm` | every 65816 addressing mode and width rule, byte for byte |
+| `kestrel-machine` (`cpu65816`) | the 65816: widths, banks, the direct page, jumps, arithmetic, cycles |
+| `kestrel-cli` (`samples`) | every program in `samples/`, against its `.expected` file |
+| `kestrel-cli` (`emulator`) | the emulator's front end: the model flag chooses the machine, a session switches models, and a command that is not one is refused |
 
 ```bash
-ctest --test-dir build --output-on-failure      # all of them
-./build/kestrel_machine_tests                   # one, with its own output
+./start.sh test                     # all of them
+cd rust && cargo test -p kestrel-machine   # one crate, with its own output
 ```
 
-`tests/check.hpp` is the whole framework: `TW_CHECK(condition)` and
-`TW_CHECK_EQ(actual, expected)`, a tally, and a non-zero exit code. A failure
-prints the file and line and flushes immediately, because a test that crashes
-should still have reported the check before it.
+The framework is Rust's: `#[test]`, `assert_eq!` and `cargo test`. What the
+assertions say matters more than the framework, so they say what the machine
+should have done -- `"sixteen bits, not eight"` beside a number, not a bare
+equality.
 
 A test of a ROM is a keystroke going in and characters coming out of the screen.
-That is deliberate: a test that called a ROM routine from C++ would prove the
+That is deliberate: a test that called a ROM routine from Rust would prove the
 routine runs, not that the machine works.
+
+Two of them are stronger than that. The assemblers' output is compared byte for
+byte with the images the machine boots, and the same sample programs the
+documentation uses are run through the emulator and checked against their
+`.expected` files.
 
 ## The build
 
-| Target | Builds |
+| Crate | Builds |
 | --- | --- |
-| `kestrel_roms`, `kestrel16_roms` | The ROM images, as headers of bytes |
-| `kestrel_machine` | The machine, both models, no Qt |
-| `kestrel` | The command line |
-| `kestrel_emu` | The interactive emulator, either machine |
-| `kestrel_computers` | The window, if Qt 6 Widgets is found |
-| `kestrel_asm`, `kestrel16_asm` | The assemblers the ROMs are built with |
-| `kestrel_*_tests` | The eight suites |
+| `kestrel-machine` | the library: profile, devices, bus, both processors, the machine |
+| `kestrel-asm` | `kestrel_asm`, the Kestrel's assembler |
+| `kestrel16-asm` | `kestrel16_asm`, the Kestrel 16's assembler |
+| `kestrel-cli` | `kestrel`, the command line, and `kestrel_emu`, the interactive one |
+| `kestrel-app` | `kestrel_computers`, the window |
 
-Each ROM is a custom command: `kestrel_asm` or `kestrel16_asm` writes a header
-into `build/generated/` and the machine includes it. A change to a `.s` file
-rebuilds the image, the header and everything that includes it, so the tests can
-never be run against yesterday's ROM.
+Nothing is generated ahead of time. The machine assembles `roms/*.s` with the two
+ported assemblers when it starts, once per process, so a change to a `.s` file is
+in the next run and the tests can never be run against yesterday's ROM.
 
-`./start.sh` wraps the three steps (`build`, `test`, and starting a machine), and
-`Vagrantfile` does the same in a clean Ubuntu 22.04 guest if you want a build
-machine without touching yours.
+`./start.sh` builds what is out of date and starts a machine; `Vagrantfile` does
+the same in a clean Ubuntu 22.04 guest if you want a build machine without
+touching yours.
 
 ## House rules
 
-- **The map is written twice and changed together.** `map.hpp` and the `.inc`
+- **The map is written twice and changed together.** `bus.rs` and the `.inc`
   beside it, in one commit, or the ROMs and the emulator disagree.
 - **A ROM change is proved by a machine test.** If typing at the machine cannot
   see the difference, the test is not yet written.
