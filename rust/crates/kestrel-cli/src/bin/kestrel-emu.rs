@@ -34,6 +34,9 @@ struct Emulator {
     machine: Machine,
     frames: i32,
     quiet: bool,
+    /// The disk in the drive and the tape in the deck, when there is one.
+    disk_path: Option<PathBuf>,
+    tape_path: Option<PathBuf>,
     /// Where images to load from disk live, when the session was told to use
     /// them; otherwise the ROMs are assembled from their sources.
     roms: Option<PathBuf>,
@@ -57,6 +60,8 @@ impl Emulator {
             machine,
             frames,
             quiet,
+            disk_path: None,
+            tape_path: None,
             roms,
         })
     }
@@ -230,6 +235,47 @@ fn command(emulator: &mut Emulator, line: &str, quit: &mut bool) -> bool {
             emulator.machine.run_frames(20);
             emulator.draw(false);
         }
+        // A disk in the drive and a tape in the deck. `/disk FILE` mounts and
+        // loads; `/disk` on its own writes the volume back out, which is what a
+        // person does before switching the machine off.
+        "disk" => match argument {
+            "" => match emulator.disk_path.clone() {
+                Some(path) => match emulator.machine.save_disk_image(&path) {
+                    Ok(()) => println!("kestrel_emu: {} written", path.display()),
+                    Err(error) => println!("kestrel_emu: {}: {error}", path.display()),
+                },
+                None => println!("kestrel_emu: no disk in the drive; /disk FILE mounts one"),
+            },
+            path => {
+                let path = PathBuf::from(path);
+                match emulator.machine.mount_disk_image(&path) {
+                    Ok(()) => {
+                        emulator.disk_path = Some(path.clone());
+                        println!("kestrel_emu: {} in the drive", path.display());
+                    }
+                    Err(error) => println!("kestrel_emu: {}: {error}", path.display()),
+                }
+            }
+        },
+        "tape" => match argument {
+            "" => match emulator.tape_path.clone() {
+                Some(path) => match emulator.machine.save_tape_image(&path) {
+                    Ok(()) => println!("kestrel_emu: {} written", path.display()),
+                    Err(error) => println!("kestrel_emu: {}: {error}", path.display()),
+                },
+                None => println!("kestrel_emu: no tape in the deck; /tape FILE mounts one"),
+            },
+            path => {
+                let path = PathBuf::from(path);
+                match emulator.machine.mount_tape_image(&path) {
+                    Ok(()) => {
+                        emulator.tape_path = Some(path.clone());
+                        println!("kestrel_emu: {} on the tape", path.display());
+                    }
+                    Err(error) => println!("kestrel_emu: {}: {error}", path.display()),
+                }
+            }
+        },
         "rom" => match emulator.mount_socket_rom(argument) {
             Ok(()) => emulator.draw(false),
             Err(message) => println!("kestrel_emu: {message}"),

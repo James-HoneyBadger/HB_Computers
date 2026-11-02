@@ -68,7 +68,8 @@ impl std::fmt::Display for RomError {
             RomError::WrongSize { wanted, got } => {
                 write!(f, "a ROM of {wanted} bytes was needed, {got} were given")
             }
-            RomError::Unreadable(why) => write!(f, "the ROM could not be read: {why}"),
+            // A ROM is an image and so is a disk; the sentence has to serve both.
+            RomError::Unreadable(why) => write!(f, "{why}"),
         }
     }
 }
@@ -186,6 +187,39 @@ impl Machine {
         let basic = read_image(&directory.join("basic.bin"))?;
         self.mount_kernal(&kernal)?;
         self.mount_basic(&basic)
+    }
+
+    /// A disk in the drive: the image has to be the whole volume, and a file of
+    /// any other size is refused rather than half-loaded.
+    pub fn mount_disk_image(&mut self, path: &Path) -> Result<(), RomError> {
+        let bytes = read_image(path)?;
+        let wanted = self.bus.disk.image_size();
+        if bytes.len() != wanted {
+            return Err(RomError::WrongSize {
+                wanted,
+                got: bytes.len(),
+            });
+        }
+        self.bus.disk.load(&bytes);
+        Ok(())
+    }
+
+    /// Write the volume back out, which is what a disk in a drive means: what the
+    /// machine wrote is there the next time it is mounted.
+    pub fn save_disk_image(&self, path: &Path) -> std::io::Result<()> {
+        std::fs::write(path, self.bus.disk.image())
+    }
+
+    /// A tape in the deck. A tape is a byte stream, so any length is a tape.
+    pub fn mount_tape_image(&mut self, path: &Path) -> Result<(), RomError> {
+        let bytes = read_image(path)?;
+        self.bus.tape.load(&bytes);
+        self.bus.tape.insert();
+        Ok(())
+    }
+
+    pub fn save_tape_image(&self, path: &Path) -> std::io::Result<()> {
+        std::fs::write(path, self.bus.tape.image())
     }
 
     /// Power-on: RAM and the tube cleared, the devices idle, the clock at zero.
@@ -398,6 +432,56 @@ mod tests {
             Cpu::Mos65816(ref cpu) => assert_eq!(cpu.illegal_opcodes(), 0),
             _ => panic!("the 1992 machine has a 65816"),
         }
+    }
+
+    /// A disk in the drive is a file on the host, and what the machine wrote to
+    /// it is there when it is mounted again. The controller has no DOS on it yet,
+    /// so the write is made through the device rather than through BASIC.
+    #[test]
+    fn a_disk_image_goes_in_and_comes_back_out() {
+        let mut machine = boot(Model::Kestrel);
+        let size = machine.bus.disk.image_size();
+        assert_eq!(size, 512 * 256, "the 1982 drive is 512 sectors of 256");
+
+        let path = std::env::temp_dir().join("kestrel-disk-image-test.dsk");
+        let mut image = vec![0u8; size];
+        image[0] = 0x42;
+        std::fs::write(&path, &image).expect("a disk image to write");
+
+        machine.mount_disk_image(&path).expect("a disk that fits the drive");
+        assert_eq!(machine.bus.disk.image()[0], 0x42, "the image went in");
+
+        let mut sector = vec![0u8; 256];
+        assert!(machine.bus.disk.read_sector(0, &mut sector));
+        assert_eq!(sector[0], 0x42);
+        sector[0] = 0x99;
+        assert!(machine.bus.disk.write_sector(0, &sector));
+        machine.save_disk_image(&path).expect("the disk to be written back");
+
+        let again = std::fs::read(&path).expect("the disk image to be read back");
+        assert_eq!(again[0], 0x99, "what the machine wrote survived");
+
+        // A file of the wrong size is refused, not half-loaded.
+        std::fs::write(&path, vec![0u8; 100]).expect("a short file");
+        assert!(matches!(
+            machine.mount_disk_image(&path),
+            Err(RomError::WrongSize { wanted, got }) if wanted == size && got == 100
+        ));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// A tape is a byte stream, so any length is a tape, and it comes back out
+    /// byte for byte.
+    #[test]
+    fn a_tape_image_goes_in_and_comes_back_out() {
+        let mut machine = boot(Model::Kestrel16);
+        let path = std::env::temp_dir().join("kestrel-tape-image-test.tap");
+        std::fs::write(&path, [1u8, 2, 3, 4]).expect("a tape image to write");
+        machine.mount_tape_image(&path).expect("any length is a tape");
+        assert_eq!(machine.bus.tape.image(), &[1, 2, 3, 4]);
+        machine.save_tape_image(&path).expect("the tape to be written back");
+        assert_eq!(std::fs::read(&path).expect("the tape back"), vec![1, 2, 3, 4]);
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

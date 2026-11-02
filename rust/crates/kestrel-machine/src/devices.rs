@@ -233,6 +233,16 @@ impl Disk {
         true
     }
 
+    /// The whole volume, as a file would hold it: every sector, in order.
+    pub fn image(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// The size an image has to be to fit this drive.
+    pub fn image_size(&self) -> usize {
+        self.sectors as usize * self.sector_size as usize
+    }
+
     pub fn read_sector(&self, index: u32, into: &mut [u8]) -> bool {
         let (start, end) = match self.sector_range(index) {
             Some(range) => range,
@@ -290,6 +300,11 @@ impl Tape {
             present: false,
             mode: TapeMode::Stopped,
         }
+    }
+
+    /// The bytes on the tape, as a file would hold them.
+    pub fn image(&self) -> &[u8] {
+        &self.bytes
     }
 
     pub fn load(&mut self, bytes: &[u8]) {

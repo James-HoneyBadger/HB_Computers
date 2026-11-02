@@ -88,3 +88,29 @@ fn a_socket_rom_can_be_chosen_and_a_bank_cannot() {
     let out = session("/rom nonsense\n", &["--model", "kestrel"]);
     assert!(out.contains("no such ROM: nonsense"), "{out}");
 }
+
+#[test]
+fn a_disk_and_a_tape_can_be_put_in_and_taken_out() {
+    let directory = std::env::temp_dir().join("kestrel-emu-media");
+    std::fs::create_dir_all(&directory).expect("a directory for the media");
+    let disk = directory.join("demo.dsk");
+    let tape = directory.join("demo.tap");
+    std::fs::write(&disk, vec![0u8; 512 * 256]).expect("a disk image");
+    std::fs::write(&tape, [1u8, 2, 3]).expect("a tape image");
+
+    let script = format!(
+        "/disk {}\n/tape {}\n/disk\n/tape\n/disk {}/missing.dsk\n",
+        disk.display(),
+        tape.display(),
+        directory.display()
+    );
+    let out = session(&script, &["--model", "kestrel"]);
+    assert!(out.contains("demo.dsk in the drive"), "{out}");
+    assert!(out.contains("demo.tap on the tape"), "{out}");
+    assert!(out.contains("demo.dsk written"), "the volume went back out:\n{out}");
+    assert!(out.contains("demo.tap written"), "{out}");
+    assert!(out.contains("No such file"), "a missing image is reported:\n{out}");
+    assert_eq!(std::fs::metadata(&disk).expect("the disk").len(), 512 * 256);
+    assert_eq!(std::fs::read(&tape).expect("the tape"), vec![1, 2, 3]);
+    let _ = std::fs::remove_dir_all(&directory);
+}

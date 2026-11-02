@@ -386,6 +386,19 @@ that is already in memory. [The tools page](../TOOLS.md) covers both assemblers.
 
 ---
 
+## Disks and tapes
+
+The drive takes a volume image of the whole disk -- 512 sectors of 256 bytes, so
+131072 bytes -- and the deck takes any byte stream as a tape:
+
+```bash
+./start.sh cli --disk myvolume.dsk --tape mysave.tap --type "PRINT 1"
+```
+
+A disk is a disk: what the machine writes is in the image when it is mounted
+again. A file of the wrong size is refused rather than half-loaded, because a
+half-loaded volume is worse than a missing one.
+
 ## Colophon
 
 The machine is `Machine` built for `Model::Kestrel`. Its tests type at it and read

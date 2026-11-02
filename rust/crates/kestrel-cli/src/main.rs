@@ -22,6 +22,8 @@ struct Options {
     lines: Vec<String>,
     roms: Option<PathBuf>,
     screen: bool,
+    disk: Option<PathBuf>,
+    tape: Option<PathBuf>,
 }
 
 fn usage() {
@@ -34,6 +36,8 @@ fn usage() {
          \x20 --type     a line to type at the machine; may be repeated\n\
          \x20 --file     a file of lines to type, one to a line\n\
          \x20 --roms     where the assembled images are (default build/generated)\n\
+         \x20 --disk     a disk image to put in the drive; it is written back at exit\n\
+         \x20 --tape     a tape image to put in the deck\n\
          \x20 --no-screen  run without printing the tube\n\
          \n\
          The images are assembled by the C++ build: run ./start.sh build first."
@@ -47,6 +51,8 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
         lines: Vec::new(),
         roms: None,
         screen: true,
+        disk: None,
+        tape: None,
     };
     let mut index = 0;
     while index < arguments.len() {
@@ -81,6 +87,8 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
                 options.lines.extend(text.lines().map(str::to_string));
             }
             "--roms" => options.roms = Some(PathBuf::from(value()?)),
+            "--disk" => options.disk = Some(PathBuf::from(value()?)),
+            "--tape" => options.tape = Some(PathBuf::from(value()?)),
             "--no-screen" => options.screen = false,
             "--help" | "-h" => {
                 usage();
@@ -104,6 +112,16 @@ fn run(options: &Options) -> Result<(), String> {
             .map_err(|error| error.to_string())?,
     }
     machine.reset();
+    if let Some(path) = &options.disk {
+        machine
+            .mount_disk_image(path)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+    }
+    if let Some(path) = &options.tape {
+        machine
+            .mount_tape_image(path)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+    }
     machine.run_frames(options.frames);
 
     for line in &options.lines {
@@ -114,6 +132,13 @@ fn run(options: &Options) -> Result<(), String> {
 
     if options.screen {
         println!("{}", machine.screen_text());
+    }
+    // The disk is a disk: what the machine wrote is there next time it is
+    // mounted.
+    if let Some(path) = &options.disk {
+        machine
+            .save_disk_image(path)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
     }
     Ok(())
 }
