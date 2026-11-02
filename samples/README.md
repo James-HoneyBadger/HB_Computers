@@ -56,3 +56,4 @@ stands.
 | `08-for-step.bas` | positive and negative `STEP`, a loop past its limit, `STEP 0` rejected |
 | `09-strings.bas` | `A$` variables, `LEN`, comparing, joining and slicing |
 | `10-arrays.bas` | `DIM`, a sieve, two loops one inside the other, and an array of strings |
+| `11-functions.bas` | `DEF FN` of one argument, and the letter it borrows given back |

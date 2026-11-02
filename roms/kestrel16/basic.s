@@ -252,6 +252,12 @@ KW_SGN_END:
 KW_DIM:
         .text "DIM"
 KW_DIM_END:
+KW_DEF:
+        .text "DEF"
+KW_DEF_END:
+KW_FN:
+        .text "FN"
+KW_FN_END:
 KW_LEFT:
         .text "LEFT$"
 KW_LEFT_END:
@@ -782,6 +788,10 @@ EXEC_TRY_LET:
         LDY.W #KW_DELETE_END - KW_DELETE
         JSR MATCHKW
         BCS DO_DELETE
+        LDX.W #(KW_DEF & $FFFF)
+        LDY.W #KW_DEF_END - KW_DEF
+        JSR MATCHKW
+        BCS DO_DEF
         LDX.W #(KW_REM & $FFFF)
         LDY.W #KW_REM_END - KW_REM
         JSR MATCHKW
@@ -951,6 +961,131 @@ DO_CLOAD:
 CLOAD_NONAME:
         JSR SAY_NONAME
         BRA EXEC_DONE
+
+; DO_DEF: `DEF FNA(X)=X*X+1` gives the letter a function of one argument. The
+; text after the `=` is copied into the letter's own slot in bank three, so it
+; outlives the line it was typed on -- at the prompt, or in a program that is
+; then edited. A definition runs to the end of its line.
+DO_DEF:
+        JSR SKIPSP
+        LDX.W #(KW_FN & $FFFF)
+        LDY.W #KW_FN_END - KW_FN
+        JSR MATCHKW
+        BCC DEF_BAD
+        JSR SKIPSP
+        JSR IS_ALPHA
+        BCC DEF_BAD
+        LDA [ZP_SRC]
+        JSR TO_UPPER
+        SEC
+        SBC #'A'
+        STA ZP_CH               ; the function's letter
+        JSR SRC_STEP
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE DEF_BAD
+        JSR SRC_STEP
+        JSR SKIPSP
+        JSR IS_ALPHA
+        BCC DEF_BAD
+        LDA [ZP_SRC]
+        JSR TO_UPPER
+        SEC
+        SBC #'A'
+        STA ZP_VAR              ; and the letter its argument is called by
+        JSR SRC_STEP
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE DEF_BAD
+        JSR SRC_STEP
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'='
+        BNE DEF_BAD
+        JSR SRC_STEP
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        BEQ DEF_BAD             ; a definition with nothing in it is not one
+        JSR DEF_TEXTADDR        ; ZP_SDST = the letter's own slot
+        REP #$10
+        LDY.W #0
+DEF_COPY:
+        LDA [ZP_SRC]
+        BEQ DEF_COPY_END        ; the line's end, or a colon, ends the text
+        CMP #':'
+        BEQ DEF_COPY_END
+        CPY.W #(DEF_SIZE-1)
+        BCS DEF_BAD             ; more than a slot holds
+        STA [ZP_SDST],Y
+        JSR SRC_STEP
+        INY
+        BRA DEF_COPY
+DEF_COPY_END:
+        LDA #0
+        STA [ZP_SDST],Y         ; the text ends with a zero, as a line does
+        ; the entry says where the text is and what the argument is called
+        JSR DEF_ENTRYADDR       ; X = the entry
+        REP #$20
+        LDA ZP_SDST
+        STA.L DEFNS,X
+        SEP #$20
+        LDA ZP_SDST+2
+        STA.L DEFNS+2,X         ; the bank of it, which is what says it is there
+        LDA ZP_VAR
+        STA.L DEFNS+3,X
+        JMP EXEC_DONE
+DEF_BAD:
+        JSR SAY_WHAT
+        JMP EXEC_DONE
+
+; DEF_ENTRYADDR: ZP_CH = a function's letter. X = its entry in the table.
+DEF_ENTRYADDR:
+        PHP
+        REP #$20
+        LDA ZP_CH
+        AND.W #$00FF
+        ASL A
+        ASL A                   ; four bytes an entry
+        TAX
+        PLP
+        RTS
+
+; DEF_ENTRYADDR_SEL: X = the entry of the function named in DEFNSEL. Unlike
+; DEF_ENTRYADDR it reads nothing from zero page, which an expression has been
+; through since the letter was read.
+DEF_ENTRYADDR_SEL:
+        PHP
+        REP #$20
+        LDA.L DEFNSEL
+        AND.W #$00FF
+        ASL A
+        ASL A                   ; four bytes an entry
+        TAX
+        PLP
+        RTS
+
+; DEF_TEXTADDR: ZP_CH = a function's letter. ZP_SDST = its text in bank three.
+DEF_TEXTADDR:
+        PHP
+        REP #$20
+        LDA ZP_CH
+        AND.W #$00FF
+        ASL A
+        ASL A
+        ASL A
+        ASL A
+        ASL A
+        ASL A                   ; DEF_SIZE bytes a definition
+        CLC
+        ADC.W #(DEFTEXT & $FFFF)
+        STA ZP_SDST
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SDST+2
+        PLP
+        RTS
 
 ; DO_FIND: `FIND "NAME"` asks the filesystem where a name is and prints what it
 ; says: the directory entry, the sector the file starts at, and how many sectors
@@ -2812,6 +2947,10 @@ FACTOR:
         BRA FACTOR_NUM
 FACTOR_WORD:
         ; PEEK, VAL, ASC and LEN all answer with a number, so all four live here.
+        LDX.W #(KW_FN & $FFFF)
+        LDY.W #KW_FN_END - KW_FN
+        JSR MATCHKW
+        BCS FACTOR_FN
         LDX.W #(KW_PEEK & $FFFF)
         LDY.W #KW_PEEK_END - KW_PEEK
         JSR MATCHKW
@@ -2999,6 +3138,102 @@ FACTOR_MISMATCH:
         TAX
         SEP #$20
         RTS
+
+; FNA(v): a defined function. The argument is evaluated, put in the letter the
+; definition calls it by, and the definition's own text is read as an
+; expression; then the letter's old value and the line pointer go back as they
+; were. There is one guard byte and not a stack of them, so while a definition
+; is being read no definition may be called at all -- which is what rules out
+; the one that would otherwise call itself for ever.
+;
+; Which function it is lives in bank three, not in zero page: an expression has
+; been through every byte of zero page by the time the entry is needed again.
+FACTOR_FN:
+        JSR SKIPSP
+        JSR IS_ALPHA
+        BCC FACTOR_MISMATCH
+        LDA [ZP_SRC]
+        JSR TO_UPPER
+        SEC
+        SBC #'A'
+        STA.L DEFNSEL
+        JSR SRC_STEP
+        JSR DEF_ENTRYADDR_SEL
+        LDA.L DEFNS+2,X
+        CMP #BANK_STR
+        BNE FACTOR_MISMATCH     ; never defined
+        LDA.L DEFNS+3,X         ; the letter the argument is called by
+        STA.L DEFARG
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        JSR EXPR                ; X = the argument
+        REP #$20
+        TXA
+        STA ZP_SDST             ; kept where the evaluation cannot reach it
+        SEP #$20
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        LDA.L DEFGUARD
+        BEQ FACTOR_FN_GO
+        JMP FACTOR_MISMATCH     ; a definition while another is being read
+FACTOR_FN_GO:
+        LDA #1
+        STA.L DEFGUARD
+        ; the line, three bytes
+        LDA ZP_SRC
+        PHA
+        LDA ZP_SRC+1
+        PHA
+        LDA ZP_SRC+2
+        PHA
+        ; the argument goes into the letter's own word, and that letter's old
+        ; value waits on the stack
+        JSR DEF_ENTRYADDR_SEL   ; X = the entry
+        LDA.L DEFARG
+        ASL A
+        TAY
+        REP #$20
+        LDA VARS,Y
+        PHA                     ; the old value, two bytes
+        LDA ZP_SDST
+        STA VARS,Y              ; the argument, where the definition looks for it
+        LDA.L DEFNS,X
+        STA ZP_SRC
+        SEP #$20
+        LDA.L DEFNS+2,X
+        STA ZP_SRC+2
+        JSR EXPR                ; X = what the definition says it is
+        REP #$20
+        TXA
+        STA ZP_SDST             ; the answer, out of the way of the tidying up
+        SEP #$20
+        LDA.L DEFARG
+        ASL A
+        TAY
+        PLA
+        STA VARS,Y              ; the old value back, low byte first
+        PLA
+        STA VARS+1,Y
+        PLA
+        STA ZP_SRC+2            ; and the line, bank first
+        PLA
+        STA ZP_SRC+1
+        PLA
+        STA ZP_SRC
+        LDA #0
+        STA.L DEFGUARD
+        REP #$20
+        LDA ZP_SDST
+        TAX
+        SEP #$20
+        RTS
+
 FACTOR_PLUS:
         JSR SRC_STEP
         BRA FACTOR

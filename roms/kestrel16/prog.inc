@@ -80,9 +80,10 @@ CLEAR_STRS_LOOP:
         PLP
         RTS
 
-; CLEAR_ARRAYS: every letter's array is forgotten and the heap starts again at
-; the bottom. The runs themselves are not wiped: a count of nought is what says
-; an array is not there, and the next DIM writes over what it takes.
+; CLEAR_ARRAYS: every letter's array and every letter's definition is forgotten
+; and the heap starts again at the bottom. The runs themselves are not wiped: a
+; count of nought is what says an array is not there, and the next DIM writes
+; over what it takes.
 CLEAR_ARRAYS:
         PHP
         REP #$10
@@ -102,6 +103,18 @@ CLEAR_ARRAYS_LOOP:
         BCC CLEAR_ARRAYS_LOOP
         LDA.W #ARR_HEAP
         STA.L ARR_TOP
+        ; the definitions go with them: a bank of nought is a letter with none
+        LDX.W #0
+CLEAR_ARRAYS_DEFS:
+        LDA.W #0
+        STA.L DEFNS,X
+        STA.L DEFNS+2,X
+        TXA
+        CLC
+        ADC.W #4
+        TAX
+        CPX.W #(26*4)
+        BCC CLEAR_ARRAYS_DEFS
         SEP #$20
         PLP
         RTS

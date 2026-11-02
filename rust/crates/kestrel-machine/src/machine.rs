@@ -753,6 +753,100 @@ mod tests {
         );
     }
 
+    /// A function of the program's own: `DEF FNS(X)=...` keeps its text, and
+    /// `FNS(3)` reads it with the argument in place.
+    #[test]
+    fn a_1992_program_can_define_a_function() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 DEF FNS(X)=X*X+1",
+            "20 DEF FNT(A)=A*2+1",
+            "30 PRINT FNS(4);\" \";FNS(-3)",
+            "40 PRINT FNT(2)",
+            "50 A=7",
+            "60 PRINT FNS(2);\" \";A",
+            "70 X=300",
+            "80 PRINT FNS(2);\" \";X",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(120);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "17 10"),
+            "the definition was read with its argument in place:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "5"),
+            "and a second definition has its own text and letter:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "5 7"),
+            "and a variable the definition does not borrow is untouched:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "5 300"),
+            "and the letter it borrows is given back with its own value:\n{screen}"
+        );
+    }
+
+    /// A definition can be made at the prompt, and one that calls itself is
+    /// refused rather than left to fill the stack.
+    #[test]
+    fn a_1992_definition_is_refused_where_it_would_never_end() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced("DEF FNS(X)=X*X");
+        machine.type_line_paced("PRINT FNS(5)");
+        machine.type_line_paced("DEF FNL(X)=FNL(X)+1");
+        machine.type_line_paced("PRINT FNL(1)");
+        machine.type_line_paced("PRINT FNS(6)");
+        machine.type_line_paced("NEW");
+        machine.type_line_paced("PRINT FNS(5)");
+        machine.run_frames(80);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "25"),
+            "a definition typed at the prompt works:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "36"),
+            "and the refusal gave the guard back, so the next call reads:\n{screen}"
+        );
+        assert!(
+            screen.matches("?TYPE MISMATCH").count() >= 2,
+            "a definition that calls itself is refused, and NEW forgets the lot:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "READY."),
+            "and the machine is still at the prompt afterwards:\n{screen}"
+        );
+    }
+
+    /// The guard is one byte, not a stack, so a definition may not call
+    /// another one -- itself included. Each on its own is still read.
+    #[test]
+    fn a_1992_definition_may_not_call_another() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced("DEF FNO(A)=A+1");
+        machine.type_line_paced("DEF FNT(A)=FNO(A)*2");
+        machine.type_line_paced("PRINT FNT(4)");
+        machine.type_line_paced("PRINT FNO(4)");
+        machine.run_frames(80);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.matches("?TYPE MISMATCH").count() == 1,
+            "a definition that calls another is refused:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "5"),
+            "and the one it called is read on its own:\n{screen}"
+        );
+    }
+
     /// The two functions that answer with a number about a number: `ABS` and
     /// `SGN`.
     #[test]
