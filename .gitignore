@@ -1,6 +1,9 @@
 # Build trees
 rust/target/
 
+# Scratch space for tools and one-off runs
+.scratch/
+
 # Editors and desktops
 .vscode/
 *.swp
