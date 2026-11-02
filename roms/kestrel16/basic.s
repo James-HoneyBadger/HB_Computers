@@ -243,6 +243,12 @@ KW_NEXT_END:
 KW_LEN:
         .text "LEN"
 KW_LEN_END:
+KW_ABS:
+        .text "ABS"
+KW_ABS_END:
+KW_SGN:
+        .text "SGN"
+KW_SGN_END:
 KW_DIM:
         .text "DIM"
 KW_DIM_END:
@@ -2822,9 +2828,74 @@ FACTOR_WORD:
         LDY.W #KW_LEN_END - KW_LEN
         JSR MATCHKW
         BCS FACTOR_LEN
+        LDX.W #(KW_ABS & $FFFF)
+        LDY.W #KW_ABS_END - KW_ABS
+        JSR MATCHKW
+        BCS FACTOR_ABS
+        LDX.W #(KW_SGN & $FFFF)
+        LDY.W #KW_SGN_END - KW_SGN
+        JSR MATCHKW
+        BCS FACTOR_SGN
         BRA FACTOR_VAR
 FACTOR_ISSTR:
         JMP FACTOR_MISMATCH
+
+; ABS(n) and SGN(n). Both take a whole expression in brackets, which is what
+; FACTOR_IN_BRACKETS is for: the two smaller functions, LEN and PEEK, have their
+; own because one of them reads a string and the other a byte.
+FACTOR_ABS:
+        JSR FACTOR_IN_BRACKETS
+        BCC FACTOR_MISMATCH
+        REP #$20
+        TXA
+        BPL FACTOR_ABS_DONE     ; already nought or more
+        EOR.W #$FFFF
+        INC A
+        TAX
+FACTOR_ABS_DONE:
+        SEP #$20
+        RTS
+FACTOR_SGN:
+        JSR FACTOR_IN_BRACKETS
+        BCC FACTOR_MISMATCH
+        REP #$20
+        TXA
+        BEQ FACTOR_SGN_ZERO
+        BMI FACTOR_SGN_NEG
+        LDA.W #1
+        TAX
+        BRA FACTOR_SGN_DONE
+FACTOR_SGN_NEG:
+        LDA.W #$FFFF
+        TAX
+FACTOR_SGN_ZERO:
+FACTOR_SGN_DONE:
+        SEP #$20
+        RTS
+
+; FACTOR_IN_BRACKETS: the text is `(expression)`. X = its value and the pointer
+; steps past the bracket. Carry set, and nothing taken, when it is not.
+FACTOR_IN_BRACKETS:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE FACTOR_IN_BRACKETS_NO
+        JSR SRC_STEP
+        JSR EXPR
+        PHX
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE FACTOR_IN_BRACKETS_BAD
+        JSR SRC_STEP
+        PLX
+        SEC
+        RTS
+FACTOR_IN_BRACKETS_BAD:
+        PLX
+FACTOR_IN_BRACKETS_NO:
+        CLC
+        RTS
 FACTOR_LEN:
         JSR SKIPSP
         LDA [ZP_SRC]

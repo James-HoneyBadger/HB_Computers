@@ -195,6 +195,7 @@ THE ANSWER IS 42
 | `LEFT$(A$,n)` / `RIGHT$(A$,n)` / `MID$(A$,n,m)` | part of a string; `MID$` counts its first character as one, and a count past the end is as much as there is |
 | `CHR$(n)` / `ASC(A$)` | the character with that number, and the number of the first character |
 | `STR$(n)` / `VAL(A$)` | the digits of a number, and the number those digits begin with |
+| `ABS(n)` / `SGN(n)` | the size without its sign, and the sign on its own: `-1`, `0` or `1` |
 | `PEEK(addr)` / `POKE addr,value` | one byte of bank zero, which is where the tube, the I/O page and the program are |
 | `FIND "NAME"` | where a file is: its directory entry, the sector it starts at, and how many it runs for |
 | `CSAVE "NAME"` | the program store onto the cassette, as one more block after what is already there |
@@ -278,7 +279,7 @@ The honest list, because a manual that hides it is worse than useless:
   whole words or of string slots. There is no `DIM` of more than two
   subscripts, and a `DIM` that asks for more elements than the letter already
   has takes a fresh run from the heap and does not give the old one back;
-- **no other functions** — no `ABS`, no `DEF FN`;
+- **no `DEF FN`** — the functions are the ones in the table above;
 - **a filesystem** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD`, `DELETE` and `FIND`
   all work. The volume format below is fixed, so anything written against it
   keeps working;

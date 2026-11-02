@@ -753,6 +753,31 @@ mod tests {
         );
     }
 
+    /// The two functions that answer with a number about a number: `ABS` and
+    /// `SGN`.
+    #[test]
+    fn a_1992_number_knows_its_size_and_its_sign() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced("PRINT ABS(-5);\" \";ABS(5);\" \";ABS(0)");
+        machine.type_line_paced("PRINT SGN(-3);\" \";SGN(0);\" \";SGN(7)");
+        machine.type_line_paced("PRINT ABS(3-10)+1");
+        machine.run_frames(60);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "5 5 0"),
+            "the size without the sign:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "-1 0 1"),
+            "and the sign on its own:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "8"),
+            "and an expression is read whole before it is answered:\n{screen}"
+        );
+    }
+
     /// An array of strings: `DIM A$(2)` is three slots, each holding as much as
     /// a string variable does, and an element is a string wherever one is wanted.
     #[test]

@@ -359,6 +359,7 @@ than its predecessor, and honest about it:
 | `LEFT$(A$,n)` / `RIGHT$(A$,n)` / `MID$(A$,n,m)` | part of a string, counting from one; a count past the end is as much as there is |
 | `CHR$(n)` / `ASC(A$)` | the character with that number, and the number of the first character |
 | `STR$(n)` / `VAL(A$)` | the digits of a number, and the number those digits begin with |
+| `ABS(n)` / `SGN(n)` | the size without its sign, and the sign on its own |
 | `PEEK(addr)` / `POKE addr,value` | one byte of bank zero: the tube, the I/O page and the program |
 | `DIM A(10)` / `DIM M(2,3)` | an array of eleven words, `A(0)` to `A(10)`, or `M(i,j)` with two subscripts; the `DIM` comes first |
 | `DIM S$(10)` / `S$(i)` | an array of strings, each a slot of thirty-one characters |
@@ -415,7 +416,7 @@ PRINT A$
   turned into characters, digits and back with `CHR$`/`ASC`/`STR$`/`VAL`;
 - **arrays, in part** — `DIM A(10)` and `A(i)` with one or two subscripts, of
   whole words or of strings: no more than two subscripts;
-- **no other functions** — no `ABS`, no `DEF FN`;
+- **no `DEF FN`** — the functions are the ones in the statement table;
 - **a filesystem** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD`, `DELETE` and `FIND`
   all work;
 - **the cassette, in part** — `CSAVE "NAME"` and `CLOAD "NAME"` move the
