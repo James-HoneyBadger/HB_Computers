@@ -90,6 +90,16 @@ const ACCENT: Color32 = Color32::from_rgb(0x5B, 0xCB, 0xB2);
 const WARN: Color32 = Color32::from_rgb(0xE0, 0xA0, 0x5A);
 const LAMP_OFF: Color32 = Color32::from_rgb(0x34, 0x3B, 0x48);
 
+// The settings sheet's page list: wide enough for the longest title and no
+// wider, because the page beside it gets what is left of the window.
+const TREE_WIDTH: f32 = 118.0;
+
+// The window cannot be made smaller than this, and the settings sheet is laid
+// out to fit it: a sheet bigger than the window it is drawn in is one whose
+// controls cannot be reached.
+const MIN_WINDOW_WIDTH: f32 = 560.0;
+const MIN_WINDOW_HEIGHT: f32 = 420.0;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Speed {
     Mhz1,
@@ -848,38 +858,79 @@ impl App {
         let mut commit = false;
         let mut cancel = false;
 
+        // The sheet lives inside the window it belongs to, so it is measured
+        // against that window rather than against a preferred size: at the
+        // window's own default width the whole sheet fits, and the page column
+        // takes what the tree leaves rather than a width of its own.
+        let viewport = ctx.content_rect().size();
+        let width = (viewport.x - 28.0).clamp(360.0, 620.0);
+        let height = (viewport.y - 52.0).clamp(300.0, 560.0);
+
+        // The row of tree and page gets what the sheet's own chrome leaves:
+        // a title bar, the page's heading, a separator and the buttons. It is
+        // measured from the sheet rather than from the space left inside it,
+        // because a height taken from that space feeds its own next pass and
+        // the sheet grows a little more every frame.
+        const CHROME: f32 = 104.0;
+
         egui::Window::new("Settings")
             .open(&mut open)
             .collapsible(false)
-            .resizable(true)
-            .default_pos(Pos2::new(10.0, 38.0))
-            .default_size(Vec2::new(600.0, 520.0))
-            .min_size(Vec2::new(560.0, 440.0))
+            .fixed_pos(Pos2::new(10.0, 38.0))
+            // The sheet follows the window it is drawn in, in both directions:
+            // a floating window that keeps a size of its own is one that hangs
+            // off the edge as soon as the emulator's window is made smaller.
+            .fixed_size(Vec2::new(width, height))
             .show(ctx, |ui| {
+                let row = Vec2::new(
+                    (width - 26.0).max(240.0),
+                    (height - CHROME)
+                        .max(140.0)
+                        // The foot of the sheet -- a separator and the buttons
+                        // -- is not inside the scroll area, so the row never
+                        // grows into the space the buttons need.
+                        .min((ui.available_height() - 40.0).max(140.0)),
+                );
+                let tree = TREE_WIDTH;
+                let page_width = (row.x - tree - 26.0).max(180.0);
                 ui.allocate_ui_with_layout(
-                    Vec2::new(560.0, 400.0),
+                    row,
                     Layout::left_to_right(Align::TOP),
                     |ui| {
                     ui.vertical(|ui| {
-                        ui.set_width(132.0);
+                        ui.set_width(tree);
                         ui.label(RichText::new("PROPERTIES").small().strong().color(MUTED));
                         ui.add_space(6.0);
-                        let mut heading = "";
-                        for (page, title, group) in PAGES {
-                            if group != heading {
-                                heading = group;
-                                ui.add_space(8.0);
-                                ui.label(RichText::new(group.to_uppercase()).small().color(EDGE));
-                            }
-                            if ui.selectable_label(self.page == page, title).clicked() {
-                                self.page = page;
-                            }
-                        }
+                        // Ten pages and three headings do not fit a short
+                        // window, so the list scrolls as the page beside it
+                        // does; a list that does not fit and does not scroll
+                        // pushes the buttons off the foot of the sheet.
+                        egui::ScrollArea::vertical()
+                            .id_salt("settings-pages")
+                            .auto_shrink([false, true])
+                            .max_height((row.y - 40.0).max(80.0))
+                            .show(ui, |ui| {
+                                ui.set_width(tree);
+                                let mut heading = "";
+                                for (page, title, group) in PAGES {
+                                    if group != heading {
+                                        heading = group;
+                                        ui.add_space(8.0);
+                                        ui.label(
+                                            RichText::new(group.to_uppercase())
+                                                .small()
+                                                .color(EDGE),
+                                        );
+                                    }
+                                    if ui.selectable_label(self.page == page, title).clicked() {
+                                        self.page = page;
+                                    }
+                                }
+                            });
                     });
                     ui.separator();
                     ui.vertical(|ui| {
-                        ui.set_min_width(400.0);
-                        ui.set_max_width(430.0);
+                        ui.set_width(page_width);
                         ui.label(
                             RichText::new(self.page.title())
                                 .strong()
@@ -890,7 +941,7 @@ impl App {
                         egui::ScrollArea::vertical()
                             .id_salt("settings-page")
                             .auto_shrink([false, true])
-                            .max_height(360.0)
+                            .max_height((row.y - 34.0).max(80.0))
                             .show(ui, |ui| {
                                 match self.page {
                                     Page::Quickstart => self.page_quickstart(ui, &mut draft),
@@ -1310,7 +1361,7 @@ impl App {
             }
         });
         group(ui, "Palette", |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 for (index, colour) in palette(self.machine.model()).iter().enumerate() {
                     swatch(ui, *colour, index);
                 }
@@ -1970,7 +2021,9 @@ fn field(ui: &mut egui::Ui, label: &str, value: &str) {
     ui.horizontal(|ui| {
         ui.label(RichText::new(label).small().color(MUTED));
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            ui.label(RichText::new(value).small().color(TEXT));
+            // A value is one line: a path too long for the column ends in an
+            // ellipsis rather than making the sheet wider than the window.
+            ui.add(egui::Label::new(RichText::new(value).small().color(TEXT)).truncate());
         });
     });
 }
@@ -2225,7 +2278,7 @@ fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size(default_window(model))
-            .with_min_inner_size([560.0, 420.0])
+            .with_min_inner_size([MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT])
             .with_title(window_title(model)),
         ..Default::default()
     };
@@ -2251,4 +2304,63 @@ fn main() -> eframe::Result<()> {
             Ok(Box::new(app) as Box<dyn eframe::App>)
         }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The settings sheet, laid out at a given viewport. Nothing is drawn:
+    /// `Context::run_ui` lays the widgets out, and the area the layers used is
+    /// what the sheet turns out to want.
+    fn sheet_at(ctx: &egui::Context, app: &mut App, viewport: Vec2) -> Rect {
+        let mut input = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, viewport)),
+            ..Default::default()
+        };
+        let mut used = Rect::NOTHING;
+        // A window settles on its size over the first passes, so the used area
+        // is read once the layout has stopped moving.
+        for pass in 0..4 {
+            input.time = Some(f64::from(pass) / 60.0);
+            let _ = ctx.run_ui(input.clone(), |ui| app.settings_window(ui.ctx()));
+            used = ctx.globally_used_rect();
+        }
+        used
+    }
+
+    /// Every page of the settings sheet fits the window it is opened in, at the
+    /// window's own default size and at the smallest size it can be dragged to,
+    /// and the small one is checked after the large one because a window keeps
+    /// the size it was given: the sheet used to stay 600 points wide after the
+    /// emulator's window was made smaller, and its buttons went off the edge.
+    #[test]
+    fn the_settings_sheet_fits_the_window() {
+        let mut app = App::new(Model::Kestrel, None).expect("a machine with its ROMs");
+        let ctx = egui::Context::default();
+        ctx.set_pixels_per_point(1.0);
+        let sizes = [
+            default_window(Model::Kestrel),
+            Vec2::new(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT),
+        ];
+        for (page, title, _) in PAGES {
+            app.open_settings();
+            app.page = page;
+            for viewport in sizes {
+                let used = sheet_at(&ctx, &mut app, viewport);
+                assert!(
+                    used.width() <= viewport.x + 0.5,
+                    "the {title} page wants {:.0} points across in a {:.0}-point window",
+                    used.width(),
+                    viewport.x
+                );
+                assert!(
+                    used.height() <= viewport.y + 0.5,
+                    "the {title} page wants {:.0} points down in a {:.0}-point window",
+                    used.height(),
+                    viewport.y
+                );
+            }
+        }
+    }
 }

@@ -151,7 +151,9 @@ the machine stands still while its switches are out.
 
 A tree of properties down the left, the chosen page on the right, and `OK`,
 `Cancel` and `Reset` along the foot. A page is a set of groups: labelled boxes,
-one for each thing being set.
+one for each thing being set. The sheet is the size of the window it opens in,
+and the page list and the page both scroll, so every control stays reachable
+however small the window is made.
 
 | Page | What it sets |
 | --- | --- |
