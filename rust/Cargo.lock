@@ -1659,7 +1659,7 @@ dependencies = [
 
 [[package]]
 name = "kestrel-app"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "eframe",
  "image",
@@ -1668,18 +1668,18 @@ dependencies = [
 
 [[package]]
 name = "kestrel-asm"
-version = "1.0.0"
+version = "1.0.1"
 
 [[package]]
 name = "kestrel-cli"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "kestrel-machine",
 ]
 
 [[package]]
 name = "kestrel-machine"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "kestrel-asm",
  "kestrel16-asm",
@@ -1687,7 +1687,7 @@ dependencies = [
 
 [[package]]
 name = "kestrel16-asm"
-version = "1.0.0"
+version = "1.0.1"
 
 [[package]]
 name = "khronos-egl"

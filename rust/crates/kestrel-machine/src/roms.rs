@@ -11,7 +11,7 @@
 // not a second implementation -- so the bytes are the ones the C++ build puts in
 // `build/generated`, which the tests compare.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use crate::profile::{Model, KESTREL, KESTREL16};
@@ -52,22 +52,54 @@ impl ShippedRoms {
 }
 
 /// Where the assembly sources are: `KESTREL_SOURCES` if it is set, otherwise
-/// found by walking up from this crate to the repository that holds `roms/`.
+/// the first `roms/` found by walking up from this crate, from the running
+/// program, or from the working directory.
+///
+/// The first of those is where the sources are during development. The other
+/// two are what makes a build useful away from the machine that made it: a
+/// program carries the source path of its own build inside it, so a copy taken
+/// somewhere else would otherwise look for `roms/` in a directory that is not
+/// there. Beside the program, or in the directory it is called from, is where
+/// a release keeps them.
 pub fn source_directory() -> Result<PathBuf, String> {
     if let Some(path) = std::env::var_os("KESTREL_SOURCES") {
         return Ok(PathBuf::from(path));
     }
-    let mut directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut starts = vec![PathBuf::from(env!("CARGO_MANIFEST_DIR"))];
+    if let Some(directory) = std::env::current_exe()
+        .ok()
+        .and_then(|program| program.parent().map(Path::to_path_buf))
+    {
+        starts.push(directory);
+    }
+    if let Ok(directory) = std::env::current_dir() {
+        starts.push(directory);
+    }
+    starts
+        .iter()
+        .find_map(|start| roms_below(start))
+        .ok_or_else(|| {
+            "no roms/ directory: set KESTREL_SOURCES to the repository's roms directory"
+                .to_string()
+        })
+}
+
+/// The `roms/` directory at or above `start`. The mark of the repository is
+/// `roms/kestrel/kestrel.inc` rather than the directory's name alone, and six
+/// levels is deeper than any place a program can sit: `rust/target/release` is
+/// three.
+fn roms_below(start: &Path) -> Option<PathBuf> {
+    let mut directory = start.to_path_buf();
     for _ in 0..6 {
         let candidate = directory.join("roms");
         if candidate.join("kestrel").join("kestrel.inc").is_file() {
-            return Ok(candidate);
+            return Some(candidate);
         }
         if !directory.pop() {
             break;
         }
     }
-    Err("no roms/ directory: set KESTREL_SOURCES to the repository's roms directory".to_string())
+    None
 }
 
 /// The images for a model, assembled once per process.
@@ -293,4 +325,33 @@ fn assemble_65816(
         .assemble()
         .map_err(|error| format!("{text}: {error}"))?;
     Ok(assembly.image)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The search for `roms/` walks up from wherever it is started, and it is
+    /// started beside the program as well as beside the crate, which is what
+    /// lets a release carry the sources it assembles.
+    #[test]
+    fn roms_are_found_by_walking_up() {
+        let root = std::env::temp_dir().join(format!("kestrel-roms-{}", std::process::id()));
+        let deep = root.join("here/target/release");
+        std::fs::create_dir_all(root.join("roms/kestrel")).expect("a tree to search");
+        std::fs::create_dir_all(&deep).expect("a program's directory");
+        std::fs::write(root.join("roms/kestrel/kestrel.inc"), "NOP\n").expect("the mark");
+
+        assert_eq!(roms_below(&deep), Some(root.join("roms")));
+        assert_eq!(roms_below(&root), Some(root.join("roms")));
+
+        // A `roms/` without the mark is some other directory that happens to be
+        // called that, and the search does not stop at it.
+        let elsewhere = std::env::temp_dir().join(format!("kestrel-noroms-{}", std::process::id()));
+        std::fs::create_dir_all(elsewhere.join("roms/kestrel")).expect("a tree to search");
+        assert_eq!(roms_below(&elsewhere), None);
+
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&elsewhere);
+    }
 }
