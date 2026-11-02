@@ -1,6 +1,5 @@
-# The Rust port. The C++ tree stays until the port has reached it: one crate at a
-# time, each with the tests that prove it, so nothing is "converted" that is not
-# also still working.
+# The Rust tree: one crate at a time, each with the tests that prove it, so
+# nothing is "converted" that is not also still working.
 [workspace]
 resolver = "2"
 members = [
@@ -12,6 +11,6 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 license = "MIT"

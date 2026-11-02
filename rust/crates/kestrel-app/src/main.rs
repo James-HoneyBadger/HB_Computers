@@ -2329,6 +2329,15 @@ mod tests {
         used
     }
 
+    /// The version on the About page is the version this tree says it is. It
+    /// is shown by a program that carries its own copy of the number, so the
+    /// two can only stay together if something compares them.
+    #[test]
+    fn the_version_is_the_one_in_the_version_file() {
+        let declared = include_str!("../../../../VERSION").trim();
+        assert_eq!(env!("CARGO_PKG_VERSION"), declared);
+    }
+
     /// Every page of the settings sheet fits the window it is opened in, at the
     /// window's own default size and at the smallest size it can be dragged to,
     /// and the small one is checked after the large one because a window keeps
