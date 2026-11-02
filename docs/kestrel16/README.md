@@ -227,12 +227,43 @@ The honest list, because a manual that hides it is worse than useless:
   back to when the next line is typed;
 - **no strings as values** — `PRINT "text"` works, `A$` does not;
 - **no arrays, no functions** — no `DIM`, no `ABS` or `LEN`, no `DEF FN`;
-- **no filesystem** — the disk device moves sectors, and Kestrel DOS 2.0's jump
-  table entries answer `1` (an error) until it is written;
+- **a filesystem, in part** — `FORMAT` and `CATALOG` work, and `FIND`, `SAVE`,
+  `LOAD` and `DELETE` answer `1` (an error) until they are written. The volume
+  format below is fixed, so anything written against it keeps working;
 - **no cassette blocks** — the tape is a byte stream and the KERNAL has the
   registers, but the block format is not written.
 
 ---
+
+## The volume format
+
+Kestrel DOS 2.0 keeps its system area in the first two sectors of a 4096-sector
+volume. The header is sector 0:
+
+| Offset | Bytes | What |
+| --- | --- | --- |
+| 0 | 8 | `"HBDOS20"` and a zero |
+| 8 | 16 | the volume name, space padded |
+| 24 | 2 | the sector count, low byte first |
+| 26 | 6 | reserved |
+| 32 | 480 | the free map: one bit per sector, set means free |
+
+The map is nearly a whole sector because 4096 sectors need 4096 bits. That is the
+one place this filesystem cannot simply be the 1982 one with larger numbers, and
+it is why the map starts at a fixed offset rather than following the name.
+
+Sector 1 is the directory: sixteen entries of thirty-two bytes.
+
+| Offset | Bytes | What |
+| --- | --- | --- |
+| 0 | 16 | the file's name, space padded; a zero in the first byte means the entry is free |
+| 16 | 2 | its first sector |
+| 18 | 2 | how many sectors it occupies |
+| 20 | 12 | reserved |
+
+`FORMAT` writes both sectors, so a freshly formatted volume is a header naming
+itself and sixteen free entries. `CATALOG` reads the header back and prints the
+volume name between brackets.
 
 ## Writing for the machine
 
