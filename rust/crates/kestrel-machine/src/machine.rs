@@ -417,6 +417,55 @@ mod tests {
         );
     }
 
+    /// The two machines prompt the same way: `READY.` on a line of its own, and
+    /// what a person types on the line beneath it. The 1992 machine used to say
+    /// `READY> ` and take its input on the same line, which made a session look
+    /// like a different computer from the one the manual describes.
+    #[test]
+    fn both_machines_prompt_the_same_way() {
+        for model in [Model::Kestrel, Model::Kestrel16] {
+            let mut machine = boot(model);
+            machine.type_line_paced("PRINT 2+2*3");
+            let rows: Vec<String> = (0..machine.bus.video.rows() as usize)
+                .map(|row| machine.screen_line(row).trim().to_string())
+                .collect();
+            let ready = rows
+                .iter()
+                .position(|row| row == "READY.")
+                .unwrap_or_else(|| panic!("no READY. on {model:?}:\n{}", machine.screen_text()));
+            assert_eq!(rows[ready + 1], "PRINT 2+2*3", "the line is typed beneath it");
+            assert_eq!(rows[ready + 2], "8", "and answered beneath that");
+            assert!(
+                !machine.screen_text().contains("READY>"),
+                "the old prompt survived on {model:?}:\n{}",
+                machine.screen_text()
+            );
+        }
+    }
+
+    /// A statement ends its line unless something said otherwise. The 1992
+    /// BASIC held the line open after `;` and never closed it again once a value
+    /// had been printed, so `PRINT "X ";6*7` ran into the prompt -- the extra
+    /// newline the old prompt printed was hiding it.
+    #[test]
+    fn a_print_statement_finishes_its_line() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced("PRINT \"X \";6*7");
+        machine.type_line_paced("PRINT 1,2");
+        machine.type_line_paced("PRINT \"A\"");
+        let rows: Vec<String> = (0..machine.bus.video.rows() as usize)
+            .map(|row| machine.screen_line(row).trim_end().to_string())
+            .collect();
+        assert!(rows.iter().any(|row| row == "X 42"), "the value ended its line:\n{}", machine.screen_text());
+        assert!(rows.iter().any(|row| row == "1 2"), "a comma continues the line:\n{}", machine.screen_text());
+        assert!(rows.iter().any(|row| row == "A"), "a string ends its line:\n{}", machine.screen_text());
+        assert!(
+            !machine.screen_text().lines().any(|row| row.trim_end().ends_with("READY.") && row.trim() != "READY."),
+            "nothing ran into the prompt:\n{}",
+            machine.screen_text()
+        );
+    }
+
     #[test]
     fn the_frame_is_the_profile_s() {
         let mut machine = boot(Model::Kestrel);

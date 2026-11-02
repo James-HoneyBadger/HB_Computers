@@ -67,10 +67,10 @@ ENTRY:
         JSL L_CLS
         JSR SAY_BANNER
         JSR PROG_NEW
+        JSR SAY_NEWLINE          ; the banner has no newline of its own
 MAIN_LOOP:
-        JSR SAY_NEWLINE
         JSR SAY_READY
-        JSR SAY_PROMPT
+        JSR SAY_NEWLINE          ; the line is typed on the one below READY.
         LDA #<LINEBUF
         STA ZP_PTR
         LDA #>LINEBUF
@@ -142,11 +142,8 @@ TXT_BANNER:
         .text "KESTREL 16 BASIC 2.0"
 TXT_BANNER_END:
 TXT_READY:
-        .text "READY"
+        .text "READY."
 TXT_READY_END:
-TXT_PROMPT:
-        .text "> "
-TXT_PROMPT_END:
 TXT_WHAT:
         .text "?WHAT?"
 TXT_WHAT_END:
@@ -288,16 +285,6 @@ SAY_READY:
         LDA #BANK_BASIC
         STA ZP_PTR+2
         LDX.W #TXT_READY_END - TXT_READY
-        JSL L_PRINT
-        RTS
-SAY_PROMPT:
-        LDA #<TXT_PROMPT
-        STA ZP_PTR
-        LDA #>TXT_PROMPT
-        STA ZP_PTR+1
-        LDA #BANK_BASIC
-        STA ZP_PTR+2
-        LDX.W #TXT_PROMPT_END - TXT_PROMPT
         JSL L_PRINT
         RTS
 SAY_NEWLINE:
@@ -685,6 +672,8 @@ PRINT_ITEM:
         RTS
 PRINT_VALUE:
         JSR PRNUM
+        LDA #0                  ; the value ended the item, so the next thing
+        STA ZP_FLAG             ; decides whether the line ends
         BRA PRINT_LOOP
 PRINT_STRING:
         INC ZP_SRC
@@ -698,6 +687,8 @@ PRINT_STR_LOOP:
         BRA PRINT_STR_LOOP
 PRINT_STR_CLOSE:
         INC ZP_SRC
+        LDA #0
+        STA ZP_FLAG
         BRA PRINT_LOOP
 PRINT_SEMI:
         INC ZP_SRC
@@ -708,7 +699,7 @@ PRINT_COMMA:
         INC ZP_SRC
         LDA #32
         JSL L_CHROUT
-        LDA #0
+        LDA #1                  ; a comma continues the line: `PRINT 1,` waits
         STA ZP_FLAG
         BRA PRINT_LOOP
 PRINT_END:

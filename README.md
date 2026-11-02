@@ -28,7 +28,8 @@ READY.
 
 $ ./start.sh cli --model kestrel16 --type "PRINT 2+2"
 KESTREL 16 BASIC 2.0
-READY> PRINT 2+2
+READY.
+PRINT 2+2
 4
 ```
 

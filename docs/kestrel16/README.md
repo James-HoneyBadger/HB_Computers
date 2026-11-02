@@ -8,9 +8,10 @@ no longer shares a socket with the kernel.
 
 ```
 KESTREL 16 BASIC 2.0
-READY> PRINT 2+2
+READY.
+PRINT 2+2
 4
-READY>
+READY.
 ```
 
 ---
@@ -148,10 +149,13 @@ A line-oriented BASIC with sixteen-bit integers, in the tradition the decade
 inherited: type a line, press Return, read the answer.
 
 ```
-READY> PRINT 2+2
+READY.
+PRINT 2+2
 4
-READY> LET A=41
-READY> PRINT "THE ANSWER IS ";A+1
+READY.
+LET A=41
+READY.
+PRINT "THE ANSWER IS ";A+1
 THE ANSWER IS 42
 ```
 
@@ -187,7 +191,8 @@ that means nothing here — says `?WHAT?` and prints no value at all, and
 Anything else is a mistake, and the machine says so:
 
 ```
-READY> WIBBLE
+READY.
+WIBBLE
 ?WHAT?
 ```
 
