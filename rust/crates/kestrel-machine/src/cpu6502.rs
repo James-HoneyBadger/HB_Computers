@@ -892,7 +892,9 @@ impl Cpu6502 {
                 ((self.a ^ value) & (self.a ^ (difference as u8)) & 0x80) != 0,
             );
             self.a = (((high << 4) | adjusted_low) & 0xFF) as u8;
-            self.set_zn(self.a);
+            // The 6502 reports N and Z from the binary subtraction even in
+            // decimal mode; only the carry comes from the decimal digit.
+            self.set_zn(difference as u8);
             return;
         }
         self.set_flag(CARRY, difference >= 0);

@@ -729,10 +729,12 @@ impl Cpu65816 {
 
         self.set_flag(CARRY, i64::from(binary) > i64::from(mask));
         self.set_flag(OVERFLOW, (!(a ^ v) & (a ^ (binary as u16)) & sign) != 0);
-        if self.m8() {
-            self.set_zn8(result as u8);
-        } else {
-            self.set_zn16(result);
+        if !self.flag(DECIMAL) {
+            if self.m8() {
+                self.set_zn8(result as u8);
+            } else {
+                self.set_zn16(result);
+            }
         }
 
         let mut stored = result;
@@ -754,6 +756,13 @@ impl Cpu65816 {
             }
             self.set_flag(CARRY, carry_in != 0);
             stored = adjusted as u16 & mask;
+            // N and Z come from the decimal digit that came out, not from the
+            // binary sum; V above came from the intermediate.
+            if self.m8() {
+                self.set_zn8(stored as u8);
+            } else {
+                self.set_zn16(stored);
+            }
         }
         if self.m8() {
             self.c = (self.c & 0xFF00) | stored;
@@ -773,10 +782,12 @@ impl Cpu65816 {
 
         self.set_flag(CARRY, binary >= 0);
         self.set_flag(OVERFLOW, ((a ^ v) & (a ^ (binary as u16)) & sign) != 0);
-        if self.m8() {
-            self.set_zn8(result as u8);
-        } else {
-            self.set_zn16(result);
+        if !self.flag(DECIMAL) {
+            if self.m8() {
+                self.set_zn8(result as u8);
+            } else {
+                self.set_zn16(result);
+            }
         }
 
         let mut stored = result;
@@ -798,6 +809,11 @@ impl Cpu65816 {
             }
             self.set_flag(CARRY, borrow_in == 0);
             stored = adjusted as u16 & mask;
+            if self.m8() {
+                self.set_zn8(stored as u8);
+            } else {
+                self.set_zn16(stored);
+            }
         }
         if self.m8() {
             self.c = (self.c & 0xFF00) | stored;

@@ -309,6 +309,46 @@ fn arithmetic() {
 /// A memory increment is as wide as the accumulator. It used to be forced to a
 /// byte here, on a comment that claimed the processor had no sixteen-bit `INC`;
 /// it has one, and the flags come from the whole word.
+/// In decimal mode the 65816 takes N and Z from the decimal result and V from
+/// the intermediate, which is the opposite of what this core did: it reported
+/// all three from the binary sum.
+#[test]
+fn decimal_flags_come_from_the_decimal_result() {
+    // $99 + $01 is $00 decimal with a carry: the decimal result is zero, so Z is
+    // set -- the binary sum $9A is not zero, and used to be what Z followed.
+    let mut run = Run::new(ORIGIN, &[0x69, 0x01]);
+    run.set(|r| {
+        r.c = 0x0099;
+        r.p = MEMORY_8 | DECIMAL;
+    });
+    run.step();
+    assert_eq!(run.regs().c & 0xFF, 0x00, "decimal arithmetic still works");
+    assert_eq!(run.regs().p & ZERO, ZERO, "Z from the decimal result");
+    assert_eq!(run.regs().p & CARRY, CARRY);
+
+    // $50 + $50 is $00 decimal, and both are the same nibble sum: N clear.
+    let mut run = Run::new(ORIGIN, &[0x69, 0x50]);
+    run.set(|r| {
+        r.c = 0x0050;
+        r.p = MEMORY_8 | DECIMAL;
+    });
+    run.step();
+    assert_eq!(run.regs().c & 0xFF, 0x00);
+    assert_eq!(run.regs().p & NEGATIVE, 0);
+
+    // Sixteen-bit decimal subtraction: $1000 - $0001 is $0999 with no borrow,
+    // so the carry stays set.
+    let mut run = Run::new(ORIGIN, &[0xE9, 0x01, 0x00]);
+    run.set(|r| {
+        r.c = 0x1000;
+        r.p = DECIMAL | CARRY;
+    });
+    run.step();
+    assert_eq!(run.regs().c, 0x0999);
+    assert_eq!(run.regs().p & CARRY, CARRY, "nothing was borrowed");
+    assert_eq!(run.regs().p & ZERO, 0);
+}
+
 #[test]
 fn memory_increments_follow_the_accumulator_width() {
     // Sixteen-bit: $7EFF + 1 carries into the byte above it.
