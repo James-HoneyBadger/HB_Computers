@@ -386,6 +386,18 @@ impl Assembler {
                 mode = Mode::LongX;
             }
         }
+        // `.L` is a promise the source makes, and answering it with the
+        // absolute form breaks that promise in silence: there is no long,Y, so
+        // `STA.L table,Y` became `abs,Y`, which addresses the data bank rather
+        // than the bank the table is in. Quietly changing where a byte lands is
+        // not a favour, so a suffix that cannot be honoured is refused.
+        if stmt.long_form && !matches!(mode, Mode::Long | Mode::LongX | Mode::Imp | Mode::Acc) {
+            return Err(Error::new(
+                &stmt.file,
+                stmt.line,
+                format!("{} has no long form for {}", stmt.mnemonic, mode),
+            ));
+        }
         let Some(op) = find_opcode(&stmt.mnemonic, mode) else {
             return Err(Error::new(
                 &stmt.file,

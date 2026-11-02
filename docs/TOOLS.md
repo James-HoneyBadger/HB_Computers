@@ -102,6 +102,12 @@ and the assembler cannot see those flags. So the source says what it means:
 An immediate that does not fit the width it was given is an error rather than a
 silent truncation: a missing `.W` should not become a mystery on the screen.
 
+The same goes for a suffix on an address. `.L` asks for the twenty-four-bit
+form, and if the mnemonic has none for that operand — there is no `long,Y`, for
+instance — the assembler refuses rather than falling back to the absolute form,
+because that form addresses the data bank and the byte would land somewhere the
+source did not name.
+
 ---
 
 ## `kestrel` — the command line

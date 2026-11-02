@@ -146,6 +146,8 @@ fn every_addressing_mode() {
     expect("  LDA $7E:$2100", &[0xAF, 0x00, 0x21, 0x7E]);
     expect("  STA $7E:$2100", &[0x8F, 0x00, 0x21, 0x7E]);
     expect("  LDA.L $1234", &[0xAF, 0x34, 0x12, 0x00]);
+    expect("  STA.L $10,X", &[0x9F, 0x10, 0x00, 0x00]);
+    expect("  LDA.L $10", &[0xAF, 0x10, 0x00, 0x00]);
     expect("  LDA $123456,X", &[0xBF, 0x56, 0x34, 0x12]);
     expect("  JSL $C01234", &[0x22, 0x34, 0x12, 0xC0]);
     expect("  JML $C01234", &[0x5C, 0x34, 0x12, 0xC0]);
@@ -223,6 +225,10 @@ fn refusals() {
     expect_refused("start: WIBBLE #$12", "a mnemonic that does not exist");
     expect_refused("  WIBBLE #$12", "an identifier where an opcode should be");
     expect_refused("  .byte $", "empty hexadecimal number");
+    // `.L` on an operand with no long form used to assemble the absolute one,
+    // which addressed the data bank instead of the bank the source named.
+    expect_refused("  STA.L $1234,Y", "a long form that does not exist");
+    expect_refused("  LDA.L ($12)", "a long form for an indirect operand");
 }
 
 /// An operand that does not fit the form it ends up in is a diagnostic, not a

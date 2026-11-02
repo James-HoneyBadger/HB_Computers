@@ -343,7 +343,9 @@ accumulator a byte and `REP #$20` makes it a word; every immediate between a
 `SEP` and its matching `REP` says `.B` or nothing, and every word immediate says
 `.W`. The assembler cannot see the flags, so the source says what it means, and
 an immediate that does not fit its width is an error rather than a silent
-truncation.
+truncation. The same is true of an address: `.L` asks for the long form, and a
+mnemonic that has none for that operand is refused rather than quietly given the
+absolute one, which would address the data bank instead.
 
 **A memory increment is as wide as the accumulator.** In eight-bit mode `INC addr`
 moves one byte and the byte above it is left alone, so a sixteen-bit pointer that
