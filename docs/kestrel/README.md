@@ -214,7 +214,7 @@ a number is stored in the program, and a line without one is run at once.
 | Variables and data | `LET`, `DIM`, `READ`, `DATA`, `RESTORE` |
 | Control flow | `IF … THEN … ELSE`, `FOR … TO … STEP … NEXT`, `GOTO`, `GOSUB`, `RETURN`, `ON … GOTO`, `ON … GOSUB` |
 | Other | `REM`, `END`, `STOP`, `CONT`, `POKE`, `CLS`, `HELP` |
-| Your own functions | `DEF FN A(X)=X*X+1`, then `PRINT FN A(3)` |
+| Your own functions | `DEF FN A(X)=X*X+1` as a program line, called as `FN A(3)` |
 
 `HELP` prints the command list, which is where this table comes from.
 
@@ -236,7 +236,7 @@ the variable holding that start, so `FOR J=I*I TO 100` is safe even when `I*I` h
 run past the end of the array it indexes. The machine walks forward for the
 matching `NEXT` to find out where the body ends, counting the loops it passes
 through on the way, and a `NEXT` inside a remark or a quoted string is not
-mistaken for it. `STEP` may be negative; `STEP 0` loops for ever, as it did then.
+mistaken for it. `STEP` may be negative; `STEP 0` never ends its loop.
 
 ### Functions
 
@@ -259,7 +259,7 @@ says `?OVERFLOW`, and past the bottom the answer is `0`.
 
 `A`–`Z` and `A0`–`Z9`, each a number or — with a `$` — a string. Arrays are
 automatic at eleven elements: `A(1)`, `M(rows,columns)`, `DIM A$(20)`, up to four
-dimensions. `DIM` twice is an error worth having: `?REDIMENSIONED ARRAY`.
+dimensions. `DIM` on the same name twice is `?REDIMENSIONED ARRAY`.
 
 ### Errors
 
@@ -301,9 +301,9 @@ RUN
 838997
 ```
 
-Line 60 is the interesting one: once `I` passes ten, `I*I` is past the end of
-the array, and the loop runs no times at all rather than once with a subscript
-out of range.
+Line 60 relies on the `FOR` rule above: once `I` passes ten, `I*I` is past the
+end of the array, and the loop runs no times at all rather than once with a
+subscript out of range.
 
 The primes share a line because line 50 is `PRINT I;` and not `PRINT I`: a
 trailing `;` leaves the cursor where it is, so the next number follows the last.

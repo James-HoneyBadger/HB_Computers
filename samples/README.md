@@ -1,9 +1,9 @@
 # Samples
 
-Programs to type, run and read. Every one of them is exercised by
-`kestrel_samples_tests`, which types each file at the machine it was written for
-and compares the screen with the `.expected` file beside it — so a sample here
-runs or the suite fails.
+Programs to type, run and read. Every one of them is exercised by the samples
+suite (`rust/crates/kestrel-cli/tests/samples.rs`), which types each file at the
+machine it was written for and compares the screen with the `.expected` file
+beside it, so a sample here runs or the suite fails.
 
 A `.expected` file holds the lines that must appear on the screen. A line that
 begins with `~` only has to appear somewhere in the screen text, which is for
@@ -13,10 +13,10 @@ output that shares a row with the prompt.
 
 ```bash
 # The 1982 machine: the lines are stored and RUN
-./build/kestrel --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
+./start.sh cli --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
 
-# The 1992 machine: the lines are direct statements, so there is nothing to RUN
-./build/kestrel --model kestrel16 --file samples/kestrel16/03-division.bas
+# The 1992 machine: the early files are direct statements, the rest end with RUN
+./start.sh cli --model kestrel16 --file samples/kestrel16/03-division.bas
 ```
 
 Or type them in at the window, or from `./start.sh cli`.

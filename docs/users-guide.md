@@ -91,7 +91,7 @@ A variable that has never been used is zero; a string variable is empty.
 | --- | --- |
 | `IF cond THEN statement` | `THEN` is required. `ELSE` takes the other branch |
 | `IF cond THEN 100` | a line number after `THEN` jumps there |
-| `FOR I=1 TO 10 STEP 2` … `NEXT I` | `STEP` may be negative; `STEP 0` loops for ever, as it did then |
+| `FOR I=1 TO 10 STEP 2` … `NEXT I` | `STEP` may be negative; `STEP 0` never ends its loop |
 | `GOTO 100` / `GOSUB 100` / `RETURN` | seven `FOR` frames and sixteen `GOSUB` frames |
 | `ON 2 GOTO 100,200` | the index chooses which line; a zero index falls through |
 | `ON 1 GOSUB 100,200` | the same, and `RETURN` comes back to the next statement |
@@ -226,7 +226,8 @@ has gone by the next line.
 
 - `A` to `Z`, and `A0` to `Z9`, each a number; with a `$`, a string.
 - Arrays are automatic at eleven elements: `A(0)` to `A(10)`.
-- `DIM A(20)` makes twenty-one; `DIM` twice is an error worth having.
+- `DIM A(20)` makes twenty-one; `DIM` on the same name twice is
+  `?REDIMENSIONED ARRAY`.
 - Up to four dimensions. A fifth is `?BAD SUBSCRIPT`.
 
 ```basic
@@ -545,24 +546,32 @@ PRINT A$
 ?WHAT?
 ```
 
-### What it does not do yet
+### What it has not got
 
-- **loops that span lines belong in a program** — a loop typed at the prompt runs
-  only as far as the end of its line, because each new line starts with no loops
-  pending; a loop whose `FOR` and `NEXT` share a line runs at the prompt;
-- **strings, in part** — `A$` holds thirty-one characters and can be assigned,
-  printed, compared, joined with `+`, sliced with `LEFT$`/`RIGHT$`/`MID$`, and
-  turned into characters, digits and back with `CHR$`/`ASC`/`STR$`/`VAL`;
-- **arrays, in part** — `DIM A(10)` and `A(i)` with one or two subscripts, of
-  whole words or of strings: no more than two subscripts;
-- **one argument** — a `DEF FN` function takes one argument and may not call
-  another definition, itself included; it borrows the variable of the letter it
-  calls its argument by;
-- **a filesystem** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD`, `DELETE` and `FIND`
-  all work;
-- **the cassette, in part** — `CSAVE "NAME"` and `CLOAD "NAME"` move the
-  program store as named blocks, and a tape may hold as many as fit; nothing
-  else can be saved or loaded, and there is no way to see what a tape holds.
+A word the language does not know is `?WHAT?`, and an error ends the program,
+as it does on the 1982 machine.
+
+- **no keyboard input** — there is no `INPUT` and no `GET`; a program is
+  self-contained, and the noise register at `PEEK(40981)` is where variety comes
+  from;
+- **no `RND`, `INT` or `SQR`** — the arithmetic is sixteen-bit integers, so a
+  division already loses the fraction and `ABS` and `SGN` cover the rest;
+- **no `DATA`/`READ`, no `ON … GOTO`, no `STOP`/`CONT`**;
+- **one-letter names** — `A`–`Z` and `A$`–`Z$`, and no digits: `A1` is `?WHAT?`;
+- **one array per letter, one `DIM` per statement** — `DIM Q(4),P(4)` is
+  `?WHAT?`, and a subscript is one of two dimensions at most;
+- **strings of thirty-one characters** — `A$` holds thirty-one and a longer
+  assignment is `?STRING TOO LONG`;
+- **`DEF FN` of one argument**, which may not call another definition, itself
+  included, and which borrows the variable of the letter it names its argument
+  by;
+- **`PEEK` and `POKE` reach bank zero only** — the tube, the I/O page and the
+  program;
+- **the filesystem is complete** — `FORMAT`, `CATALOG`, `DIR`, `SAVE`, `LOAD`,
+  `DELETE` and `FIND`;
+- **the cassette moves the program store and nothing else** — `CSAVE "NAME"` and
+  `CLOAD "NAME"`, as many blocks as fit on the tape, and no way to list what is
+  on one.
 
 ---
 
@@ -587,9 +596,9 @@ RUN
 838997
 ```
 
-The primes run together because line 50 leaves the cursor where it is. Line 60 is
-the interesting one: once `I` passes ten, `I*I` is past the end of the array, and
-the loop runs no times at all rather than once with a bad subscript.
+The primes run together because line 50 leaves the cursor where it is. Line 60
+relies on the `FOR` rule above: once `I` passes ten, `I*I` is past the end of the
+array, and the loop runs no times at all rather than once with a bad subscript.
 
 ### Factorials
 
@@ -627,33 +636,13 @@ with a beep.
 Every file in [samples/](../samples) is typed by the samples suite and
 compared with the `.expected` file beside it, so these programs run as written.
 
-| Kestrel | What it shows |
-| --- | --- |
-| [01-hello](../samples/kestrel/01-hello.bas) | `PRINT`, strings, a small `FOR` |
-| [02-sieve](../samples/kestrel/02-sieve.bas) | arrays, `FOR` with a start past its limit |
-| [03-fibonacci](../samples/kestrel/03-fibonacci.bas) | variables in a loop |
-| [04-factorial](../samples/kestrel/04-factorial.bas) | accumulating a product |
-| [05-tables](../samples/kestrel/05-tables.bas) | nested loops and `;` |
-| [06-average](../samples/kestrel/06-average.bas) | `READ`/`DATA` with a sentinel |
-| [07-strings](../samples/kestrel/07-strings.bas) | the string functions and comparisons |
-| [08-functions](../samples/kestrel/08-functions.bas) | `DEF FN` in the program |
-| [09-subroutines](../samples/kestrel/09-subroutines.bas) | `GOSUB`/`RETURN` |
-| [10-random](../samples/kestrel/10-random.bas) | `RND` and `INT` |
-| [11-pattern](../samples/kestrel/11-pattern.bas) | `POKE` into the tube and its colours |
-| [12-sound](../samples/kestrel/12-sound.bas) | the sound latch |
-
-| Kestrel 16 | What it shows |
-| --- | --- |
-| [01-hello](../samples/kestrel16/01-hello.bas) | `PRINT` with strings and `;` |
-| [02-arithmetic](../samples/kestrel16/02-arithmetic.bas) | sixteen-bit range and precedence |
-| [03-division](../samples/kestrel16/03-division.bas) | signed division |
-| [04-variables](../samples/kestrel16/04-variables.bas) | `LET` and the `A`–`Z` variables |
-| [05-table](../samples/kestrel16/05-table.bas) | a table, one row to a line |
-| [06-limits](../samples/kestrel16/06-limits.bas) | what the language does not do yet |
-| [07-branches-and-loops](../samples/kestrel16/07-branches-and-loops.bas) | `IF`/`THEN`, `GOSUB`/`RETURN` and `FOR`/`NEXT` in one program |
-| [08-for-step](../samples/kestrel16/08-for-step.bas) | positive and negative `STEP`, a loop that runs no times, `STEP 0` rejected |
-| [09-strings](../samples/kestrel16/09-strings.bas) | `A$` variables, `LEN`, comparing, joining and slicing |
-| [10-arrays](../samples/kestrel16/10-arrays.bas) | `DIM`, a sieve, and nested loops |
+Twenty-two programs for the 1982 machine and twenty for the 1992 one, in
+[samples/](../samples): games, utilities, teaching programs and business
+programs, alongside the language features each one exercises — `PRINT` and
+strings, arrays and `FOR`, `READ`/`DATA`, `DEF FN`, `GOSUB`, `POKE` into the tube
+and the sound latch, and on the 1992 machine the integer arithmetic, the noise
+register and the filesystem. [The samples index](../samples/README.md) says what
+each file shows.
 
 Run one:
 

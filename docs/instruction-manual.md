@@ -1,8 +1,8 @@
 # Instruction Manual
 
-Two home computers, and the emulator that is both of them. This book is the one
-that comes in the box: what the machines are, how to get them running, which
-keys do what, and what to do when the screen does not say what you expected.
+Two home computers, and the emulator that is both of them. This book covers what
+the machines are, how to get them running, which keys do what, and what to do
+when the screen does not say what you expected.
 
 The other three books are for after this one:
 
@@ -28,9 +28,9 @@ The other three books are for after this one:
 | Language | 16 KiB socket ROM: Kestrel BASIC V2.0, PILOT, Diagnostics or the monitor | 64 KiB bank: Kestrel 16 BASIC 2.0 |
 | KERNAL | 8 KiB at `$E000` | 8 KiB at `$00:E000` |
 
-Neither machine is a picture of a machine. The host supplies a processor, a bus,
-a tube, a keyboard and a disk; everything on the glass is machine code
-assembled into a ROM image and executed.
+Neither machine is simulated above the hardware: the host supplies a processor, a
+bus, a tube, a keyboard and a disk, and everything on the glass is machine code
+fetched from a ROM image and executed.
 
 ## What you need
 
@@ -63,7 +63,7 @@ fails, and everything it builds lands in `rust/target/release`.
 22.04 build machine, installs the tools, and builds and tests everything:
 
 ```bash
-vagrant up     # provision, build, run the eight suites
+vagrant up     # provision, build, run every suite
 vagrant ssh    # the tree is at /vagrant
 ```
 
@@ -76,7 +76,8 @@ given one, and the suites do not need it.
 
 ```bash
 ./start.sh                    # the Kestrel
-./start.sh --model kestrel16  # the Kestrel 16
+./start.sh kestrel16          # the Kestrel 16
+./start.sh window --model kestrel       # either, with arguments passed through
 ```
 
 **Interactively** — either machine, chosen at the prompt, with a session around
@@ -95,10 +96,9 @@ the samples are run:
 ./start.sh cli --model kestrel16 --type "PRINT 2+2"
 ```
 
-The banner is not decoration. On the Kestrel it is printed by the KERNAL's
-reset routine before the language ROM gets control; on the Kestrel 16 it is the
-KERNAL's first act, before it hands over to bank one. If you see a banner and a
-prompt, a processor really did fetch those instructions.
+The banner is machine code, not a host splash: on the Kestrel the KERNAL's reset
+routine prints it before the language ROM gets control, and on the Kestrel 16 it
+is the KERNAL's first act, before it hands over to bank one.
 
 ---
 
@@ -112,7 +112,7 @@ prompt, a processor really did fetch those instructions.
 | Escape | 27 |
 | Arrows | 28–31 |
 | Delete | 127 |
-| `Pause` | the BREAK line, a warm start |
+| `Pause`, `Shift+F1` | a break line, which is a warm start |
 
 Letters arrive as typed, upper or lower. The Kestrel's BASIC is case-blind about
 keywords, so `print 2+2` and `PRINT 2+2` are the same statement, and a program
@@ -156,7 +156,7 @@ one for each thing being set.
 | Page | What it sets |
 | --- | --- |
 | **Quickstart** | which machine, with its own clock, in one click |
-| **Machine** | what the machine is made of, and (Kestrel only) which ROM is in the language socket |
+| **Machine** | what the machine is made of, and which ROM is in the language socket (on the Kestrel 16, in its language bank) |
 | **CPU & speed** | 1, 2, 4 or 8 MHz, or as fast as this computer |
 | **ROM** | where the ROM images are read from, and a rebuild |
 | **Cartridge** | the expansion cartridge, its size and where it sits |
@@ -271,9 +271,30 @@ PRINT -7/2
 -3
 ```
 
-The 1992 machine's language is smaller on purpose: no line numbers, no stored
-program, no `IF`, no `FOR`. What it has is sixteen-bit arithmetic, a wide screen
-and the beginnings of a machine that a decade of software could have grown on.
+The arithmetic is sixteen-bit integers, so a division throws the fraction away
+and a product past 32767 comes back negative. A program is stored the same way
+as on the 1982 machine — a numbered line is kept, `RUN` runs it — and the
+language has `IF`/`THEN`/`ELSE`, `FOR`/`NEXT`, `GOSUB`/`RETURN`, arrays, and
+functions of the program's own:
+
+```basic
+10 FOR I=1 TO 3
+20 PRINT I;" SQUARED IS ";I*I
+30 NEXT I
+RUN
+```
+
+```
+1 SQUARED IS 1
+2 SQUARED IS 4
+3 SQUARED IS 9
+READY.
+```
+
+What it does not have is a keyboard input statement, random numbers, `INT` or
+`SQR`: the language is smaller than the 1982 one, which is why the samples for
+this machine use the noise register and integer arithmetic in their place
+([the User Guide](users-guide.md#kestrel-16-basic) lists the differences).
 `CLS` clears the screen and prints the banner again.
 
 ---

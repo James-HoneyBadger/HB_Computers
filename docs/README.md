@@ -22,8 +22,7 @@ chapters:
 
 ## Where the facts come from
 
-Documentation is part of this machine, not a description of it. Every table in
-these books is written against a source in the tree:
+Every table in these books is written against a source in the tree:
 
 - **maps and registers** — `rust/crates/kestrel-machine/src/bus.rs`, and the
   `.inc` files beside the ROMs;
@@ -33,9 +32,9 @@ these books is written against a source in the tree:
   `cpu65816.rs`, and their tests;
 - **the samples** — `samples/`, with a `.expected` file beside each program.
 
-If a book and a machine disagree, one of them is a bug. The rule in this tree is
-that a change to the machine, its maps, or its dialect carries its documentation
-with it, in the same commit.
+A book and a machine that disagree are a defect in one of them, so a change to
+the machine, its maps or its dialect carries its documentation with it, in the
+same commit.
 
 ## Reading order
 

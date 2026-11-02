@@ -201,6 +201,11 @@ THE ANSWER IS 42
 | `ABS(n)` / `SGN(n)` | the size without its sign, and the sign on its own: `-1`, `0` or `1` |
 | `DEF FNA(X)=expr` / `FNA(n)` | a function of the program's own: one argument, a letter, and the text kept so it outlives the line |
 | `PEEK(addr)` / `POKE addr,value` | one byte of bank zero, which is where the tube, the I/O page and the program are |
+| `FORMAT` | write a fresh volume: the signature, a blank name, and a free map with the system area taken |
+| `CATALOG` | the volume's name, and a line for each file |
+| `DIR` | the same listing without the volume's name |
+| `SAVE "NAME"` / `LOAD "NAME"` | the program store to and from the volume |
+| `DELETE "NAME"` | a file's sectors go back on the free map |
 | `FIND "NAME"` | where a file is: its directory entry, the sector it starts at, and how many it runs for |
 | `CSAVE "NAME"` | the program store onto the cassette, as one more block after what is already there |
 | `CLOAD "NAME"` | the first block of that name becomes the program store |
@@ -268,31 +273,44 @@ RUN
 DONE
 ```
 
-### What it does not do
+### What it has, and what it has not
 
-The limits, stated plainly:
+The limits, stated plainly. A word the language does not know is `?WHAT?`, and an
+error ends the program.
 
-- **loops that span lines belong in a program** — a loop typed at the prompt runs
-  only as far as the end of its line, because each new line starts with no loops
-  and no subroutines pending. A whole loop on one line, colons and all, runs;
-- **strings, in part** — a string variable holds up to thirty-one characters,
-  and can be assigned, printed, compared, joined, sliced and measured; an array
-  of them holds as many as the heap has room for, and `DIM S$(10)` is written
-  with the dollar as `S$(i)` is read;
-- **arrays, in part** — `DIM A(10)` and `A(i)` with one or two subscripts, of
-  whole words or of string slots. There is no `DIM` of more than two
-  subscripts, and a `DIM` that asks for more elements than the letter already
-  has takes a fresh run from the heap and does not give the old one back;
-- **one argument** — `DEF FN` takes one, and a definition may not call another
-  definition, itself included. The argument is kept in a variable of its own
-  letter, so a definition borrows that letter while it is being read and gives
-  it back afterwards;
-- **a filesystem** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD`, `DELETE` and `FIND`
-  all work. The volume format below is fixed, so anything written against it
-  keeps working;
-- **the cassette, in part** — `CSAVE` and `CLOAD` move the program store as
-  named blocks, and a tape may hold as many as fit. There is no way to save or
-  load anything else, and no way to see what a tape holds.
+**What it has**
+
+- **strings of thirty-one characters** — assigned, printed, compared, joined,
+  sliced with `LEFT$`/`RIGHT$`/`MID$`, and turned into characters, digits and
+  back with `CHR$`/`ASC`/`STR$`/`VAL`;
+- **arrays of one or two subscripts**, of whole words or of string slots, with
+  `DIM` written before the first use;
+- **`DEF FN` of one argument**, kept as text in the language's own table, so a
+  definition outlives the line that made it. A definition may not call another
+  definition, itself included, and it borrows the variable of the letter it names
+  its argument by, giving it back afterwards;
+- **a loop on one line, at the prompt**, colons and all: `FOR I=1 TO 3:PRINT I:NEXT I`
+  runs. A loop that spans lines belongs in a program, because each line typed at
+  the prompt starts with no loops and no subroutines pending;
+- **the filesystem** — `FORMAT`, `CATALOG`, `DIR`, `SAVE`, `LOAD`, `DELETE` and
+  `FIND`. The volume format below is fixed, so anything written against it keeps
+  working;
+- **the cassette, in part** — `CSAVE` and `CLOAD` move the program store as named
+  blocks, and a tape holds as many as fit.
+
+**What it has not**
+
+- **no keyboard input** — there is no `INPUT` and no `GET`;
+- **no `RND`, `INT` or `SQR`** — the arithmetic is sixteen-bit integers, so a
+  division already drops the fraction, and `ABS` and `SGN` cover the rest;
+- **no `DATA`/`READ`, no `ON … GOTO`, no `STOP`/`CONT`**;
+- **no more than two subscripts**, and a `DIM` that asks for more elements than
+  the letter already has takes a fresh run from the heap without giving the old
+  one back;
+- **no way to save or load anything but the program store**, and no way to see
+  what a tape holds;
+- **`PEEK` and `POKE` reach bank zero**, which is the tube, the I/O page and the
+  program.
 
 ---
 
@@ -309,11 +327,10 @@ volume. The header is sector 0:
 | 26 | 6 | reserved |
 | 32 | 480 | the free map: one bit per sector, set means taken — the same way round as the 1982 DOS |
 
-The map is nearly a whole sector because 4096 sectors need 4096 bits. That is the
-one place this filesystem cannot simply be the 1982 one with larger numbers, and
-it is why the map starts at a fixed offset rather than following the name. Four
-hundred and eighty bytes hold 3840 bits, so the top 256 sectors of the volume
-have no bit of their own and are never allocated.
+The map is nearly a whole sector because 4096 sectors need 4096 bits, which is
+why it starts at a fixed offset rather than following the name. Four hundred and
+eighty bytes hold 3840 bits, so the top 256 sectors of the volume have no bit of
+their own and are never allocated.
 
 Sector 1 is the directory: sixteen entries of thirty-two bytes.
 

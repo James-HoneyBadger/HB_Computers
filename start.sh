@@ -28,6 +28,7 @@ start.sh -- build what is out of date, then start a machine.
 
   ./start.sh                     the window, on the Kestrel
   ./start.sh kestrel16           the window, on the Kestrel 16
+  ./start.sh window [args...]    the window, arguments passed through
   ./start.sh emu [arguments...]  the interactive emulator; with no --model it
                                  asks which machine, and /model switches
   ./start.sh cli [arguments...]  the command line, arguments passed through

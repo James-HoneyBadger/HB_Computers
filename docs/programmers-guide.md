@@ -273,6 +273,9 @@ Every crate carries the tests for what it is:
 | `kestrel-cli` (`samples`) | every program in `samples/`, against its `.expected` file |
 | `kestrel-cli` (`cartridges`) | every cartridge's image, and the reset starting the one that is fitted |
 | `kestrel-cli` (`emulator`) | the emulator's front end: the model flag chooses the machine, a session switches models, and a command that is not one is refused |
+| `kestrel-cli` (`socket_rom`) | `--rom` puts the language it names in the machine, and `--languages` lists the ones there are |
+| `kestrel-cli` (`pilot`) | PILOT's statements, and the editing and jumping a lesson does |
+| `kestrel-cli` (`roms`) | every language source assembles into the whole socket or bank, and the diagnostics ROM reports on the machine |
 
 ```bash
 ./start.sh test                     # all of them
@@ -318,7 +321,8 @@ touching yours.
 - **A ROM change is proved by a machine test.** If typing at the machine cannot
   see the difference, the test is not yet written.
 - **The manuals are part of the machine.** If a table and the code disagree, one
-  of them is a bug — and the code usually wins.
+  of them is a defect; the code is what the machine does, so the book follows it
+  in the same commit.
 - **The samples are tests.** A sample with no `.expected` file fails the suite.
 - **Nothing on the screen is drawn by the host.** It is the one rule that makes
   these machines machines.

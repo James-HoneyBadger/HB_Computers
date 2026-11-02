@@ -1,6 +1,7 @@
 # The Kestrel
 
-Two home computers from an imagined 1982, and the emulator that runs both.
+Two fictional home computers — one from 1982, one from 1992 — and the emulator
+that runs both.
 
 - the **Kestrel** — a 6502 at 1 MHz, 32 KiB of RAM behind a banner that claims
   64K, a 40 × 25 tube, a disk measured in 256-byte sectors, an 8 KiB KERNAL and a
@@ -8,11 +9,11 @@ Two home computers from an imagined 1982, and the emulator that runs both.
 - the **Kestrel 16** — its 1992 successor: a 65816 at 8 MHz, a megabyte of banked
   memory, an 80 × 50 tube, and Kestrel 16 BASIC in a 64 KiB bank of its own.
 
-Both are real machines, not pictures of machines. The host supplies a processor, a
-bus, a tube, a keyboard and a disk; everything on the glass is machine code
-assembled into a ROM image and executed -- on both machines by an assembler in
-this tree, from the sources beside them. Neither machine has an interpreter
-written for it in Rust.
+The emulation is complete in the sense that matters: the host supplies a
+processor, a bus, a tube, a keyboard and a disk, and everything on the glass is
+machine code. Both ROM sets are assembled from the sources in [roms/](roms) by
+the assemblers in this tree when a machine starts, so neither machine has an
+interpreter written in Rust.
 
 ```
 $ ./start.sh cli --model kestrel --type "PRINT 2+2"
@@ -60,11 +61,11 @@ cargo build --release
 cargo test
 ```
 
-A hundred and nine tests: the two assemblers, the two processors, the bus and
-its devices, both machines booting their assemblers' ROMs and answering at the
-keyboard, every sample program in [samples/](samples), every cartridge in
-[cartridges/](cartridges) starting in place of the language, the socket ROM the
-command line can choose, and the emulator's own front end.
+The suites cover the two assemblers, the two processors, the bus and its devices,
+both machines booting their ROMs and answering at the keyboard, every sample
+program in [samples/](samples), every cartridge in [cartridges/](cartridges)
+starting in place of the language, every language ROM in [roms/](roms), and the
+two front ends.
 
 `./start.sh` builds what is out of date and starts a machine:
 

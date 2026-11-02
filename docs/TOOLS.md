@@ -11,7 +11,7 @@ Assembles the Kestrel's ROMs. It is a 6502 assembler with the directives a ROM
 needs and nothing else.
 
 ```bash
-cd roms/kestrel                 # .include is resolved from the working directory
+cd roms/kestrel                 # an include is looked for beside the file first
 kestrel_asm basic.s --name basic --origin $A000 --size 16384 \
              --bin /tmp/basic.bin --listing /tmp/basic.lst --symbols /tmp/basic.sym
 ```
@@ -26,7 +26,7 @@ the same goes for every number in the source.
 | `--size` | The size of the image; the rest is filled |
 | `--fill` | The fill byte, `$FF` for an erased EPROM by default |
 | `--bin` | Write the image |
-| `--header` | Write a C++ header of the bytes, for a host that includes them |
+| `--header` | Write a C++ header of the bytes; nothing in this tree includes one |
 | `--symbols` | Write every label's address |
 | `--listing` | Write the listing: addresses, bytes and source |
 
@@ -42,7 +42,7 @@ the same goes for every number in the source.
 | `.align n` | Pad to a multiple of `n` |
 | `.text "…"` | Bytes of the string, no terminator |
 | `.asciiz "…"` | The string and a zero |
-| `.include "file"` | Another source file, resolved from the working directory |
+| `.include "file"` | Another source file: looked for beside the file that asks, then as written |
 
 Labels are `NAME:` or in column zero; `NAME = expr` is a constant. Identifiers are
 uppercased, so `Loop` and `LOOP` are the same label. Expressions may be decimal,
@@ -230,7 +230,7 @@ the machine, a key at a time and at the speed the machine could be typed at.
 | `/disk [FILE]` | mount a volume, or write the one in the drive back to its file |
 | `/tape [FILE]` | insert a cassette, or write the one in the deck back to its file |
 | `/screen` | draw the tube |
-| `/status` | clock, frame, cycles |
+| `/status` | the clock, the frame, the cycles and the opcodes |
 | `/help` | the command list |
 | `/quit` | leave |
 

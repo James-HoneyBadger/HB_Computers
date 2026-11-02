@@ -94,5 +94,8 @@ there assembles and fills the socket.
 | `kestrel-cli`, `samples` | Every program in `samples/` runs, and prints what its `.expected` file says |
 | `kestrel-cli`, `cartridges` | Every cartridge assembles into the whole of its slot, and the reset starts the one that is fitted |
 | `kestrel-cli`, `emulator` | The emulator's front end: the model flag, switching models in a session, and the refusals |
+| `kestrel-cli`, `socket_rom` | `--rom` and `--languages`: the language named goes into the machine, and the catalogue is what `roms/` holds |
+| `kestrel-cli`, `pilot` | PILOT at the keyboard: lessons typed, listed, edited, run, and the branches a matched answer takes |
+| `kestrel-cli`, `roms` | Every language source fills its socket or bank, and the diagnostics ROM measures and reports |
 
 `./start.sh test` runs all of them.
