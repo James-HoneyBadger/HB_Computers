@@ -6,3 +6,5 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+kestrel-asm = { path = "../kestrel-asm" }
+kestrel16-asm = { path = "../kestrel16-asm" }

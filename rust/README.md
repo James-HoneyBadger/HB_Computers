@@ -7,8 +7,6 @@ prove it, and the C++ tree kept until the port can do everything it does.
 The port is far enough along to boot both machines and answer BASIC:
 
 ```bash
-./start.sh build                              # assembles the ROMs the port loads
-
 cd rust
 cargo run --offline --bin kestrel -- --type 'PRINT 2+2*3'
 cargo run --offline --bin kestrel -- --model kestrel16 --type 'PRINT 1000*20'

@@ -167,6 +167,14 @@ impl Machine {
         Ok(())
     }
 
+    /// Loads the images assembled from `roms/` by the ported assemblers, so the
+    /// machine needs no build step and no artefact from the C++ tree.
+    pub fn mount_assembled_roms(&mut self) -> Result<(), RomError> {
+        let roms = crate::roms::shipped(self.model()).map_err(RomError::Unreadable)?;
+        self.mount_kernal(&roms.kernal.clone())?;
+        self.mount_basic(&roms.basic.clone())
+    }
+
     /// Loads the images the C++ build assembled. `root` is the build's
     /// `generated` directory, which holds `kestrel/` and `kestrel16/`.
     pub fn mount_shipped_roms(&mut self, root: &Path) -> Result<(), RomError> {
@@ -330,19 +338,12 @@ fn read_image(path: &Path) -> Result<Vec<u8>, RomError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-
-    /// The images the C++ build assembled. A Rust-only checkout has no ROMs, so
-    /// these tests say so rather than pretending to have run.
-    fn generated() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../build/generated")
-    }
 
     fn boot(model: Model) -> Machine {
         let mut machine = Machine::new(model);
         machine
-            .mount_shipped_roms(&generated())
-            .expect("the assembled ROMs -- run ./start.sh build first");
+            .mount_assembled_roms()
+            .expect("the ROM sources to assemble");
         machine.reset();
         machine.run_frames(25);
         machine

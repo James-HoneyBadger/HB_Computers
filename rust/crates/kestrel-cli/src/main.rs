@@ -13,7 +13,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use kestrel_machine::machine::{shipped_roms_directory, Machine};
+use kestrel_machine::machine::Machine;
 use kestrel_machine::profile::Model;
 
 struct Options {
@@ -94,11 +94,15 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
 }
 
 fn run(options: &Options) -> Result<(), String> {
-    let images = shipped_roms_directory(options.roms.as_deref())?;
     let mut machine = Machine::new(options.model);
-    machine
-        .mount_shipped_roms(&images)
-        .map_err(|error| error.to_string())?;
+    match options.roms.as_deref() {
+        Some(directory) => machine
+            .mount_shipped_roms(directory)
+            .map_err(|error| error.to_string())?,
+        None => machine
+            .mount_assembled_roms()
+            .map_err(|error| error.to_string())?,
+    }
     machine.reset();
     machine.run_frames(options.frames);
 

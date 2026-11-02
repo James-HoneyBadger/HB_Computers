@@ -394,6 +394,23 @@ impl SourceParser {
 
 /// Expands every `.include` in place, so the layout passes see one flat
 /// program.
+/// An include is looked for beside the file that asked for it before it is looked
+/// for in the working directory, so a tree of sources assembles from wherever it
+/// is called -- which the C++ tool only manages because its build sets the
+/// working directory to the ROM's own.
+fn resolve_include(from: &str, wanted: &str) -> String {
+    if std::path::Path::new(wanted).is_absolute() {
+        return wanted.to_string();
+    }
+    let beside = std::path::Path::new(from)
+        .parent()
+        .map(|directory| directory.join(wanted));
+    match beside {
+        Some(candidate) if candidate.is_file() => candidate.to_string_lossy().into_owned(),
+        _ => wanted.to_string(),
+    }
+}
+
 pub fn expand_includes(statements: &mut Vec<Statement>, depth: i32) -> Result<()> {
     let mut out = Vec::with_capacity(statements.len());
     for stmt in statements.drain(..) {
@@ -401,7 +418,7 @@ pub fn expand_includes(statements: &mut Vec<Statement>, depth: i32) -> Result<()
             out.push(stmt);
             continue;
         }
-        let path = String::from_utf8_lossy(&stmt.text).into_owned();
+        let path = resolve_include(&stmt.file, &String::from_utf8_lossy(&stmt.text));
         let mut included = SourceParser::new(depth + 1).parse_file(&path)?;
         expand_includes(&mut included, depth + 1)?;
         out.extend(included);

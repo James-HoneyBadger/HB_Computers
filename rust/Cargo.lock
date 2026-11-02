@@ -1680,6 +1680,10 @@ dependencies = [
 [[package]]
 name = "kestrel-machine"
 version = "0.1.0"
+dependencies = [
+ "kestrel-asm",
+ "kestrel16-asm",
+]
 
 [[package]]
 name = "kestrel16-asm"

@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Color32, FontId, Pos2, Rect, Stroke};
-use kestrel_machine::machine::{shipped_roms_directory, Machine};
+use kestrel_machine::machine::Machine;
 use kestrel_machine::profile::Model;
 
 /// The machines' sixteen colours, as the C++ window's palette has them.
@@ -73,7 +73,9 @@ impl Speed {
 
 struct App {
     machine: Machine,
-    images: PathBuf,
+    /// Images to load from disk, when `--roms` said so; otherwise the ROMs are
+    /// assembled from their sources.
+    roms: Option<PathBuf>,
     speed: Speed,
     last: Instant,
     /// What the window last said, so a message can be read without leaving.
@@ -85,15 +87,20 @@ struct App {
 }
 
 impl App {
-    fn new(model: Model, images: PathBuf, speed: Speed) -> Result<Self, String> {
+    fn new(model: Model, roms: Option<PathBuf>, speed: Speed) -> Result<Self, String> {
         let mut machine = Machine::new(model);
-        machine
-            .mount_shipped_roms(&images)
-            .map_err(|error| error.to_string())?;
+        match roms.as_deref() {
+            Some(directory) => machine
+                .mount_shipped_roms(directory)
+                .map_err(|error| error.to_string())?,
+            None => machine
+                .mount_assembled_roms()
+                .map_err(|error| error.to_string())?,
+        }
         machine.reset();
         Ok(Self {
             machine,
-            images,
+            roms,
             speed,
             last: Instant::now(),
             message: String::new(),
@@ -111,7 +118,7 @@ impl App {
             self.message = "cold booted".to_string();
             return;
         }
-        match App::new(model, self.images.clone(), self.speed) {
+        match App::new(model, self.roms.clone(), self.speed) {
             Ok(app) => {
                 self.machine = app.machine;
                 self.message = "powered on".to_string();
@@ -125,16 +132,27 @@ impl App {
             self.message = "the Kestrel 16's language ROM is a bank, not a socket".to_string();
             return;
         }
-        let path = self.images.join("kestrel").join(format!("{id}.bin"));
-        match std::fs::read(&path) {
-            Ok(image) => match self.machine.mount_basic(&image) {
+        let shipped = match kestrel_machine::roms::shipped(Model::Kestrel) {
+            Ok(shipped) => shipped,
+            Err(error) => {
+                self.message = error;
+                return;
+            }
+        };
+        let image = match id {
+            "basic" => Some(&shipped.basic),
+            "monitor" => shipped.monitor.as_ref(),
+            _ => None,
+        };
+        match image {
+            Some(image) => match self.machine.mount_basic(image) {
                 Ok(()) => {
                     self.machine.reset();
                     self.message = format!("{id} in the socket");
                 }
                 Err(error) => self.message = error.to_string(),
             },
-            Err(error) => self.message = format!("no such ROM: {id} ({error})"),
+            None => self.message = format!("no such ROM: {id}; this machine has basic and monitor"),
         }
     }
 
@@ -524,21 +542,13 @@ fn main() -> eframe::Result<()> {
         index += 1;
     }
 
-    let images = match shipped_roms_directory(images_arg.as_deref()) {
-        Ok(path) => path,
-        Err(message) => {
-            eprintln!("kestrel_computers: {message}");
-            std::process::exit(1);
-        }
-    };
-
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([720.0, 560.0])
             .with_title("Kestrel Computers"),
         ..Default::default()
     };
-    let mut app = match App::new(model, images, Speed::Mhz1) {
+    let mut app = match App::new(model, images_arg, Speed::Mhz1) {
         Ok(app) => app,
         Err(message) => {
             eprintln!("kestrel_computers: {message}");

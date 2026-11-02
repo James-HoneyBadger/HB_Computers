@@ -18,10 +18,6 @@ fn repository() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
 
-fn images() -> PathBuf {
-    repository().join("build/generated")
-}
-
 fn lines(path: &Path) -> Vec<String> {
     std::fs::read_to_string(path)
         .unwrap_or_else(|error| panic!("{}: {error}", path.display()))
@@ -36,8 +32,8 @@ fn run_sample(sample: &Path, model: Model) {
     let expected = sample.with_extension("expected");
     let mut machine = Machine::new(model);
     machine
-        .mount_shipped_roms(&images())
-        .expect("the assembled ROMs -- run ./start.sh build first");
+        .mount_assembled_roms()
+        .expect("the ROM sources to assemble");
     machine.reset();
     machine.run_frames(25);
 

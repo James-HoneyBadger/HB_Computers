@@ -19,7 +19,7 @@ use std::io::{BufRead, IsTerminal, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use kestrel_machine::machine::{shipped_roms_directory, Cpu, Machine, KEY_RETURN};
+use kestrel_machine::machine::{Cpu, Machine, KEY_RETURN};
 use kestrel_machine::profile::Model;
 
 fn model_name(model: Model) -> &'static str {
@@ -34,15 +34,22 @@ struct Emulator {
     machine: Machine,
     frames: i32,
     quiet: bool,
-    images: PathBuf,
+    /// Where images to load from disk live, when the session was told to use
+    /// them; otherwise the ROMs are assembled from their sources.
+    roms: Option<PathBuf>,
 }
 
 impl Emulator {
-    fn boot(model: Model, images: &PathBuf, frames: i32, quiet: bool) -> Result<Self, String> {
+    fn boot(model: Model, roms: Option<PathBuf>, frames: i32, quiet: bool) -> Result<Self, String> {
         let mut machine = Machine::new(model);
-        machine
-            .mount_shipped_roms(images)
-            .map_err(|error| error.to_string())?;
+        match roms.as_deref() {
+            Some(directory) => machine
+                .mount_shipped_roms(directory)
+                .map_err(|error| error.to_string())?,
+            None => machine
+                .mount_assembled_roms()
+                .map_err(|error| error.to_string())?,
+        }
         machine.reset();
         machine.run_frames(20);
         Ok(Self {
@@ -50,7 +57,7 @@ impl Emulator {
             machine,
             frames,
             quiet,
-            images: images.clone(),
+            roms,
         })
     }
 
@@ -58,7 +65,7 @@ impl Emulator {
     /// cold boot and anything in memory is lost; the same model is a reset.
     fn select_model(&mut self, model: Model) -> Result<bool, String> {
         let different = model != self.model;
-        *self = Self::boot(model, &self.images.clone(), self.frames, self.quiet)?;
+        *self = Self::boot(model, self.roms.clone(), self.frames, self.quiet)?;
         Ok(different)
     }
 
@@ -66,11 +73,17 @@ impl Emulator {
         if self.model != Model::Kestrel {
             return Err("the Kestrel 16's language ROM is a bank, not a socket".to_string());
         }
-        let path = self.images.join("kestrel").join(format!("{id}.bin"));
-        let image = std::fs::read(&path)
-            .map_err(|error| format!("no such ROM: {id} ({error}); this machine has basic and monitor"))?;
+        let shipped = kestrel_machine::roms::shipped(Model::Kestrel)?;
+        let image = match id {
+            "basic" => &shipped.basic,
+            "monitor" => shipped
+                .monitor
+                .as_ref()
+                .ok_or("this machine has basic and monitor")?,
+            other => return Err(format!("no such ROM: {other}; this machine has basic and monitor")),
+        };
         self.machine
-            .mount_basic(&image)
+            .mount_basic(image)
             .map_err(|error| error.to_string())?;
         self.machine.reset();
         self.machine.run_frames(20);
@@ -313,14 +326,6 @@ fn main() -> ExitCode {
         index += 1;
     }
 
-    let images = match shipped_roms_directory(images_arg.as_deref()) {
-        Ok(path) => path,
-        Err(message) => {
-            eprintln!("kestrel_emu: {message}");
-            return ExitCode::from(1);
-        }
-    };
-
     let interactive = std::io::stdin().is_terminal();
     let chosen = model.unwrap_or_else(|| {
         if interactive {
@@ -331,7 +336,7 @@ fn main() -> ExitCode {
     });
 
     let mut emulator =
-        match Emulator::boot(chosen, &images, frames, !interactive) {
+        match Emulator::boot(chosen, images_arg.clone(), frames, !interactive) {
             Ok(emulator) => emulator,
             Err(message) => {
                 eprintln!("kestrel_emu: {message}");

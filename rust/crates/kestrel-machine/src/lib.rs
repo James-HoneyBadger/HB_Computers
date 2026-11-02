@@ -18,6 +18,7 @@ pub mod cpu65816;
 pub mod devices;
 pub mod machine;
 pub mod profile;
+pub mod roms;
 
 pub use bus::{Bus, Register};
 pub use devices::{Devices, Disk, Keyboard, SpecialKey, Tape, TapeMode, Video};
