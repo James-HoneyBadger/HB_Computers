@@ -8,7 +8,7 @@
 // not the machine.
 //
 //   kestrel [--model kestrel|kestrel16] [--frames N] [--type "LINE"]...
-//           [--file PATH] [--rom basic|monitor] [--roms DIR] [--cart NAME|FILE]
+//           [--file PATH] [--rom NAME|basic] [--roms DIR] [--cart NAME|FILE]
 //           [--disk IMAGE] [--tape IMAGE] [--no-screen]
 
 use std::path::PathBuf;
@@ -32,7 +32,7 @@ struct Options {
 fn usage() {
     println!(
         "usage: kestrel [--model kestrel|kestrel16] [--frames N] [--type \"LINE\"]...\n\
-         \x20              [--file PATH] [--rom basic|monitor] [--roms DIR]\n\
+         \x20              [--file PATH] [--rom NAME] [--roms DIR] [--languages]\n\
          \x20              [--cart NAME|FILE] [--disk IMAGE] [--tape IMAGE]\n\
          \x20              [--no-screen]\n\
          \n\
@@ -40,7 +40,9 @@ fn usage() {
          \x20 --frames   frames to run before and after typing (default 40)\n\
          \x20 --type     a line to type at the machine; may be repeated\n\
          \x20 --file     a file of lines to type, one to a line\n\
-         \x20 --rom      which ROM to put in the Kestrel's socket: basic or monitor\n\
+         \x20 --rom      which language to put in the machine: one of the names\n\
+         \x20            `--languages` lists (basic when the machine starts)\n\
+         \x20 --languages  list the language ROMs the repository ships for the model\n\
          \x20 --roms     a directory of assembled images; without it the ROMs are\n\
          \x20            assembled from roms/*.s when the machine starts\n\
          \x20 --cart     a cartridge to fit: one of the names `--cartridges` lists,\n\
@@ -98,6 +100,14 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
             }
             "--rom" => options.rom = Some(value()?),
             "--roms" => options.roms = Some(PathBuf::from(value()?)),
+            "--languages" => {
+                for name in kestrel_machine::roms::shipped_languages(options.model)
+                    .map_err(|error| error.to_string())?
+                {
+                    println!("{name}");
+                }
+                return Err(String::new());
+            }
             "--cart" => options.cartridge = Some(value()?),
             "--cartridges" => {
                 let names = kestrel_machine::roms::shipped_cartridges(options.model)
@@ -186,39 +196,32 @@ fn run(options: &Options) -> Result<(), String> {
     Ok(())
 }
 
-/// The image `--rom` asks for: the shipped file when `--roms` named a directory,
-/// the assembled one otherwise. The Kestrel 16's language is a bank, not a
-/// socket, so it has no choice to make.
+/// The image `--rom` asks for: the assembled one, or the shipped file when
+/// `--roms` named a directory of them. The Kestrel's socket and the Kestrel 16's
+/// language bank both take one language at a time, and the names come from the
+/// sources in `roms/`, so a machine's catalogue is what it can be asked for.
 fn socket_rom(options: &Options, id: &str) -> Result<Vec<u8>, String> {
-    if options.model != Model::Kestrel {
-        return Err("the Kestrel 16's language ROM is a bank, not a socket".to_string());
-    }
-    if id == "basic" {
-        return match options.roms.as_deref() {
-            Some(root) => {
-                let path = root.join("kestrel").join("basic.bin");
-                std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))
-            }
-            None => kestrel_machine::roms::shipped(Model::Kestrel)
-                .map(|shipped| shipped.basic.clone())
-                .map_err(|error| error.clone()),
-        };
-    }
-    if id != "monitor" {
-        return Err(format!(
-            "no such ROM: {id}; the Kestrel has basic and monitor"
-        ));
+    let names = kestrel_machine::roms::shipped_languages(options.model)?;
+    if !names.iter().any(|name| name == id) {
+        return Err(match options.model {
+            Model::Kestrel => format!("no such ROM: {id}; the Kestrel has {}", names.join(", ")),
+            Model::Kestrel16 => format!(
+                "no such ROM: {id}; the Kestrel 16's language is a bank, not a socket, and it \
+                 holds {}",
+                names.join(", ")
+            ),
+        });
     }
     match options.roms.as_deref() {
         Some(root) => {
-            let path = root.join("kestrel").join("monitor.bin");
+            let folder = match options.model {
+                Model::Kestrel => "kestrel",
+                Model::Kestrel16 => "kestrel16",
+            };
+            let path = root.join(folder).join(format!("{id}.bin"));
             std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))
         }
-        None => kestrel_machine::roms::shipped(Model::Kestrel)
-            .map_err(|error| error.clone())?
-            .monitor
-            .clone()
-            .ok_or_else(|| "the assembled images have no monitor".to_string()),
+        None => kestrel_machine::roms::language(options.model, id),
     }
 }
 

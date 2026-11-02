@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 //
-// `--rom` on the command line: the Kestrel's socket takes one 16 KiB image, and
-// the Kestrel 16's language is a bank, so asking it for a socket ROM is refused.
+// `--rom` on the command line: the Kestrel's socket takes one 16 KiB image at a
+// time, and the names come from the sources in `roms/`, so the machine is asked
+// for one of its own.
 
 use std::process::Command;
 
@@ -39,4 +40,14 @@ fn a_socket_rom_that_does_not_exist_is_refused() {
 fn the_kestrel_16_has_no_socket_to_choose_from() {
     let out = run(&["--model", "kestrel16", "--rom", "monitor"]);
     assert!(out.contains("is a bank, not a socket"), "{out}");
+}
+
+#[test]
+fn the_languages_are_what_the_sources_hold() {
+    let out = run(&["--languages"]);
+    let names: Vec<&str> = out.lines().map(str::trim).filter(|line| !line.is_empty()).collect();
+    assert_eq!(names, ["basic", "diagnostics", "monitor", "pilot"], "{out}");
+    let out = run(&["--model", "kestrel16", "--languages"]);
+    assert!(out.contains("basic"), "{out}");
+    assert!(!out.contains("pilot"), "the Kestrel 16 has no pilot:\n{out}");
 }

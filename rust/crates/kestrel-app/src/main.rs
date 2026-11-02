@@ -516,34 +516,22 @@ impl App {
         }
     }
 
+    /// A language in the machine: one of the ROMs `roms/` holds, assembled and
+    /// put in the socket (or, on the Kestrel 16, in its language bank).
     fn mount_socket_rom(&mut self, id: &str) {
-        if self.machine.model() != Model::Kestrel {
-            self.set_message("the Kestrel 16's language ROM is a bank, not a socket");
-            return;
-        }
-        let shipped = match kestrel_machine::roms::shipped(Model::Kestrel) {
-            Ok(shipped) => shipped,
-            Err(error) => {
-                self.set_message(error);
-                return;
+        let model = self.machine.model();
+        match self.machine.mount_assembled_language(id) {
+            Ok(()) => {
+                self.machine.reset();
+                self.notes_seen = 0;
+                let title = kestrel_machine::roms::language_title(model, id);
+                let where_it_is = match model {
+                    Model::Kestrel => "socket",
+                    Model::Kestrel16 => "language bank",
+                };
+                self.set_message(format!("{title} in the {where_it_is}"));
             }
-        };
-        let image = match id {
-            "basic" => Some(&shipped.basic),
-            "monitor" => shipped.monitor.as_ref(),
-            _ => None,
-        };
-        match image {
-            Some(image) => match self.machine.mount_basic(image) {
-                Ok(()) => {
-                    self.machine.reset();
-                    self.set_message(format!("{id} in the socket"));
-                }
-                Err(error) => self.set_message(error.to_string()),
-            },
-            None => self.set_message(format!(
-                "no such ROM: {id}; this machine has basic and monitor"
-            )),
+            Err(error) => self.set_message(error.to_string()),
         }
     }
 
@@ -1051,36 +1039,31 @@ impl App {
             field(ui, "KERNAL", &format!("{} KiB", profile.kernal_size / 1024));
         });
 
-        if draft.model == Model::Kestrel {
-            group(ui, "ROM socket", |ui| {
-                ui.label(
-                    RichText::new(
-                        "Which 16 KiB image sits in the language socket. Changing it cold-boots the machine.",
-                    )
-                    .small()
-                    .color(MUTED),
-                );
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    if ui.button("Kestrel BASIC V2.0").clicked() {
-                        self.mount_socket_rom("basic");
+        // The socket, or the Kestrel 16's language bank: whichever the machine
+        // has, it is one image at a time, and the list is whatever `roms/` holds.
+        let languages = kestrel_machine::roms::shipped_languages(draft.model).unwrap_or_default();
+        let (heading, note) = match draft.model {
+            Model::Kestrel => (
+                "ROM socket",
+                "Which 16 KiB image sits in the language socket. Changing it cold-boots the machine.",
+            ),
+            Model::Kestrel16 => (
+                "Language bank",
+                "Which 64 KiB image fills the language bank. Changing it cold-boots the machine.",
+            ),
+        };
+        group(ui, heading, |ui| {
+            ui.label(RichText::new(note).small().color(MUTED));
+            ui.add_space(6.0);
+            ui.horizontal_wrapped(|ui| {
+                for name in &languages {
+                    let title = kestrel_machine::roms::language_title(draft.model, name);
+                    if ui.button(title).clicked() {
+                        self.mount_socket_rom(name);
                     }
-                    if ui.button("Monitor V1.0").clicked() {
-                        self.mount_socket_rom("monitor");
-                    }
-                });
+                }
             });
-        } else {
-            group(ui, "Banks", |ui| {
-                ui.label(
-                    RichText::new(
-                        "The language is one whole 64 KiB bank above bank zero, where the KERNAL and the tube live.",
-                    )
-                    .small()
-                    .color(MUTED),
-                );
-            });
-        }
+        });
 
         if draft.model != self.machine.model() {
             ui.label(
@@ -2187,6 +2170,7 @@ fn main() -> eframe::Result<()> {
     let mut images_arg: Option<PathBuf> = None;
     let mut shot: Option<PathBuf> = None;
     let mut cartridge: Option<String> = None;
+    let mut language: Option<String> = None;
     let mut index = 0;
     while index < arguments.len() {
         match arguments[index].as_str() {
@@ -2209,16 +2193,22 @@ fn main() -> eframe::Result<()> {
                 index += 1;
                 cartridge = arguments.get(index).cloned();
             }
+            "--rom" => {
+                index += 1;
+                language = arguments.get(index).cloned();
+            }
             "--shot" => {
                 index += 1;
                 shot = arguments.get(index).map(PathBuf::from);
             }
             "--help" | "-h" => {
                 println!(
-                    "usage: kestrel_computers [--model kestrel|kestrel16] [--roms DIR] [--shot PNG]\n\
+                    "usage: kestrel_computers [--model kestrel|kestrel16] [--rom NAME]\n\
+                     \x20                         [--roms DIR] [--cart NAME|FILE] [--shot PNG]\n\
                      \n\
                      \x20 --model   which machine to power on (default kestrel)\n\
                      \x20 --roms    where the assembled images are (default build/generated)\n\
+                     \x20 --rom     which language to put in the machine, by name from roms/\n\
                      \x20 --cart    a cartridge to fit, by name from cartridges/ or as an image\n\
                      \x20 --shot    write a PNG of the window once it has settled, then leave"
                 );
@@ -2246,6 +2236,9 @@ fn main() -> eframe::Result<()> {
             std::process::exit(1);
         }
     };
+    if let Some(which) = &language {
+        app.mount_socket_rom(which);
+    }
     if let Some(which) = &cartridge {
         app.fit_cartridge_argument(which);
     }

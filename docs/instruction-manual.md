@@ -25,7 +25,7 @@ The other three books are for after this one:
 | Sound | one latch byte | one latch byte |
 | Disk | 512 sectors of 256 bytes | 4096 sectors of 512 bytes |
 | Cassette | a byte stream | a byte stream |
-| Language | 16 KiB socket ROM: Kestrel BASIC V2.0, or the monitor | 64 KiB bank: Kestrel 16 BASIC 2.0 |
+| Language | 16 KiB socket ROM: Kestrel BASIC V2.0, PILOT, Diagnostics or the monitor | 64 KiB bank: Kestrel 16 BASIC 2.0 |
 | KERNAL | 8 KiB at `$E000` | 8 KiB at `$00:E000` |
 
 Neither machine is a picture of a machine. The host supplies a processor, a bus,
@@ -201,8 +201,11 @@ image is 128 KiB, and the machine shows it twice: through an 8 KiB window at
 `$00:C000`–`$DFFF`, and across banks `$04`–`$07`.
 
 **The ROM socket.** The Kestrel's language socket takes one 16 KiB image at a
-time: Kestrel BASIC, or the monitor ROM. Which one is in it changes the machine,
-so the window cold-boots when it changes.
+time, and which one is in it is what the machine is: Kestrel BASIC V2.0, Kestrel
+PILOT, Kestrel Diagnostics, or the monitor ROM. The machine cold-boots when it
+changes, so it is a different machine afterwards. `roms/README.md` is the
+catalogue; `--rom pilot` and the **ROM socket** group in the window's settings
+sheet are how one is chosen.
 
 ---
 

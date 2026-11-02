@@ -565,7 +565,7 @@ ROWOFF:
         .word 640, 680, 720, 760, 800, 840, 880, 920
         .word 960
 
-        .include "dos.s"
+        .include "dos.inc"
 
         .org $FFFA
         .word NMI

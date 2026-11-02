@@ -40,6 +40,8 @@ struct Emulator {
     /// Where images to load from disk live, when the session was told to use
     /// them; otherwise the ROMs are assembled from their sources.
     roms: Option<PathBuf>,
+    /// The language in the socket (the Kestrel 16's language bank), by name.
+    language: String,
 }
 
 impl Emulator {
@@ -63,6 +65,7 @@ impl Emulator {
             disk_path: None,
             tape_path: None,
             roms,
+            language: "basic".to_string(),
         })
     }
 
@@ -90,22 +93,42 @@ impl Emulator {
         Ok(different)
     }
 
+    /// A language in the machine: one of the ROMs `roms/` holds, assembled (or
+    /// read from the `--roms` directory when the session was given one). On the
+    /// Kestrel it goes in the socket; on the Kestrel 16 it is its language bank.
     fn mount_socket_rom(&mut self, id: &str) -> Result<(), String> {
-        if self.model != Model::Kestrel {
-            return Err("the Kestrel 16's language ROM is a bank, not a socket".to_string());
+        let names = kestrel_machine::roms::shipped_languages(self.model)?;
+        if !names.iter().any(|name| name == id) {
+            return Err(match self.model {
+                Model::Kestrel => {
+                    format!("no such ROM: {id}; the Kestrel has {}", names.join(", "))
+                }
+                Model::Kestrel16 => format!(
+                    "no such ROM: {id}; the Kestrel 16's language is a bank, not a socket, and \
+                     it holds {}",
+                    names.join(", ")
+                ),
+            });
         }
-        let shipped = kestrel_machine::roms::shipped(Model::Kestrel)?;
-        let image = match id {
-            "basic" => &shipped.basic,
-            "monitor" => shipped
-                .monitor
-                .as_ref()
-                .ok_or("this machine has basic and monitor")?,
-            other => return Err(format!("no such ROM: {other}; this machine has basic and monitor")),
-        };
-        self.machine
-            .mount_basic(image)
-            .map_err(|error| error.to_string())?;
+        match self.roms.as_deref() {
+            Some(root) => {
+                let folder = match self.model {
+                    Model::Kestrel => "kestrel",
+                    Model::Kestrel16 => "kestrel16",
+                };
+                let path = root.join(folder).join(format!("{id}.bin"));
+                let image =
+                    std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+                self.machine
+                    .mount_basic(&image)
+                    .map_err(|error| error.to_string())?;
+            }
+            None => self
+                .machine
+                .mount_assembled_language(id)
+                .map_err(|error| error.to_string())?,
+        }
+        self.language = id.to_string();
         self.machine.reset();
         self.machine.run_frames(20);
         Ok(())
@@ -215,7 +238,7 @@ fn help(frames: i32) {
          \x20 /frames N                 frames run after each line (now {frames})\n\
          \x20 /run [N]                  run N frames (default 50)\n\
          \x20 /break                    the BREAK key\n\
-         \x20 /rom basic|monitor        the Kestrel's socket ROM\n\
+         \x20 /rom [NAME]                the language in the machine, or which one is in\n\
          \x20 /cart [NAME|FILE]         fit a cartridge, or say which one is in\n\
          \x20 /disk [FILE]              mount a volume, or write the one in the drive back\n\
          \x20 /tape [FILE]              insert a cassette, or write the one in the deck back\n\
@@ -332,10 +355,20 @@ fn command(emulator: &mut Emulator, line: &str, quit: &mut bool) -> bool {
                 }
             }
         }
-        "rom" => match emulator.mount_socket_rom(argument) {
-            Ok(()) => emulator.draw(false),
-            Err(message) => println!("kestrel_emu: {message}"),
-        },
+        "rom" => {
+            if argument.is_empty() {
+                println!(
+                    "{} in the {}",
+                    emulator.language,
+                    model_name(emulator.model)
+                );
+            } else {
+                match emulator.mount_socket_rom(argument) {
+                    Ok(()) => emulator.draw(false),
+                    Err(message) => println!("kestrel_emu: {message}"),
+                }
+            }
+        }
         "screen" => emulator.draw(true),
         "status" => emulator.status(),
         _ => println!("kestrel_emu: no such command: /{name} (try /help)"),
@@ -360,14 +393,16 @@ fn ask_which_machine() -> Model {
 fn usage() {
     println!(
         "usage: kestrel-emu [--model kestrel|kestrel16] [--speed 1|2|4|8|turbo]\n\
-         \x20                  [--frames N] [--type \"LINE\"]... [--rom basic|monitor]\n\
-         \x20                  [--roms DIR] [--cart NAME|FILE]\n\
+         \x20                  [--frames N] [--type \"LINE\"]... [--rom NAME]\n\
+         \x20                  [--roms DIR] [--languages] [--cart NAME|FILE]\n\
          \n\
          \x20 --model   which machine to power on; without it, it asks\n\
          \x20 --speed   noted for the session; a session runs frames, not a clock\n\
          \x20 --frames  frames run after each line typed (default 20)\n\
          \x20 --type    a line to type before the session starts; may be repeated\n\
-         \x20 --rom     which ROM is in the Kestrel's socket: basic or monitor\n\
+         \x20 --rom     which language the machine starts with: a name `--languages`\n\
+         \x20           lists (basic when it is not told)\n\
+         \x20 --languages  list the language ROMs the repository ships for the model\n\
          \x20 --roms    images to load from disk instead of assembling the ROMs\n\
          \x20 --cart    a cartridge to fit, by name from cartridges/ or as an image\n\
          \n\
@@ -427,6 +462,21 @@ fn main() -> ExitCode {
                 }
             },
             "--roms" => images_arg = value(&mut index).map(PathBuf::from),
+            "--languages" => {
+                let which = model.unwrap_or(Model::Kestrel);
+                match kestrel_machine::roms::shipped_languages(which) {
+                    Ok(names) => {
+                        for name in names {
+                            println!("{name}");
+                        }
+                        return ExitCode::SUCCESS;
+                    }
+                    Err(message) => {
+                        eprintln!("kestrel_emu: {message}");
+                        return ExitCode::from(1);
+                    }
+                }
+            }
             "--cart" => match value(&mut index) {
                 Some(which) => cartridge = Some(which),
                 None => {

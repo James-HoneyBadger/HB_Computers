@@ -78,12 +78,17 @@ fn the_break_key_starts_the_machine_again() {
 }
 
 #[test]
-fn a_socket_rom_can_be_chosen_and_a_bank_cannot() {
+fn a_language_can_be_chosen_and_the_catalogue_is_the_machine_s() {
     let out = session("/rom basic\n/screen\n", &["--model", "kestrel"]);
     assert!(out.contains("KESTREL BASIC"), "{out}");
     let out = session("/rom monitor\n/screen\n", &["--model", "kestrel"]);
     assert!(!out.contains("KESTREL BASIC"), "the socket changed:\n{out}");
-    let out = session("/rom basic\n", &["--model", "kestrel16"]);
+    let out = session("/rom pilot\n/screen\n", &["--model", "kestrel"]);
+    assert!(out.contains("KESTREL PILOT"), "{out}");
+    let out = session("/rom pilot\n/rom\n", &["--model", "kestrel"]);
+    assert!(out.contains("pilot in the Kestrel"), "the language in it:\n{out}");
+    // The Kestrel 16's language is a bank of its own, and it holds one ROM.
+    let out = session("/rom monitor\n", &["--model", "kestrel16"]);
     assert!(out.contains("is a bank, not a socket"), "{out}");
     let out = session("/rom nonsense\n", &["--model", "kestrel"]);
     assert!(out.contains("no such ROM: nonsense"), "{out}");

@@ -1,6 +1,6 @@
 ; SPDX-License-Identifier: MIT
 ;
-; dos.s -- Kestrel DOS 1.0, the part of the KERNAL that turns 512 raw sectors into a
+; dos.inc -- Kestrel DOS 1.0, the part of the KERNAL that turns 512 raw sectors into a
 ; disk with names on it.
 ;
 ; The hardware knows two things: read a sector, write a sector. Everything above

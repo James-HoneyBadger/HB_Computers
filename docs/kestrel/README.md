@@ -345,6 +345,53 @@ cold-boots, and `kestrel --rom monitor` does the same from the command line.
 
 ---
 
+## The other ROMs in the socket
+
+BASIC and the monitor were the two in the box. The socket took anything else that
+came on a chip, and this repository has two more — a language for schools and a
+ROM for the workshop. `roms/README.md` is the catalogue.
+
+| ROM | `--rom` | What it is |
+| --- | --- | --- |
+| Kestrel BASIC V2.0 | `basic` | the language the machine is switched on with |
+| Kestrel Monitor V1.0 | `monitor` | the processor's view, above |
+| Kestrel PILOT V1.0 | `pilot` | the teaching language: `T:` says, `A:` asks, `M:` marks, `Y:`/`N:`/`J:` go somewhere |
+| Kestrel Diagnostics V1.0 | `diagnostics` | the service ROM: memory with the address that failed, the tube, a note to listen for, and every key with its code |
+
+```sh
+kestrel --rom pilot
+kestrel --languages            # what the socket could take
+```
+
+PILOT keeps a lesson as numbered lines of one statement each, and a line typed
+without a number is obeyed at once:
+
+```pilot
+10 T:WHAT IS THE CAPITAL OF FRANCE?
+20 A:C
+30 M:PARIS
+40 Y:RIGHT
+50 T:NO, IT IS PARIS.
+60 E:
+70 :RIGHT
+80 T:THAT IS RIGHT.
+90 E:
+```
+
+The diagnostics ROM is what a shop fitted to a machine that came back faulty. It
+prints one line per test, and where memory failed it prints the address:
+
+```
+*** KESTREL DIAGNOSTICS V1.0 ***
+
+RAM  $0800-$7FFF  OK
+TUBE 40 X 25      OK
+SOUND             LISTEN FOR THE NOTE
+KEYBOARD          PRESS ANY KEY
+```
+
+---
+
 ## What the machine does not have
 
 The limits, stated plainly:
@@ -363,7 +410,7 @@ The limits, stated plainly:
 ## Writing for the machine
 
 The language is `roms/kestrel/basic.s`; the KERNAL is `roms/kestrel/kernal.s`;
-Kestrel DOS is `roms/kestrel/dos.s`; the map and the constants are
+Kestrel DOS is `roms/kestrel/dos.inc`; the map and the constants are
 `roms/kestrel/kestrel.inc`. `kestrel_asm` assembles them, and the machine does it
 for you when it starts:
 

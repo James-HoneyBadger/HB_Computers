@@ -1,7 +1,7 @@
 # User Guide
 
 How to use the software these two machines run: Kestrel BASIC on the 1982
-machine, the monitor ROM in its socket, Kestrel DOS on the disk, and Kestrel 16
+machine, the ROMs its socket takes, Kestrel DOS on the disk, and Kestrel 16
 BASIC on the 1992 machine. It assumes [the instruction manual](instruction-manual.md)
 has already got a prompt on the screen.
 
@@ -20,6 +20,7 @@ Kestrel, and the error names are the ones the ROM holds.
 - [Variables and arrays](#variables-and-arrays)
 - [Errors](#errors)
 - [The monitor ROM](#the-monitor-rom)
+- [The other ROMs in the socket](#the-other-roms-in-the-socket)
 - [Cartridges](#cartridges)
 - [Kestrel DOS](#kestrel-dos)
 - [Kestrel 16 BASIC](#kestrel-16-basic)
@@ -312,6 +313,92 @@ The monitor's prompt is a full stop, and the `A.` on the last line is the
 character the routine printed followed by that prompt coming back.
 
 `A9 41` loads `'A'`, `20 00 E0` calls `CHROUT` at `$E000`, and `60` returns.
+
+---
+
+## The other ROMs in the socket
+
+BASIC and the monitor were in the box. The socket took more than that, and the
+repository ships the two that a school and a dealer would have bought: a teaching
+language and a service ROM.
+
+| ROM | `--rom` | What it is |
+| --- | --- | --- |
+| Kestrel BASIC V2.0 | `basic` | the language the machine is switched on with |
+| Kestrel Monitor V1.0 | `monitor` | the processor's view, above |
+| Kestrel PILOT V1.0 | `pilot` | the teaching language |
+| Kestrel Diagnostics V1.0 | `diagnostics` | the service ROM a dealer fitted to a faulty machine |
+
+Changing one is a reset, because changing a chip is:
+
+```sh
+./start.sh cli --rom pilot
+./start.sh cli --languages            # what this machine could take
+```
+
+### PILOT
+
+PILOT is a language for teaching, and it is small on purpose: a lesson is a list
+of numbered lines, and each line types something, accepts an answer, or decides
+what to do about the answer.
+
+| Statement | Does |
+| --- | --- |
+| `T: text` | type the text, then a new line; `$A` prints answer `A`, `$$` prints `$` |
+| `A: letter` | accept an answer into that variable, up to fifteen characters |
+| `M: text` | does the answer just accepted match this text? `*` matches anything |
+| `Y: label` | go to the label when it matched |
+| `N: label` | go to the label when it did not |
+| `J: label` | go to the label |
+| `E:` | end the program |
+| `R: text` | a remark |
+| `:label` | a label, which is where a jump goes |
+
+The commands are `RUN`, `LIST` and `NEW`. A number on its own deletes that line,
+and a line typed without a number is obeyed at once, which is how a lesson is
+tried out before it is written down. Matching is without regard to case.
+
+```
+>10 T:WHAT IS THE CAPITAL OF FRANCE?
+>20 A:C
+>30 M:PARIS
+>40 Y:RIGHT
+>50 T:NO, IT IS PARIS.
+>60 E:
+>70 :RIGHT
+>80 T:THAT IS RIGHT.
+>90 E:
+>RUN
+WHAT IS THE CAPITAL OF FRANCE?
+Paris
+THAT IS RIGHT.
+```
+
+### Diagnostics
+
+The service ROM measures the machine instead of using it. It tests memory, the
+tube and the keyboard on the way up, and it prints the address of the first byte
+that did not come back:
+
+```
+*** KESTREL DIAGNOSTICS V1.0 ***
+
+RAM  $0800-$7FFF  OK
+TUBE 40 X 25      OK
+SOUND             LISTEN FOR THE NOTE
+KEYBOARD          PRESS ANY KEY
+                  BREAK TESTS AGAIN
+KEY $41 A
+```
+
+`BREAK` runs the tests again. The note is a note to listen for rather than a
+result, because the sound chip cannot be read back on this machine. A memory test
+of thirty kilobytes takes several seconds on a one-megahertz machine, so give it
+time:
+
+```sh
+./start.sh cli --rom diagnostics --frames 400
+```
 
 ---
 

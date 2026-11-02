@@ -172,8 +172,17 @@ impl Machine {
     /// machine needs no build step and no artefact from the C++ tree.
     pub fn mount_assembled_roms(&mut self) -> Result<(), RomError> {
         let roms = crate::roms::shipped(self.model()).map_err(RomError::Unreadable)?;
+        let basic = roms.basic().to_vec();
         self.mount_kernal(&roms.kernal.clone())?;
-        self.mount_basic(&roms.basic.clone())
+        self.mount_basic(&basic)
+    }
+
+    /// One of the languages the machine could be bought with, assembled and
+    /// put in the socket (or, on the Kestrel 16, in its language bank), leaving
+    /// the KERNAL alone. The caller resets, which is what starts it.
+    pub fn mount_assembled_language(&mut self, name: &str) -> Result<(), RomError> {
+        let image = crate::roms::language(self.model(), name).map_err(RomError::Unreadable)?;
+        self.mount_basic(&image)
     }
 
     /// Loads the images the C++ build assembled. `root` is the build's

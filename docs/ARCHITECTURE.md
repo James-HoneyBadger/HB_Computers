@@ -45,7 +45,7 @@ arrays and the I/O page.
 | `rust/crates/kestrel-machine/src/devices.rs` | The tube, the keyboard, the disk and the tape, parameterised by the profile |
 | `rust/crates/kestrel-machine/src/cpu6502.rs` | The Kestrel's processor, whole |
 | `rust/crates/kestrel-machine/src/cpu65816.rs` | The Kestrel 16's processor, whole |
-| `rust/crates/kestrel-machine/src/roms.rs` | The ROMs, assembled from `roms/*.s` at start-up |
+| `rust/crates/kestrel-machine/src/roms.rs` | The ROMs and the socket's catalogue, assembled from `roms/*.s` at start-up |
 
 The two processors are not interchangeable: they are separate types, and the
 `Cpu` enum the machine holds is decided once at power-on, so only the one the
@@ -73,6 +73,13 @@ process, in memory — and handed to the bus as bytes. There is no ROM build ste
 so a change to a `.s` file is in the next run and a test can never be run against
 yesterday's ROM. A change to a ROM is a change to the machine, and the machine
 tests prove it by typing at the machine and reading the screen back.
+
+A `.s` file is a ROM and an `.inc` is a piece of one, so `roms.rs` builds the
+catalogue of what a socket can take by listing the `.s` files beside the KERNAL:
+BASIC, the monitor, PILOT and the diagnostics on the Kestrel, and the language
+bank on the Kestrel 16. Nothing in Rust names them individually, so a language is
+added by putting its source in the folder — and the tests assert that whatever is
+there assembles and fills the socket.
 
 ## The tests
 

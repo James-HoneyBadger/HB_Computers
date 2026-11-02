@@ -37,6 +37,16 @@ Or type them in at the window, or from `./start.sh cli`.
 | `10-random.bas` | `RND` and `INT` from the noise generator |
 | `11-pattern.bas` | `POKE` into the tube at `$8000` and its colours at `$8400` |
 | `12-sound.bas` | the sound latch at `$8808`, which the window answers with a beep |
+| `13-guess.bas` | a guessing game: the machine halves the range and wins in ten |
+| `14-dice.bas` | two dice, a hundred throws and a histogram of the totals |
+| `15-life.bas` | Conway's Life on a six-by-six board, two generations of it |
+| `16-units.bas` | `DEF FN` for a conversion table |
+| `17-interest.bas` | compound interest, a year to a line |
+| `18-invoice.bas` | `READ`/`DATA` into an invoice, with VAT, to the penny |
+| `19-quadratic.bas` | the discriminant, real roots, and the case with none |
+| `20-stats.bas` | mean and standard deviation of a set of readings |
+| `21-hangman.bas` | `MID$` and string building: the machine plays both parts |
+| `22-roman.bas` | Roman numerals from a table of values |
 
 ## Kestrel 16 (1992), Kestrel 16 BASIC 2.0
 
@@ -57,3 +67,12 @@ stands.
 | `09-strings.bas` | `A$` variables, `LEN`, comparing, joining and slicing |
 | `10-arrays.bas` | `DIM`, a sieve, two loops one inside the other, and an array of strings |
 | `11-functions.bas` | `DEF FN` of one argument, and the letter it borrows given back |
+| `12-binary.bas` | decimal to binary and to hex, by division and by remainder |
+| `13-money.bas` | an invoice in whole pence, with VAT, since the arithmetic is integer |
+| `14-gcd.bas` | Euclid's algorithm, and the least common multiple from it |
+| `15-histogram.bas` | sixty rolls of a die from the noise register, as a histogram |
+| `16-pattern.bas` | `POKE` into the tube and its colours: a pattern drawn cell by cell |
+| `17-guess.bas` | the halving game in integer arithmetic |
+| `18-cipher.bas` | a Caesar cipher, three shifts of the same message |
+| `19-report.bas` | a regional sales report: totals, percentages and a bar for each |
+| `20-board.bas` | a noughts-and-crosses board drawn from an array, and who won |

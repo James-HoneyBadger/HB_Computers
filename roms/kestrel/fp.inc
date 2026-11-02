@@ -1,6 +1,6 @@
 ; SPDX-License-Identifier: MIT
 ;
-; fp.s -- the Kestrel BASIC's arithmetic.
+; fp.inc -- the Kestrel BASIC's arithmetic.
 ;
 ; A number is five bytes: an exponent, then a four-byte mantissa whose top bit
 ; is the sign. The value is

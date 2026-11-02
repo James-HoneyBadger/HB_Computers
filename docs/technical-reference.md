@@ -323,7 +323,16 @@ services at `$00:E054` and `$00:E057`.
 | KERNAL | both | 8192 | `$E000` / `$00:E000` | `roms/kestrel/kernal.s`, `roms/kestrel16/kernal.s` |
 | BASIC | Kestrel | 16384 | `$A000` | `roms/kestrel/basic.s` |
 | Monitor | Kestrel | 16384 | `$A000` | `roms/kestrel/monitor.s` |
+| PILOT | Kestrel | 16384 | `$A000` | `roms/kestrel/pilot.s` |
+| Diagnostics | Kestrel | 16384 | `$A000` | `roms/kestrel/diagnostics.s` |
 | BASIC | Kestrel 16 | 65536 | `$01:0000` | `roms/kestrel16/basic.s` |
+
+A language is a source in the machine's folder, and the folder is the catalogue:
+every `.s` beside the KERNAL is one language ROM, assembled into the whole of the
+socket (or, on the Kestrel 16, the whole of the language bank). Sources that are
+part of another ROM rather than a ROM of their own are `.inc` files — `fp.inc`,
+`eval.inc` and the rest of BASIC on the Kestrel, `prog.inc` on the Kestrel 16 —
+so what `--languages` prints is exactly what can be put in the machine.
 
 Each assembler writes an image of bytes from its `.s` file, and the machine is
 given those bytes and nothing else. The programs assemble them when they start,
@@ -331,10 +340,12 @@ so there is no separate build for a ROM. `kestrel_asm` and `kestrel16_asm` will
 also write an image to a file with `--bin`, which is how a cartridge or a socket
 ROM of your own is made.
 
-The Kestrel's socket takes one of `basic` or `monitor`. It is changed from the
-**ROM socket** group on the window's **Machine** page, or with `--rom` on the
-command line, and either way the machine cold-boots: the reset vector is in the
-new image, and that is where the processor starts.
+The Kestrel's socket takes one language at a time: `basic`, `monitor`, `pilot`
+or `diagnostics`. It is changed from the **ROM socket** group on the window's
+**Machine** page, or with `--rom` on the command line, and either way the machine
+cold-boots: the reset vector is in the new image, and that is where the processor
+starts. The Kestrel 16's language is a bank rather than a socket and it holds one
+image, `basic`, so asking it for another names what it has.
 
 The reset vector is `$FFFC` on the Kestrel. On the Kestrel 16 the processor reads
 its vectors from the top of bank zero, and leaves reset in emulation mode; the
@@ -400,7 +411,7 @@ that it could not execute, which is how a runaway ROM is caught in a test.
 ## Kestrel BASIC's numbers
 
 The 1982 machine's arithmetic is 6502 code in the socket ROM, in
-`roms/kestrel/fp.s`, and it is five bytes a number:
+`roms/kestrel/fp.inc`, and it is five bytes a number:
 
 | Byte | Holds |
 | --- | --- |

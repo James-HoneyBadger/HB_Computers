@@ -1,6 +1,6 @@
 ; SPDX-License-Identifier: MIT
 ;
-; str.s -- string variables. A string lives in a heap that grows down from the
+; str.inc -- string variables. A string lives in a heap that grows down from the
 ; top of memory; a variable holds its length and the address of its bytes. There
 ; is no collector: what is written is not given back, which is what a machine of
 ; this size could afford.

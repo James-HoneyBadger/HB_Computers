@@ -1,6 +1,6 @@
 ; SPDX-License-Identifier: MIT
 ;
-; eval.s -- expressions: numbers, variables, operators.
+; eval.inc -- expressions: numbers, variables, operators.
 ;
 ; The grammar, from loosest to tightest:
 ;

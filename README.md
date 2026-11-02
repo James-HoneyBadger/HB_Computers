@@ -107,7 +107,9 @@ rust/                          the emulator and its tools, in five crates:
   crates/kestrel16-asm/          the 65816 assembler, as a library and as kestrel16_asm
   crates/kestrel-cli/            kestrel, the command line, and kestrel_emu, the session
   crates/kestrel-app/            kestrel_computers, the window
-roms/kestrel/                  the Kestrel's 6502 machine code
+roms/kestrel/                  the Kestrel's 6502 machine code: the KERNAL, and the
+                               language ROMs the socket takes -- BASIC, the monitor,
+                               PILOT and the diagnostics
 roms/kestrel16/                the Kestrel 16's 65816 machine code
 samples/                       programs to type, run and learn from, and their expected output
 cartridges/                    the programs that were sold on a board, one folder to a machine
@@ -123,7 +125,7 @@ Four books, two references and the machines' own manuals; [the index](docs/READM
 | Book | What it covers |
 | --- | --- |
 | [Instruction Manual](docs/instruction-manual.md) | The box: both machines, building, switching on, the keyboard, the window, the media, first sessions, troubleshooting |
-| [User Guide](docs/users-guide.md) | The software: Kestrel BASIC, the monitor ROM, Kestrel DOS, Kestrel 16 BASIC, errors, worked examples, the samples |
+| [User Guide](docs/users-guide.md) | The software: Kestrel BASIC, the ROMs in the socket, Kestrel DOS, Kestrel 16 BASIC, errors, worked examples, the samples |
 | [Technical Reference](docs/technical-reference.md) | The hardware: both maps, the I/O pages, the colours, the bus, interrupts, the disk and tape formats, the ROM images, the processors |
 | [Programmer's Guide](docs/programmers-guide.md) | Writing for the machines and changing the emulator: the assemblers' pitfalls, the KERNAL's tables, the emulator's API, the tests, the build |
 | [The tools](docs/TOOLS.md) | Both assemblers, the command line, the window, the build targets |

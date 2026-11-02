@@ -1,6 +1,6 @@
 ; SPDX-License-Identifier: MIT
 ;
-; def.s -- DEF FN. A definition is kept as the name, the parameter and a
+; def.inc -- DEF FN. A definition is kept as the name, the parameter and a
 ; pointer at the expression, which stays where it was written in the program.
 ; That is why a definition typed at the prompt is worth nothing: the text it
 ; points at is gone by the next line.

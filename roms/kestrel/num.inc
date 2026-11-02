@@ -1,6 +1,6 @@
 ; SPDX-License-Identifier: MIT
 ;
-; num.s -- numbers as a person writes them.
+; num.inc -- numbers as a person writes them.
 ;
 ; The machine's numbers are binary fractions; the tube shows decimal. This file
 ; is the crossing: FPRINT turns the accumulator into the characters PRINT puts

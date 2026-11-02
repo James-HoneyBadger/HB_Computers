@@ -16,12 +16,39 @@ use std::sync::OnceLock;
 
 use crate::profile::{Model, KESTREL, KESTREL16};
 
-/// The images a machine boots with.
+/// A language ROM: the image a machine's socket (or, on the Kestrel 16, its
+/// language bank) takes.
+pub struct Language {
+    pub name: String,
+    pub image: Vec<u8>,
+}
+
+/// The images a machine ships with: the KERNAL, which is always there, and the
+/// languages it could be bought or upgraded with.
 pub struct ShippedRoms {
     pub kernal: Vec<u8>,
-    pub basic: Vec<u8>,
-    /// The Kestrel's socket carries more than one language.
-    pub monitor: Option<Vec<u8>>,
+    /// In catalogue order, `basic` first.
+    pub languages: Vec<Language>,
+}
+
+impl ShippedRoms {
+    /// The language the machine is switched on with.
+    pub fn basic(&self) -> &[u8] {
+        self.language("basic").unwrap_or(&[])
+    }
+
+    /// One language by name.
+    pub fn language(&self, name: &str) -> Option<&[u8]> {
+        self.languages
+            .iter()
+            .find(|language| language.name == name)
+            .map(|language| language.image.as_slice())
+    }
+
+    /// What the socket could hold, for a host that has to offer a choice.
+    pub fn language_names(&self) -> Vec<&str> {
+        self.languages.iter().map(|language| language.name.as_str()).collect()
+    }
 }
 
 /// Where the assembly sources are: `KESTREL_SOURCES` if it is set, otherwise
@@ -56,22 +83,102 @@ pub fn shipped(model: Model) -> Result<&'static ShippedRoms, String> {
 
 fn assemble(model: Model) -> Result<ShippedRoms, String> {
     let root = source_directory()?;
-    match model {
+    let folder = rom_folder(model);
+    let profile = profile_of(model);
+    let kernal = match model {
         Model::Kestrel => {
-            let profile = &KESTREL;
-            Ok(ShippedRoms {
-                kernal: assemble_6502(&root, "kestrel", "kernal", profile.kernal_base, profile.kernal_size)?,
-                basic: assemble_6502(&root, "kestrel", "basic", profile.basic_base, profile.basic_size)?,
-                monitor: Some(assemble_6502(&root, "kestrel", "monitor", profile.basic_base, profile.basic_size)?),
-            })
+            assemble_6502(&root, folder, "kernal", profile.kernal_base, profile.kernal_size)?
         }
         Model::Kestrel16 => {
-            let profile = &KESTREL16;
-            Ok(ShippedRoms {
-                kernal: assemble_65816(&root, "kestrel16", "kernal", profile.kernal_base, profile.kernal_size)?,
-                basic: assemble_65816(&root, "kestrel16", "basic", profile.basic_base, profile.basic_size)?,
-                monitor: None,
-            })
+            assemble_65816(&root, folder, "kernal", profile.kernal_base, profile.kernal_size)?
+        }
+    };
+    let mut languages = Vec::new();
+    for name in shipped_languages(model)? {
+        let image = match model {
+            Model::Kestrel => {
+                assemble_6502(&root, folder, &name, profile.basic_base, profile.basic_size)?
+            }
+            Model::Kestrel16 => {
+                assemble_65816(&root, folder, &name, profile.basic_base, profile.basic_size)?
+            }
+        };
+        languages.push(Language { name, image });
+    }
+    Ok(ShippedRoms { kernal, languages })
+}
+
+fn rom_folder(model: Model) -> &'static str {
+    match model {
+        Model::Kestrel => "kestrel",
+        Model::Kestrel16 => "kestrel16",
+    }
+}
+
+fn profile_of(model: Model) -> &'static crate::profile::Profile {
+    match model {
+        Model::Kestrel => &KESTREL,
+        Model::Kestrel16 => &KESTREL16,
+    }
+}
+
+/// The language ROMs this machine could be sold or upgraded with, by name:
+/// every source in its folder except the KERNAL, `basic` first because that is
+/// the one the machine is switched on with. A language is therefore added by
+/// putting its source beside the others.
+pub fn shipped_languages(model: Model) -> Result<Vec<String>, String> {
+    let directory = source_directory()?.join(rom_folder(model));
+    let entries =
+        std::fs::read_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
+    let mut names: Vec<String> = entries
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "s"))
+        .filter_map(|path| path.file_stem().map(|stem| stem.to_string_lossy().into_owned()))
+        .filter(|name| name != "kernal")
+        .collect();
+    names.sort();
+    // BASIC is the language in the box; the rest are upgrades.
+    if let Some(index) = names.iter().position(|name| name == "basic") {
+        names.rotate_left(index);
+    }
+    Ok(names)
+}
+
+/// What a language was called on its box, for the hosts and the settings sheet
+/// to name it by. A source with no entry of its own is named by its file, so a
+/// language can be dropped in without touching this.
+pub fn language_title(model: Model, name: &str) -> String {
+    let title = match name {
+        "basic" => match model {
+            Model::Kestrel => "Kestrel BASIC V2.0",
+            Model::Kestrel16 => "Kestrel 16 BASIC 2.0",
+        },
+        "monitor" => "Kestrel Monitor V1.0",
+        "pilot" => "Kestrel PILOT V1.0",
+        other => return other.to_string(),
+    };
+    title.to_string()
+}
+
+/// One language, assembled at the address and size the socket takes.
+pub fn language(model: Model, name: &str) -> Result<Vec<u8>, String> {
+    let root = source_directory()?;
+    let folder = rom_folder(model);
+    let profile = profile_of(model);
+    let names = shipped_languages(model)?;
+    if !names.iter().any(|candidate| candidate == name) {
+        return Err(format!(
+            "no such ROM: {name}; this machine has {}",
+            names.join(", ")
+        ));
+    }
+    match model {
+        Model::Kestrel => {
+            assemble_6502(&root, folder, name, profile.basic_base, profile.basic_size)
+        }
+        Model::Kestrel16 => {
+            assemble_65816(&root, folder, name, profile.basic_base, profile.basic_size)
         }
     }
 }

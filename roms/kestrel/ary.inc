@@ -1,6 +1,6 @@
 ; SPDX-License-Identifier: MIT
 ;
-; ary.s -- arrays. An array is a descriptor in the same heap as the strings,
+; ary.inc -- arrays. An array is a descriptor in the same heap as the strings,
 ; chained from the head at B_FRETOP:
 ;
 ;   +0/+1  link to the next descriptor, 0 at the end of the chain

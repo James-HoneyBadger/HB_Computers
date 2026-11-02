@@ -6,7 +6,7 @@ to be read; the references are for looking things up.
 | Book | Read it when | What is in it |
 | --- | --- | --- |
 | [Instruction Manual](instruction-manual.md) | you have just unboxed the machines | what they are, how to build and start them, the keyboard, the window, the media, your first session, what to do when it goes wrong |
-| [User Guide](users-guide.md) | you want to write a program | Kestrel BASIC from `PRINT` to `DEF FN`, the monitor ROM, Kestrel DOS, Kestrel 16 BASIC, errors, worked examples, the samples |
+| [User Guide](users-guide.md) | you want to write a program | Kestrel BASIC from `PRINT` to `DEF FN`, the ROMs in the socket, Kestrel DOS, Kestrel 16 BASIC, errors, worked examples, the samples |
 | [Technical Reference](technical-reference.md) | you need an address, a register or a format | both memory maps, both I/O pages, the colours, the bus decode order, interrupts and the frame, the disk layouts, the cassette, the ROM images, the processors |
 | [Programmer's Guide](programmers-guide.md) | you are writing for the machines, or changing the emulator | the assemblers' pitfalls, the KERNAL's two tables, the emulator's API, adding a register, the test suites, the build, the house rules |
 | [The tools](TOOLS.md) | you need an option rather than an explanation | both assemblers' full dialect and options, the command line, the window, the build targets |

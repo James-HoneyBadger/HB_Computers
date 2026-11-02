@@ -133,7 +133,8 @@ READY.
 | `--frames N` | Frames to run before typing and again after it (default 40) |
 | `--type "LINE"` | Type a line at the prompt and let the machine answer; may be repeated |
 | `--file FILE` | Type every line of a file, in order, before any `--type` line |
-| `--rom basic\|monitor` | Which ROM is in the Kestrel's socket (see below) |
+| `--rom NAME` | Which language to put in the machine: one of the names `--languages` lists (see below) |
+| `--languages` | List the language ROMs `roms/` holds for the model and exit |
 | `--roms DIR` | Load the assembled images from `DIR` instead of assembling them |
 | `--cart NAME\|FILE` | Fit a cartridge: a name from `cartridges/`, assembled from its source, or the path of an image |
 | `--cartridges` | List the cartridges shipped for the model and exit |
@@ -155,7 +156,20 @@ $ ./start.sh cli --rom monitor --type "S 0900 0902" --type "L"
 ```
 
 `--rom monitor` boots the machine with the monitor in the socket instead of BASIC,
-which is how the cassette is used at all: `S` and `L` live there.
+which is how the cassette is used at all: `S` and `L` live there. The name is any
+language in `roms/<machine>/` — `basic`, `monitor`, `pilot` and `diagnostics` on
+the 1982 machine — and `--languages` prints them:
+
+```bash
+$ ./start.sh cli --languages
+basic
+diagnostics
+monitor
+pilot
+$ ./start.sh cli --rom pilot --frames 20 --type "10 T:HELLO" --type "RUN"
+```
+
+A name the machine does not have is refused with the list it does have.
 
 `--file` is how a program in `samples/` is run: the lines are typed in order, at
 the speed a person could type them, so a numbered line is stored and a `RUN`
@@ -212,7 +226,7 @@ the machine, a key at a time and at the speed the machine could be typed at.
 | `/frames N` | frames to run after each line typed (default 20) |
 | `/run [N]` | run N frames (default 50) |
 | `/break` | the BREAK key |
-| `/rom basic\|monitor` | which ROM is in the Kestrel's socket |
+| `/rom [NAME]` | which language is in the machine; on its own, which one is fitted |
 | `/disk [FILE]` | mount a volume, or write the one in the drive back to its file |
 | `/tape [FILE]` | insert a cassette, or write the one in the deck back to its file |
 | `/screen` | draw the tube |
@@ -230,7 +244,8 @@ noise when nobody is watching.
 | `--model` | which machine; asked for when there is a keyboard and no flag |
 | `--speed` | noted for the session; a session runs frames, not a clock |
 | `--frames` | frames run after each line typed |
-| `--rom basic\|monitor` | which ROM is in the Kestrel's socket |
+| `--rom NAME` | which language the machine starts with, by name from `roms/` |
+| `--languages` | list the language ROMs shipped for the model and exit |
 | `--roms DIR` | images to load from disk instead of assembling the ROMs |
 | `--cart NAME\|FILE` | the cartridge in the slot, by name or as an image |
 | `--type "LINE"` | type a line before the prompt appears; may be repeated |
@@ -253,6 +268,16 @@ window shaped after WinUAE's: a tree of properties down the left, the chosen
 page in groups on the right, and `OK`, `Cancel` and `Reset` along the foot. It
 sets the machine, the clock, the ROM and the cartridge, the disk and the tape,
 the zoom and the sound; `Ctrl+Q` closes the window.
+
+The **ROM socket** group on the **Machine** page is a button for every language
+`roms/` holds for that machine, so PILOT and the diagnostics are fitted the same
+way BASIC is, and fitting one cold-boots the machine. `--rom NAME` fits one
+before the window opens:
+
+```bash
+./start.sh kestrel --rom pilot
+./start.sh window --rom diagnostics --shot tape.png
+```
 
 ---
 

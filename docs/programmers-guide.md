@@ -29,7 +29,7 @@ book is about using them well.
 
 | Address | What it wants |
 | --- | --- |
-| `$A000`–`$DFFF` | A 16 KiB socket ROM: Kestrel BASIC, or the monitor |
+| `$A000`–`$DFFF` | A 16 KiB socket ROM: Kestrel BASIC, PILOT, Diagnostics or the monitor |
 | `$9000`–`$9FFF` | A 4 KiB cartridge |
 | `$0801`–`$7EFF` | Free RAM: where a program is stored, and where the monitor's `:` deposits bytes |
 

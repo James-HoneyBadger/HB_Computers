@@ -1,6 +1,6 @@
 ; SPDX-License-Identifier: MIT
 ;
-; func.s -- the functions. A name at (B_IPTR) is offered to the table here
+; func.inc -- the functions. A name at (B_IPTR) is offered to the table here
 ; before it is treated as a variable, so SQR(2) is a call and S is a variable.
 
 ; ---------------------------------------------------------------------------
