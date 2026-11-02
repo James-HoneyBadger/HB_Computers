@@ -559,6 +559,16 @@ impl Cpu65816 {
         low | (high << 8)
     }
 
+    /// A pointer read from the program bank, which is where `JMP (abs,X)` and
+    /// `JSR (abs,X)` keep theirs. The plain sixteen-bit pointer read stays in
+    /// bank zero, which is why the two are separate functions.
+    fn read_pointer_in_code_bank(&self, bus: &mut dyn Bus, slot: u16) -> u32 {
+        let bank = u32::from(self.pbr) << 16;
+        let low = u32::from(self.read8(bus, bank | u32::from(slot)));
+        let high = u32::from(self.read8(bus, bank | u32::from(slot.wrapping_add(1))));
+        low | (high << 8)
+    }
+
     fn fetch_byte(&mut self, bus: &mut dyn Bus) -> u8 {
         let address = self.code_address(self.pc);
         let byte = self.read8(bus, address);
@@ -699,7 +709,7 @@ impl Cpu65816 {
         self.push8(bus, self.pbr);
         self.push8(bus, (self.pc >> 8) as u8);
         self.push8(bus, self.pc as u8);
-        let pushed = if software { self.p } else { self.p & !0x10 };
+        let pushed = if software { self.p } else { self.p | 0x20 };
         self.push8(bus, pushed);
         self.set_flag(IRQ_DISABLE, true);
         self.set_flag(DECIMAL, false);
@@ -999,7 +1009,7 @@ impl Cpu65816 {
             }
             Mode::AbsIndX => {
                 let slot = self.fetch_word(bus).wrapping_add(self.index_value(self.x));
-                effective.ea = u32::from(self.read_pointer(bus, slot));
+                effective.ea = self.read_pointer_in_code_bank(bus, slot);
             }
             Mode::AbsIndL => {
                 let slot = self.fetch_word(bus);

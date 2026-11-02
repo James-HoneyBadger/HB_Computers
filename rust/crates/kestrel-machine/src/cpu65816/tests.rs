@@ -477,6 +477,50 @@ fn index_width_operands_follow_the_index_flag() {
     assert_eq!(run.ram.peek(0x3001), 0xAA, "nothing above the byte was written");
 }
 
+/// A hardware interrupt in native mode pushes the flag byte with bit 4 left
+/// alone: it is the index width, and clearing it switched the machine to
+/// sixteen-bit indexes the moment it returned.
+#[test]
+fn a_native_interrupt_keeps_the_index_width() {
+    let mut run = Run::new(ORIGIN, &[0xEA, 0x40]); // NOP ; RTI
+    run.ram.poke(0xFFEE, 0x00);
+    run.ram.poke(0xFFEF, 0x90);
+    run.set(|r| {
+        r.p = INDEX_8 | MEMORY_8;
+        r.s = 0x01FF;
+    });
+    run.cpu.set_irq_line(true);
+    assert_eq!(run.step(), 8);
+    // The pushed copy has the unused bit set and the index-width bit as it was.
+    let pushed = run.ram.peek(0x01FC);
+    assert_eq!(pushed & 0x10, 0x10, "bit 4 is the index width, and it survived");
+    assert_eq!(pushed & 0x20, 0x20, "and bit 5 is set, as the chip sets it");
+
+    // After the handler returns, the indexes are still eight bits wide.
+    let mut registers = run.regs();
+    registers.pc = 0x9000;
+    run.cpu.set_registers(&registers);
+    run.ram.poke(0x9000, 0x40); // RTI
+    run.cpu.set_irq_line(false);
+    run.step();
+    assert_eq!(run.regs().p & INDEX_8, INDEX_8, "and RTI did not widen them");
+}
+
+/// `JMP (abs,X)` reads its pointer from the program bank, not from bank zero.
+#[test]
+fn an_indexed_indirect_jump_reads_its_pointer_where_it_runs() {
+    let mut run = Run::new(0x018000, &[0x7C, 0x00, 0x40]); // JMP ($4000,X)
+    // The decoy in bank zero, which a core reading bank zero would follow.
+    run.ram.poke(0x4000, 0x00);
+    run.ram.poke(0x4001, 0x00);
+    // The real table, beside the instruction in bank one.
+    run.ram.poke(0x014000, 0x34);
+    run.ram.poke(0x014001, 0x12);
+    run.step();
+    assert_eq!(run.regs().pc, 0x1234, "the pointer came from bank one");
+    assert_eq!(run.regs().pbr, 0x01, "and the jump stayed in its bank");
+}
+
 #[test]
 fn the_table_is_the_cpp_table() {
     // Every opcode the C++ map names, at the cycle count it names.
