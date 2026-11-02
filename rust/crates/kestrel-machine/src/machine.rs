@@ -808,6 +808,39 @@ mod tests {
         assert!(!screen.contains("?WHAT?"), "nothing there was unreadable:\n{screen}");
     }
 
+    /// PEEK and POKE reach the machine's own memory a byte at a time, and STR$
+    /// and VAL turn a number into its digits and back -- the two conversions the
+    /// 1982 machine has had all along.
+    #[test]
+    fn a_1992_byte_can_be_poked_and_the_digits_turned_around() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 POKE 30000,7",
+            "20 PRINT PEEK(30000)",
+            "30 POKE 30000,255",
+            "40 PRINT PEEK(30000);\" \";PEEK(30001)",
+            "50 PRINT STR$(42);\" \";STR$(-7);\" \";STR$(0)",
+            "60 PRINT VAL(\"123\");\" \";VAL(\"-45\");\" \";VAL(\"12X\")",
+            "70 PRINT LEN(STR$(32767))",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        for wanted in ["7", "255 0", "42 -7 0", "123 -45 12", "5"] {
+            assert!(
+                screen.lines().any(|row| row.trim() == wanted),
+                "the machine printed {wanted:?}:\n{screen}"
+            );
+        }
+        assert!(
+            !screen.contains("?WHAT?") && !screen.contains("?TYPE MISMATCH"),
+            "nothing there was a mistake:\n{screen}"
+        );
+    }
+
     /// A string is thirty-one characters, an assignment that will not fit is
     /// refused and leaves the old text alone, and a number given to a string
     /// variable is named as the mistake it is.

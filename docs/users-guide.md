@@ -358,6 +358,8 @@ than its predecessor, and honest about it:
 | `A$+B$` | the two joined, in a temporary of thirty-one characters |
 | `LEFT$(A$,n)` / `RIGHT$(A$,n)` / `MID$(A$,n,m)` | part of a string, counting from one; a count past the end is as much as there is |
 | `CHR$(n)` / `ASC(A$)` | the character with that number, and the number of the first character |
+| `STR$(n)` / `VAL(A$)` | the digits of a number, and the number those digits begin with |
+| `PEEK(addr)` / `POKE addr,value` | one byte of bank zero: the tube, the I/O page and the program |
 | `DIM A(10)` | an array of eleven words, `A(0)` to `A(10)`; one dimension, and the `DIM` comes first |
 | `RUN` [`n`] / `LIST` [`n`] | run the stored program, or show it from line `n` |
 | `GOTO n` | continue at line `n` |
@@ -407,8 +409,7 @@ PRINT A$
   pending; a loop whose `FOR` and `NEXT` share a line runs at the prompt;
 - **strings, in part** — `A$` holds thirty-one characters and can be assigned,
   printed, compared, joined with `+`, sliced with `LEFT$`/`RIGHT$`/`MID$`, and
-  turned into characters and back with `CHR$`/`ASC`. There is no `STR$` and no
-  `VAL`;
+  turned into characters, digits and back with `CHR$`/`ASC`/`STR$`/`VAL`;
 - **arrays, in part** — `DIM A(10)` and `A(i)` with one dimension, and whole
   words only: no string arrays, and no `DIM A(2,3)`;
 - **no other functions** — no `ABS`, no `DEF FN`;

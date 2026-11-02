@@ -252,6 +252,18 @@ KW_CHR_END:
 KW_ASC:
         .text "ASC"
 KW_ASC_END:
+KW_STR:
+        .text "STR$"
+KW_STR_END:
+KW_VAL:
+        .text "VAL"
+KW_VAL_END:
+KW_PEEK:
+        .text "PEEK"
+KW_PEEK_END:
+KW_POKE:
+        .text "POKE"
+KW_POKE_END:
 KW_AND:
         .text "AND"
 KW_AND_END:
@@ -719,6 +731,10 @@ EXEC_TRY_LET:
         LDY.W #KW_REM_END - KW_REM
         JSR MATCHKW
         BCS DO_REM
+        LDX.W #(KW_POKE & $FFFF)
+        LDY.W #KW_POKE_END - KW_POKE
+        JSR MATCHKW
+        BCS DO_POKE
         LDX.W #(KW_DIM & $FFFF)
         LDY.W #KW_DIM_END - KW_DIM
         JSR MATCHKW
@@ -1099,6 +1115,31 @@ PRINT_STRVAL:
         SEP #$20
         RTS
 
+; DO_POKE: `POKE address, value` writes one byte of bank zero. It is the other
+; half of PEEK, and the only way a program has of reaching the tube, the colour
+; registers or the sound latch.
+DO_POKE:
+        JSR SKIPSP
+        JSR EXPR                ; X = the address
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #','
+        BNE DO_POKE_BAD
+        JSR SRC_STEP
+        PHX                     ; the address waits on the stack: the value's
+        JSR EXPR                ; own expression uses every byte of zero page
+        REP #$20
+        TXA
+        TAY                     ; the value
+        PLX                     ; and the address, back again
+        SEP #$20
+        TYA
+        STA.L $000000,X         ; one byte of bank zero, and not of zero page
+        BRA EXEC_DONE
+DO_POKE_BAD:
+        JSR SAY_WHAT
+        BRA EXEC_DONE
+
 ; ---------------------------------------------------------------------------
 ; Strings. A string variable is a fixed slot in bank three -- a length byte and
 ; STR_MAX characters -- and its address comes from its letter alone, so a name
@@ -1161,6 +1202,10 @@ PARSE_STR_ONE:
         LDY.W #KW_CHR_END - KW_CHR
         JSR MATCHKW
         BCS PARSE_CHR
+        LDX.W #(KW_STR & $FFFF)
+        LDY.W #KW_STR_END - KW_STR
+        JSR MATCHKW
+        BCS PARSE_STR_NUM
         LDA [ZP_SRC]
         CMP #'"'
         BEQ PARSE_STR_LITERAL
@@ -1399,6 +1444,164 @@ PARSE_CHR:
         LDA #BANK_STR
         STA ZP_SSTR+2
         SEC
+        RTS
+
+; PARSE_STR_NUM: STR$(n) -- the digits of a number, in a buffer of their own.
+PARSE_STR_NUM:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR EXPR                ; X = the number
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE PARSE_SLICE_BAD
+        JSR SRC_STEP
+        JSR STRNUM_FROM         ; writes the digits, X = how many there are
+        REP #$20
+        STX ZP_SLEN
+        LDA.W #(STRNUM & $FFFF)
+        STA ZP_SSTR
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SSTR+2
+        SEC
+        RTS
+
+; STRNUM_FROM: X = a number. Its digits, a minus sign if it has one, go into
+; STRNUM and X comes back as the length. The digits come out of the division
+; backwards, so they wait on the processor's stack and are written in order.
+STRNUM_FROM:
+        PHP
+        SEP #$20
+        REP #$10
+        REP #$20
+        TXA                     ; the number, which arrived in X
+        STA ZP_VAL
+        SEP #$20
+        LDY.W #0
+        LDA ZP_VAL+1            ; the sign, from the number's high byte
+        BPL STRNUM_FROM_GO
+        LDA #'-'
+        STA.L STRNUM            ; the first byte, and it is the only one: no
+        INY                     ; `STA.L ...,Y` exists, and `abs,Y` loses the bank
+        REP #$20
+        LDA ZP_VAL
+        EOR.W #$FFFF
+        INC A
+        STA ZP_VAL
+        SEP #$20
+STRNUM_FROM_GO:
+        STY ZP_CH               ; where the digits begin
+        LDX.W #0                ; how many there are
+STRNUM_FROM_LOOP:
+        REP #$20
+        LDA ZP_VAL              ; by ten: ZP_A / 10 -> ZP_A, remainder ZP_CNT
+        STA ZP_A
+        LDA.W #0
+        STA ZP_CNT
+        LDY #16
+STRNUM_FROM_DIV:
+        ASL ZP_A
+        ROL ZP_CNT
+        LDA ZP_CNT
+        CMP.W #10
+        BCC STRNUM_FROM_NEXT
+        SBC.W #10
+        STA ZP_CNT
+        INC ZP_A
+STRNUM_FROM_NEXT:
+        DEY
+        BNE STRNUM_FROM_DIV
+        LDA ZP_A
+        STA ZP_VAL
+        LDA ZP_CNT
+        SEP #$20
+        ORA #'0'
+        PHA                     ; the least significant digit first
+        INX
+        REP #$20
+        LDA ZP_VAL
+        BNE STRNUM_FROM_LOOP
+        SEP #$20
+        REP #$20
+        LDA.W #(STRNUM & $FFFF)
+        STA ZP_SDST
+        SEP #$20
+        LDA #BANK_STR
+        STA ZP_SDST+2
+        LDY ZP_CH               ; and written the other way round
+STRNUM_FROM_WRITE:
+        PLA
+        STA [ZP_SDST],Y
+        INY
+        DEX
+        BNE STRNUM_FROM_WRITE
+        TYA
+        TAX                     ; the length, sign and all
+        PLP
+        RTS
+
+; STRNUM_VAL: VAL of the string in ZP_SSTR -- the number its digits begin with,
+; a minus sign allowed and the first character that is not a digit ending it.
+STRNUM_VAL:
+        REP #$10
+        REP #$20
+        LDA.W #0
+        STA ZP_VAL
+        STA ZP_SGN
+        SEP #$20
+        LDY.W #0
+        CPY ZP_SLEN
+        BCS STRNUM_VAL_DONE
+        LDA [ZP_SSTR],Y
+        CMP #'-'
+        BNE STRNUM_VAL_DIGITS
+        REP #$20
+        LDA.W #1
+        STA ZP_SGN
+        SEP #$20
+        INY
+STRNUM_VAL_DIGITS:
+        CPY ZP_SLEN
+        BCS STRNUM_VAL_DONE
+        LDA [ZP_SSTR],Y
+        CMP #'0'
+        BCC STRNUM_VAL_DONE
+        CMP #'9'+1
+        BCS STRNUM_VAL_DONE
+        SEC
+        SBC #'0'
+        REP #$20
+        AND.W #$00FF
+        STA ZP_A                ; the digit
+        LDA ZP_VAL
+        ASL A
+        STA ZP_B
+        ASL A
+        ASL A                   ; eight times
+        CLC
+        ADC ZP_B                ; ten times
+        CLC
+        ADC ZP_A
+        STA ZP_VAL
+        SEP #$20
+        INY
+        BRA STRNUM_VAL_DIGITS
+STRNUM_VAL_DONE:
+        REP #$20
+        LDA ZP_SGN
+        BEQ STRNUM_VAL_HAVE
+        LDA.W #0
+        SEC
+        SBC ZP_VAL
+        STA ZP_VAL
+STRNUM_VAL_HAVE:
+        LDA ZP_VAL
+        TAX
+        SEP #$20
         RTS
 
 ; ---------------------------------------------------------------------------
@@ -2195,8 +2398,15 @@ FACTOR:
         BCS FACTOR_WORD
         BRA FACTOR_NUM
 FACTOR_WORD:
-        ; ASC(<string>) is the number of its first character, and LEN(<string>)
-        ; how many characters it has. Both are numbers, so both live here.
+        ; PEEK, VAL, ASC and LEN all answer with a number, so all four live here.
+        LDX.W #(KW_PEEK & $FFFF)
+        LDY.W #KW_PEEK_END - KW_PEEK
+        JSR MATCHKW
+        BCS FACTOR_PEEK
+        LDX.W #(KW_VAL & $FFFF)
+        LDY.W #KW_VAL_END - KW_VAL
+        JSR MATCHKW
+        BCS FACTOR_VAL
         LDX.W #(KW_ASC & $FFFF)
         LDY.W #KW_ASC_END - KW_ASC
         JSR MATCHKW
@@ -2226,6 +2436,54 @@ FACTOR_LEN:
         TAX
         SEP #$20
         RTS
+; PEEK(addr): the byte at a bank-zero address. The machine is sixteen banks
+; deep, but the tube, the I/O page and the program are all in the first one, and
+; that is the one a language this size keeps its promises about.
+FACTOR_PEEK:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        JSR EXPR
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        REP #$20
+        TXA
+        TAX
+        SEP #$20
+        LDA.L $000000,X         ; the bank is in the instruction, not in a
+                                ; register, whatever the data bank holds
+        REP #$20
+        STA ZP_A
+        LDA ZP_A
+        AND.W #$00FF
+        TAX
+        SEP #$20
+        RTS
+
+; VAL(s): the number the digits of a string begin with, a minus sign allowed and
+; anything else ending them. `VAL("12X")` is twelve, which is what the 1982
+; machine does with it too.
+FACTOR_VAL:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'('
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        JSR PARSE_STR
+        BCC FACTOR_MISMATCH
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #')'
+        BNE FACTOR_MISMATCH
+        JSR SRC_STEP
+        JSR STRNUM_VAL
+        RTS
+
 FACTOR_ASC:
         JSR SKIPSP
         LDA [ZP_SRC]
