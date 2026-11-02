@@ -1214,7 +1214,9 @@ PILOT_BANNER:
         .byte CC_CLS
         .text "*** KESTREL PILOT V1.0 ***"
         .byte 13
-        .text "A number writes a line, RUN runs it, LIST shows it."
+        .text "A number writes a line."
+        .byte 13
+        .text "RUN runs it, LIST shows it."
         .byte 13
         .text "T: A: M: Y: N: J: E: R: :LABEL"
         .byte 13, 13, 0
