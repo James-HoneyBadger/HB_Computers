@@ -306,39 +306,41 @@ fn arithmetic() {
     assert_eq!(run.regs().p & OVERFLOW, OVERFLOW);
 }
 
+/// A memory increment is as wide as the accumulator. It used to be forced to a
+/// byte here, on a comment that claimed the processor had no sixteen-bit `INC`;
+/// it has one, and the flags come from the whole word.
 #[test]
-fn memory_increments_are_bytes() {
-    // INC and DEC on memory are one byte wide even with a sixteen-bit
-    // accumulator, which is what sixteen-bit arithmetic written by hand relies
-    // on: the byte after the operand must not be touched.
-    let mut run = Run::new(ORIGIN, &[0xE6, 0x10]);
-    run.ram.poke(0x0010, 0xFF);
-    run.ram.poke(0x0011, 0x7E);
+fn memory_increments_follow_the_accumulator_width() {
+    // Sixteen-bit: $7EFF + 1 carries into the byte above it.
+    let mut run = Run::new(ORIGIN, &[0xEE, 0x00, 0x30]); // INC $3000
+    run.ram.poke(0x3000, 0xFF);
+    run.ram.poke(0x3001, 0x7E);
     run.step();
-    assert_eq!(run.ram.peek(0x0010), 0x00, "wrapped, not carried");
-    assert_eq!(run.ram.peek(0x0011), 0x7E);
+    assert_eq!(run.ram.peek(0x3000), 0x00);
+    assert_eq!(run.ram.peek(0x3001), 0x7F, "the carry went into the high byte");
 
-    let mut dec = Run::new(ORIGIN, &[0xC6, 0x10]);
-    dec.ram.poke(0x0010, 0x00);
-    dec.ram.poke(0x0011, 0x7E);
+    let mut dec = Run::new(ORIGIN, &[0xCE, 0x00, 0x30]); // DEC $3000
+    dec.ram.poke(0x3000, 0x00);
+    dec.ram.poke(0x3001, 0x01);
     dec.step();
-    assert_eq!(dec.ram.peek(0x0010), 0xFF);
-    assert_eq!(dec.ram.peek(0x0011), 0x7E);
-    // And it sets the flags from that byte, which is how a countdown loop ends.
-    assert_eq!(dec.regs().p & ZERO, 0);
-    assert_eq!(dec.regs().p & NEGATIVE, NEGATIVE);
+    assert_eq!(dec.ram.peek(0x3000), 0xFF);
+    assert_eq!(dec.ram.peek(0x3001), 0x00, "and the borrow came out of it");
 
-    let mut zeroed = Run::new(ORIGIN, &[0xC6, 0x10]);
-    zeroed.ram.poke(0x0010, 0x01);
-    zeroed.step();
-    assert_eq!(zeroed.regs().p & ZERO, ZERO);
+    // Eight-bit: one byte, and the byte above it untouched.
+    let mut byte = Run::new(ORIGIN, &[0xE6, 0x30]); // INC $30
+    byte.ram.poke(0x0030, 0xFF);
+    byte.ram.poke(0x0031, 0x7E);
+    byte.set(|r| r.p = MEMORY_8);
+    byte.step();
+    assert_eq!(byte.ram.peek(0x0030), 0x00);
+    assert_eq!(byte.ram.peek(0x0031), 0x7E, "nothing above the byte was touched");
+    assert_eq!(byte.regs().p & ZERO, ZERO);
 
-    // The accumulator forms do follow the M flag.
-    let mut wide = Run::new(ORIGIN, &[0x1A]);
+    // The accumulator forms follow M too, as they always did.
+    let mut wide = Run::new(ORIGIN, &[0x1A]); // INC A
     wide.set(|r| r.c = 0xFFFF);
     wide.step();
     assert_eq!(wide.regs().c, 0x0000);
-    assert_eq!(wide.regs().p & ZERO, ZERO);
 }
 
 #[test]

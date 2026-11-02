@@ -1155,19 +1155,23 @@ impl Cpu65816 {
                     };
                     self.set_acc(value);
                 } else {
-                    // A memory increment is one byte wide whatever the
-                    // accumulator is: the 65816 has no sixteen-bit INC, which is
-                    // what makes the hand-written sixteen-bit loops work. It
-                    // sets the flags from that byte, which is how a loop counts
-                    // down to zero.
-                    let old = self.read8(bus, ea);
+                    // A memory increment is as wide as the accumulator, like
+                    // everything else that reads and writes through M. This core
+                    // used to force it to a byte, on the belief that the chip had
+                    // no sixteen-bit INC; it has, and forcing the width set the
+                    // flags from the wrong half of the word.
+                    let old = self.read_data(bus, ea);
                     let value = if increment {
                         old.wrapping_add(1)
                     } else {
                         old.wrapping_sub(1)
                     };
-                    self.write8(bus, ea, value);
-                    self.set_zn8(value);
+                    self.write_data(bus, ea, value);
+                    if self.m8() {
+                        self.set_zn8(value as u8);
+                    } else {
+                        self.set_zn16(value);
+                    }
                 }
             }
             Op::Dex => {
