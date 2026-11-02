@@ -500,6 +500,11 @@ mod tests {
         );
         assert_eq!(image[32] & 1, 1, "sector zero is the header, and it is taken");
         assert_eq!(image[33], 0, "everything else is free");
+        assert_eq!(
+            &image[512..1024],
+            &[0u8; 512][..],
+            "sector one is an empty directory"
+        );
         let _ = std::fs::remove_file(&path);
     }
 

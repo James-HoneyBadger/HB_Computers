@@ -711,12 +711,23 @@ FMT_NAME:
         LDX #0
         LDY #DISK_WRITE
         JSR WRITESECT
+        BNE FMT_ERR
+        ; And an empty directory beside it: after the zeroing loop the buffer is
+        ; already sixteen empty entries, so it is the same buffer written to
+        ; sector 1.
+        LDX #1
+        LDY #DISK_WRITE
+        JSR WRITESECT
         BEQ FMT_OK
         LDA #1
         PLP
         RTS
 FMT_OK:
         LDA #0
+        PLP
+        RTS
+FMT_ERR:
+        LDA #1
         PLP
         RTS
 
