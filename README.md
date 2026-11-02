@@ -1,7 +1,6 @@
 # The Kestrel
 
-Two home computers from a 1982 that never happened, and the one emulator that
-runs both.
+Two home computers from an imagined 1982, and the emulator that runs both.
 
 - the **Kestrel** — a 6502 at 1 MHz, 32 KiB of RAM behind a banner that claims
   64K, a 40 × 25 tube, a disk measured in 256-byte sectors, an 8 KiB KERNAL and a
@@ -61,10 +60,10 @@ cargo build --release
 cargo test
 ```
 
-Ninety-seven tests: the two assemblers, the two processors, the bus and its
+One hundred tests: the two assemblers, the two processors, the bus and its
 devices, both machines booting their assemblers' ROMs and answering at the
-keyboard, every sample program in [samples/](samples), and the emulator's own
-front end.
+keyboard, every sample program in [samples/](samples), the socket ROM the
+command line can choose, and the emulator's own front end.
 
 `./start.sh` builds what is out of date and starts a machine:
 
@@ -92,26 +91,27 @@ vagrant ssh     # the tree is at /vagrant
 ```bash
 ./start.sh cli --model kestrel --type "PRINT 2+2"   # on a shell
 ./start.sh cli --model kestrel16 --frames 20        # the 1992 machine
-./start.sh                            # the window
-./start.sh --model kestrel16          # the 1992 machine's window
-./start.sh emu                                  # either machine, interactively
+./start.sh                            # the window, on the Kestrel
+./start.sh kestrel16                  # the window, on the Kestrel 16
+./start.sh emu                        # either machine, interactively
 ./start.sh cli --model kestrel --file samples/kestrel/02-sieve.bas --type RUN
 ```
 
 ## What is in the tree
 
 ```
-include/kestrel/          the machine, its devices, and the two models
-src/kestrel/              their implementations
-app/                      the window's main()
-tools/                    kestrel_asm, kestrel16_asm, the command line and the interactive emulator
-roms/kestrel/             the Kestrel's 6502 machine code
-roms/kestrel16/           the Kestrel 16's 65816 machine code
-samples/                  programs to type, run and learn from, and their expected output
-tests/                    one executable per suite, no external test framework
-docs/                     the five books
-start.sh                  build what is not built, then start a machine
-Vagrantfile               the same in a clean Ubuntu 22.04 build machine
+rust/                          the emulator and its tools, in five crates:
+  crates/kestrel-machine/        the machine: profiles, bus, devices, both processors, the ROMs
+  crates/kestrel-asm/            the 6502 assembler, as a library and as kestrel_asm
+  crates/kestrel16-asm/          the 65816 assembler, as a library and as kestrel16_asm
+  crates/kestrel-cli/            kestrel, the command line, and kestrel_emu, the session
+  crates/kestrel-app/            kestrel_computers, the window
+roms/kestrel/                  the Kestrel's 6502 machine code
+roms/kestrel16/                the Kestrel 16's 65816 machine code
+samples/                       programs to type, run and learn from, and their expected output
+docs/                          the manuals, the references and the machines' own books
+start.sh                       build what is out of date, then start a machine
+Vagrantfile                    the same in a clean Ubuntu 22.04 build machine
 ```
 
 ## The manuals

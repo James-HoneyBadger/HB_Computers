@@ -10,7 +10,7 @@ One emulator, two models, and two assemblers. Everything else is a ROM image.
                         /             \
               devices (shared)      the two processors
                                      /              \
-                            model1982 (6502)   model1992 (65816)
+                            Kestrel (6502)     Kestrel 16 (65816)
                                      \              /
                                 roms/kestrel   roms/kestrel16
                                      ^              ^
@@ -26,14 +26,16 @@ One emulator, two models, and two assemblers. Everything else is a ROM image.
 | `kestrel-cli` | `kestrel`, the command line, and `kestrel_emu`, the interactive emulator |
 | `kestrel-app` | `kestrel_computers`, the window, in egui |
 
-Apart from egui and the windowing it pulls in, there are no dependencies beyond
-the standard library.
+The machine, both assemblers and the command line depend on nothing but the
+standard library. The window adds `eframe` — egui and the platform glue it needs —
+and `image`, for the PNG a screenshot is written to.
 
 ## The machine
 
 `Machine` is built for a `Model`. The profile table in
-`rust/crates/kestrel-machine/src/profile.rs` says what that model is, and the bus decodes against
-it: RAM, the ROM windows, the cartridge, the tube's two arrays and the I/O page.
+`rust/crates/kestrel-machine/src/profile.rs` says what that model is, and
+`bus.rs` decodes against it: RAM, the ROM windows, the cartridge, the tube's two
+arrays and the I/O page.
 
 | File | Part |
 | --- | --- |
@@ -51,32 +53,30 @@ model has is ever stepped. A fault in one cannot show up as a fault in the other
 
 ### The two models
 
-| | `model1982` | `model1992` |
+| | Kestrel (1982) | Kestrel 16 (1992) |
 | --- | --- | --- |
-| Processor | 6502, 64 KiB | 65816, 16 MiB / 24-bit |
-| Screen | 40 x 25 at `$8000` | 80 x 50 at `$008000` |
-| I/O | `$8800` | `$A000` |
+| Processor | 6502, 64 KiB of address space | 65816, 16 MiB over 24 address lines |
+| Screen | 40 × 25 at `$8000` | 80 × 50 at `$00:8000` |
+| I/O | `$8800` | `$00:A000` |
 | Language | socket ROM at `$A000` | bank `$01` |
-| Disk | 512 x 256 | 4096 x 512 |
+| Disk | 512 sectors of 256 bytes | 4096 sectors of 512 bytes |
 
-Each model's map has exactly one home — `rust/crates/kestrel-machine/src/bus.rs` and
-`rust/crates/kestrel-machine/src/bus.rs` — and `roms/kestrel/kestrel.inc` and
-`roms/kestrel16/kestrel16.inc` repeat them for the ROMs. The pairs are changed
-together, in the same commit.
+Each model's numbers live in one place, `profile.rs`, and are decoded in one
+place, `bus.rs`; `roms/kestrel/kestrel.inc` and `roms/kestrel16/kestrel16.inc`
+repeat them for the ROMs. The three are changed together, in the same commit.
 
 ## The ROMs
 
 The languages are not Rust: they are `roms/kestrel/*.s` and `roms/kestrel16/*.s`,
-assembled at build time by `kestrel_asm` and `kestrel16_asm` into headers of
-bytes that the machine is given. A change to a ROM is a change to the machine,
-and the machine tests prove it by typing at the machine and reading the screen
-back.
+assembled when a machine starts by `kestrel_asm` and `kestrel16_asm` — once per
+process, in memory — and handed to the bus as bytes. There is no ROM build step,
+so a change to a `.s` file is in the next run and a test can never be run against
+yesterday's ROM. A change to a ROM is a change to the machine, and the machine
+tests prove it by typing at the machine and reading the screen back.
 
 ## The tests
 
 | Suite | What it proves |
-| --- | --- |
-| Where | Proves |
 | --- | --- |
 | `kestrel-asm` | The dialect the 6502 ROMs are written in |
 | `kestrel-machine`, `cpu6502` | The 6502: addressing, arithmetic, flags, cycles, interrupts |

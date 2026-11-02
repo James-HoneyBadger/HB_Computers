@@ -8,7 +8,8 @@
 // not the machine.
 //
 //   kestrel [--model kestrel|kestrel16] [--frames N] [--type "LINE"]...
-//           [--file PATH] [--roms DIR] [--no-screen]
+//           [--file PATH] [--rom basic|monitor] [--roms DIR] [--disk IMAGE]
+//           [--tape IMAGE] [--no-screen]
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -20,6 +21,7 @@ struct Options {
     model: Model,
     frames: i32,
     lines: Vec<String>,
+    rom: Option<String>,
     roms: Option<PathBuf>,
     screen: bool,
     disk: Option<PathBuf>,
@@ -29,18 +31,19 @@ struct Options {
 fn usage() {
     println!(
         "usage: kestrel [--model kestrel|kestrel16] [--frames N] [--type \"LINE\"]...\n\
-         \x20              [--file PATH] [--roms DIR] [--no-screen]\n\
+         \x20              [--file PATH] [--rom basic|monitor] [--roms DIR]\n\
+         \x20              [--disk IMAGE] [--tape IMAGE] [--no-screen]\n\
          \n\
          \x20 --model    which machine to power on (default kestrel)\n\
          \x20 --frames   frames to run before and after typing (default 40)\n\
          \x20 --type     a line to type at the machine; may be repeated\n\
          \x20 --file     a file of lines to type, one to a line\n\
-         \x20 --roms     where the assembled images are (default build/generated)\n\
+         \x20 --rom      which ROM to put in the Kestrel's socket: basic or monitor\n\
+         \x20 --roms     a directory of assembled images; without it the ROMs are\n\
+         \x20            assembled from roms/*.s when the machine starts\n\
          \x20 --disk     a disk image to put in the drive; it is written back at exit\n\
          \x20 --tape     a tape image to put in the deck\n\
-         \x20 --no-screen  run without printing the tube\n\
-         \n\
-         The images are assembled by the C++ build: run ./start.sh build first."
+         \x20 --no-screen  run without printing the tube"
     );
 }
 
@@ -49,6 +52,7 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
         model: Model::Kestrel,
         frames: 40,
         lines: Vec::new(),
+        rom: None,
         roms: None,
         screen: true,
         disk: None,
@@ -86,6 +90,7 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
                     .map_err(|error| format!("cannot read {path}: {error}"))?;
                 options.lines.extend(text.lines().map(str::to_string));
             }
+            "--rom" => options.rom = Some(value()?),
             "--roms" => options.roms = Some(PathBuf::from(value()?)),
             "--disk" => options.disk = Some(PathBuf::from(value()?)),
             "--tape" => options.tape = Some(PathBuf::from(value()?)),
@@ -110,6 +115,12 @@ fn run(options: &Options) -> Result<(), String> {
         None => machine
             .mount_assembled_roms()
             .map_err(|error| error.to_string())?,
+    }
+    if let Some(id) = &options.rom {
+        let image = socket_rom(options, id)?;
+        machine
+            .mount_basic(&image)
+            .map_err(|error| error.to_string())?;
     }
     machine.reset();
     if let Some(path) = &options.disk {
@@ -141,6 +152,42 @@ fn run(options: &Options) -> Result<(), String> {
             .map_err(|error| format!("{}: {error}", path.display()))?;
     }
     Ok(())
+}
+
+/// The image `--rom` asks for: the shipped file when `--roms` named a directory,
+/// the assembled one otherwise. The Kestrel 16's language is a bank, not a
+/// socket, so it has no choice to make.
+fn socket_rom(options: &Options, id: &str) -> Result<Vec<u8>, String> {
+    if options.model != Model::Kestrel {
+        return Err("the Kestrel 16's language ROM is a bank, not a socket".to_string());
+    }
+    if id == "basic" {
+        return match options.roms.as_deref() {
+            Some(root) => {
+                let path = root.join("kestrel").join("basic.bin");
+                std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))
+            }
+            None => kestrel_machine::roms::shipped(Model::Kestrel)
+                .map(|shipped| shipped.basic.clone())
+                .map_err(|error| error.clone()),
+        };
+    }
+    if id != "monitor" {
+        return Err(format!(
+            "no such ROM: {id}; the Kestrel has basic and monitor"
+        ));
+    }
+    match options.roms.as_deref() {
+        Some(root) => {
+            let path = root.join("kestrel").join("monitor.bin");
+            std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))
+        }
+        None => kestrel_machine::roms::shipped(Model::Kestrel)
+            .map_err(|error| error.clone())?
+            .monitor
+            .clone()
+            .ok_or_else(|| "the assembled images have no monitor".to_string()),
+    }
 }
 
 fn main() -> ExitCode {

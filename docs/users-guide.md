@@ -340,14 +340,14 @@ READY.
 ```
 
 The volume's own layout — header, directory, files — is in
-[the technical reference](technical-reference.md#kestrel-dos-1-0-on-the-disk).
+[the technical reference](technical-reference.md#kestrel-dos-10-on-the-disk).
 
 ---
 
 ## Kestrel 16 BASIC
 
-A line-oriented language with sixteen-bit integers. It is deliberately smaller
-than its predecessor, and honest about it:
+A line-oriented language with sixteen-bit integers, deliberately smaller than
+its predecessor:
 
 | Statement | Notes |
 | --- | --- |

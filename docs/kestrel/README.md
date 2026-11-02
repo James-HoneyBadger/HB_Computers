@@ -111,7 +111,7 @@ tube's business, and the window draws a muted set that suits a 1982 monitor.
 
 The processor resets through `$FFFC`, finds the KERNAL's reset routine, clears the
 screen, prints the banner and hands the machine to the ROM in the socket. The
-socket ROM prints `READY.` and waits for a line. `Ctrl+Q` leaves the machine on.
+socket ROM prints ``READY.` and waits for a line. In the window, `Ctrl+Q` closes it.
 
 **BREAK** is a non-maskable interrupt that warm-starts the machine: it abandons a
 running program, prints `READY.` and leaves the program in memory, ready to be
@@ -301,14 +301,13 @@ RUN
 838997
 ```
 
-Line 60 is the interesting one: when `I` passes ten, `I*I` is past the end of the
-array, and the loop runs no times at all rather than once with a subscript out of
-range — which is what `FOR` is for.
+Line 60 is the interesting one: once `I` passes ten, `I*I` is past the end of
+the array, and the loop runs no times at all rather than once with a subscript
+out of range.
 
-The prime line is one line because line 50 says `PRINT I;` and not `PRINT I`: a
+The primes share a line because line 50 is `PRINT I;` and not `PRINT I`: a
 trailing `;` leaves the cursor where it is, so the next number follows the last.
-That works at the prompt too, which is why `PRINT 5;` shows `5READY.` — the
-machine's prompt does not tidy up after you.
+The same holds at the prompt, where `PRINT 5;` prints `5READY.` on one line.
 
 ---
 
@@ -328,18 +327,17 @@ The other socket ROM. `HELP` is not in it; its own words are:
 It is how a machine-code program is written and run on the machine itself, and
 how the cassette is used at all: BASIC has no tape words.
 
-`S aaaa bbbb` takes the block from `aaaa` to `bbbb` *inclusive*, so
-`S 0900 0902` writes three bytes behind a four-byte header — the load address and
-the length — and `L` puts them back where they came from. Both words need a
-cassette in the deck: the window inserts one with **Media ▸ Tape ▸ Insert tape…**,
-and `kestrel --tape`
-takes an image, or hands the machine a blank one. With the drawer empty, `S` and
-`L` both say `no tape`.
+`S aaaa bbbb` takes the block from `aaaa` to `bbbb` *inclusive*, so `S 0900
+0902` writes three bytes behind a four-byte header — the load address and the
+length — and `L` puts them back where they came from. Both words need a cassette
+in the deck: the window inserts one with **Media ▸ Tape ▸ Insert tape…**, and
+`kestrel --tape` takes an image or hands the machine a blank one. With the deck
+empty, `S` and `L` both say `no tape`.
 
-`G aaaa` jumps to the address and an `RTS` there comes back to the prompt, so a
-routine can be deposited and tried. `R` prints the registers the frame interrupt
-last saw, which is what a monitor without a `BRK` vector of its own can honestly
-report.
+`G aaaa` jumps to the address; an `RTS` there returns to the prompt, so a routine
+can be deposited and tried. `R` prints the registers last seen by the frame
+interrupt — the only register dump a monitor without a `BRK` vector of its own
+can give.
 
 The socket holds one ROM at a time, and which one it is changes the machine: the
 **ROM socket** group on the settings window's **Machine** page swaps them and
@@ -349,14 +347,14 @@ cold-boots, and `kestrel --rom monitor` does the same from the command line.
 
 ## What the machine does not have
 
-The honest list, because a manual that hides it is worse than useless:
+The limits, stated plainly:
 
 - **no tape words in BASIC** — the cassette is the monitor's (see above);
 - **no `WHILE`, no procedures** — this is 1982 BASIC, and `GOSUB` is the idiom;
 - **no `MERGE`, no renumbering** — `DELETE` and retyping are the tools;
-- **no lowercase storage** — the machine echoes what is typed, and a program
-  lists back the way it was typed, but nothing folds a letter for you: keywords
-  are matched case-blind, so `print` is `PRINT`;
+- **no case folding** — keywords are matched without regard to case, so
+  `print` is `PRINT`; everything else is stored as typed, and a program lists
+  back in the case it was written in;
 - **one language at a time** — the socket holds one ROM, and changing it resets
   the machine.
 

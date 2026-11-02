@@ -69,13 +69,23 @@ fixed addresses, so a socket ROM reaches the machine with a `JSR`:
 | `$E012` | `SCROLL` | |
 | `$E015` | `LOCATE` | X = column, Y = row |
 | `$E018` | `GETLINE` | a line into `$0200`, its length in `$15` |
-| `$E01B` | `READSECT` | A/X = sector, buffer at `$06`/`$07` |
+| `$E01B` | `READSECT` | A/X = sector low/high, buffer at `$06`/`$07` |
 | `$E01E` | `WRITESECT` | the same three, the other way round |
 | `$E021` | `CURSORON` | A = `1` solid, `0` none |
+| `$E024` | `DOSCATALOG` | |
+| `$E027` | `DOSFIND` | the name at `$0710`; A = its entry, or `$FF` |
+| `$E02A` | `DOSLOAD` | `$18`/`$19` = where; comes back holding the end |
+| `$E02D` | `DOSSAVE` | from `$18`/`$19` to `$1B`/`$1C` |
+| `$E030` | `DOSDELETE` | the name at `$0710` |
+| `$E033` | `DOSSTATUS` | A = `0`, or an error code |
+| `$E036` | `DOSFORMAT` | a blank volume on the disk |
 
-The disk words and the four `DOS*` words beside them are in
-[the user guide](users-guide.md#kestrel-dos); their reason comes back in A:
-`0` fine, `1` no disk, `2` no such file, `3` no room, `4` the disk failed.
+The disk words return their reason in A: `0` fine, `1` no disk, `2` no such
+file, `3` no room, `4` the disk itself failed. The Kestrel 16's table is the
+same list at `$00:E000` with eleven more entries above `$E036` — ink, paper,
+sound, the frame counter, the top of memory, peek, poke, a waiting key, a
+newline and the two tape calls; [its owner's manual](kestrel16/README.md)
+gives the lot.
 
 ### Writing to the tube without the KERNAL
 
@@ -101,7 +111,7 @@ step or not use the KERNAL's printing afterwards.
 | --- | --- |
 | `$00` | RAM, the screen, the I/O page, the KERNAL at `$E000` |
 | `$01` | The language ROM, 64 KiB. This is where BASIC lives |
-| `$04`–`$07` | A cartridge: 8 KiB of ROM at `$C000` of each bank and RAM above |
+| `$04`–`$07` | A cartridge, when one is fitted: 64 KiB a bank, read-only. The same image also shows through an 8 KiB window at `$00:C000`–`$DFFF`. Writes still reach the RAM underneath |
 
 The KERNAL's services are a table of `JSR`/`RTL` entries at `$00:E000`, and the
 same list again at `$00:FF00` in four-byte entries — `JSL` and `RTL` — because a
@@ -169,13 +179,14 @@ source line side by side, and `--symbols` writes every label's address.
 ### The shape of it
 
 ```
-   kestrel (CLI)     kestrel_computers (window)     kestrel_emu
-            \        /                            /
-             kestrel-machine  <- machine.rs, bus.rs
-            /            \
-     devices (shared)    the two processors
-     devices.rs           cpu6502.rs
-                          cpu65816.rs
+   kestrel (CLI)   kestrel_emu (session)   kestrel_computers (window)
+          \               |                      /
+           \              |                     /
+                   kestrel-machine
+                   /            \
+        devices (shared)     the two processors
+          devices.rs          cpu6502.rs
+                              cpu65816.rs
 ```
 
 One library serves the three programs. The bus decodes against the profile; the
@@ -189,14 +200,20 @@ generic over its processor.
 
 | Call | Does |
 | --- | --- |
-| `Machine{Model::Kestrel}` | Power on: RAM cleared, video cleared, shipped ROMs mounted, processor reset |
-| `mountKernal(bytes, id)`, `mountBasic(bytes, id)`, `mountSocketRom(rom, id)` | Put a ROM in, refusing a wrong-sized image |
-| `setSpeed(Speed)`, `runCycles(n)`, `runFrames(n)` | Pace and run |
-| `type(key)`, `typeText(s)`, `typeLine(s)`, `pressBreak()` | The host's hands |
-| `screenText()`, `screenLine(r)`, `cursorColumn()`, `frameCounter()` | Reading the machine back |
-| `cpu6502()`, `cpu65816()` | The processor, as the model's own type |
-| `video()`, `keyboard()`, `disk()`, `tape()` | The devices, for a host that needs them |
-| `onSound` | Called when the ROM writes the sound latch, so the host can beep |
+| `Machine::new(model)` | Power on the bus and the model's processor, with the ROM sockets empty |
+| `mount_assembled_roms()`, `mount_shipped_roms(dir)` | Put the ROMs in; a wrongly sized image is refused, never padded |
+| `mount_kernal(bytes)`, `mount_basic(bytes)` | Replace one image |
+| `reset()` | Take the reset vector, with the ROMs already in place |
+| `run_cycles(n)`, `run_frames(n)` | Pace and run |
+| `type_key(k)`, `type_text(s)`, `type_line(s)`, `type_line_paced(s)` | The host's hands; the paced form waits for the keyboard buffer |
+| `press_break()` | The BREAK line, as a non-maskable interrupt |
+| `screen_text()`, `screen_line(row)` | The tube read back as text |
+| `instructions()`, `cycles()` | Counters, for a host that shows them |
+| `bus.video`, `bus.keyboard`, `bus.disk`, `bus.tape` | The devices themselves |
+| `bus.notes_played` | Counts every write to the sound latch, which is what a host watches to make a noise |
+
+Speed is not in the API: the host decides how many cycles to hand the machine,
+which is what makes `Machine::run_cycles` the whole of pacing.
 
 Nothing above draws anything for the machine: the host's whole job is to run the
 processor, feed the keyboard and read the screen. A host that started painting on
@@ -253,10 +270,10 @@ A test of a ROM is a keystroke going in and characters coming out of the screen.
 That is deliberate: a test that called a ROM routine from Rust would prove the
 routine runs, not that the machine works.
 
-Two of them are stronger than that. The assemblers' output is compared byte for
-byte with the images the machine boots, and the same sample programs the
-documentation uses are run through the emulator and checked against their
-`.expected` files.
+Two of them are stronger than that. The assembler suites compare assembled bytes
+against hand-written expectations, mode by mode and width by width, and the
+sample suite types every program in `samples/` at the machine it was written for
+and compares the screen with the `.expected` file beside it.
 
 ## The build
 

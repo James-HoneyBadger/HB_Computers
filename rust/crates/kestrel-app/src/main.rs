@@ -25,8 +25,9 @@ use eframe::egui::{
 use kestrel_machine::machine::Machine;
 use kestrel_machine::profile::{profile_of, Model};
 
-/// The machines' sixteen colours, as the C++ window's palette has them.
-const PALETTE: [Color32; 16] = [
+/// The Kestrel's sixteen colours. Its attribute byte holds two of them: ink in
+/// the high nibble, paper in the low.
+const PALETTE_1982: [Color32; 16] = [
     Color32::from_rgb(0x00, 0x00, 0x00), // black
     Color32::from_rgb(0xFF, 0xFF, 0xFF), // white
     Color32::from_rgb(0x9F, 0x3B, 0x3B), // red
@@ -44,6 +45,35 @@ const PALETTE: [Color32; 16] = [
     Color32::from_rgb(0x7A, 0x8B, 0xD9), // light blue
     Color32::from_rgb(0xC4, 0xC4, 0xC4), // light grey
 ];
+
+/// The Kestrel 16's sixteen colours, which are a different set of codes: bit 0
+/// blue, bit 1 red, bit 2 green, bit 3 brightness. Muted to suit the decade.
+const PALETTE_1992: [Color32; 16] = [
+    Color32::from_rgb(0x00, 0x00, 0x00), // black
+    Color32::from_rgb(0x2E, 0x4F, 0xA8), // blue
+    Color32::from_rgb(0xA8, 0x30, 0x38), // red
+    Color32::from_rgb(0xA8, 0x40, 0x9C), // magenta
+    Color32::from_rgb(0x2F, 0x9B, 0x52), // green
+    Color32::from_rgb(0x2E, 0x9B, 0xA8), // cyan
+    Color32::from_rgb(0xA8, 0x9A, 0x32), // yellow
+    Color32::from_rgb(0xB0, 0xB0, 0xB0), // light grey
+    Color32::from_rgb(0x4C, 0x4C, 0x4C), // dark grey
+    Color32::from_rgb(0x5A, 0x74, 0xD8), // light blue
+    Color32::from_rgb(0xD8, 0x6A, 0x6A), // light red
+    Color32::from_rgb(0xD0, 0x78, 0xC0), // light magenta
+    Color32::from_rgb(0x6F, 0xC8, 0x8A), // light green
+    Color32::from_rgb(0x6F, 0xC8, 0xD0), // light cyan
+    Color32::from_rgb(0xD8, 0xCC, 0x7A), // light yellow
+    Color32::from_rgb(0xF0, 0xF0, 0xF0), // white
+];
+
+/// The colours the machine in the window draws with.
+fn palette(model: Model) -> &'static [Color32; 16] {
+    match model {
+        Model::Kestrel => &PALETTE_1982,
+        Model::Kestrel16 => &PALETTE_1992,
+    }
+}
 
 // The window's own colours: a dark bench that stays out of the tube's way.
 const BG: Color32 = Color32::from_rgb(0x0E, 0x10, 0x15);
@@ -1219,15 +1249,17 @@ impl App {
         });
         group(ui, "Palette", |ui| {
             ui.horizontal(|ui| {
-                for (index, colour) in PALETTE.iter().enumerate() {
+                for (index, colour) in palette(self.machine.model()).iter().enumerate() {
                     swatch(ui, *colour, index);
                 }
             });
             ui.add_space(4.0);
             ui.label(
-                RichText::new("The machines' sixteen colours, one ink and one paper to a cell.")
-                    .small()
-                    .color(MUTED),
+                RichText::new(
+                    "This machine's sixteen colour codes, one ink and one paper to a cell.",
+                )
+                .small()
+                .color(MUTED),
             );
         });
     }
@@ -1611,6 +1643,7 @@ impl App {
         ui.vertical_centered(|ui| {
             let (rect, _) = ui.allocate_exact_size(outer, egui::Sense::hover());
             let painter = ui.painter_at(rect);
+            let colours = palette(self.machine.model());
 
             // The case: a dark bezel, a hairline where the light catches it.
             painter.rect_filled(rect, CornerRadius::same(14), BEZEL);
@@ -1631,12 +1664,12 @@ impl App {
             // The ring the machine itself paints, in its own border colour.
             let ring = rect.shrink(bezel);
             if self.settings.show_border {
-                let colour = PALETTE[(self.machine.bus.border & 0x0F) as usize];
+                let colour = colours[(self.machine.bus.border & 0x0F) as usize];
                 painter.rect_filled(ring, CornerRadius::same(3), colour);
             }
 
             let screen_rect = ring.shrink(border);
-            painter.rect_filled(screen_rect, 0.0, PALETTE[0]);
+            painter.rect_filled(screen_rect, 0.0, colours[0]);
             let cells = painter.with_clip_rect(screen_rect);
 
             for row in 0..rows {
@@ -1659,8 +1692,8 @@ impl App {
                         origin,
                         egui::vec2((end - column) as f32 * cell_width, cell_height),
                     );
-                    let paper = PALETTE[(attribute & 0x0F) as usize];
-                    let ink = PALETTE[(attribute >> 4) as usize];
+                    let paper = colours[(attribute & 0x0F) as usize];
+                    let ink = colours[(attribute >> 4) as usize];
                     cells.rect_filled(span, 0.0, paper);
                     let text: String = (column..end)
                         .map(|index| {
@@ -1693,7 +1726,7 @@ impl App {
                     cells.rect_filled(
                         Rect::from_min_size(origin, egui::vec2(cell_width, cell_height)),
                         0.0,
-                        PALETTE[(attribute >> 4) as usize],
+                        colours[(attribute >> 4) as usize],
                     );
                 }
             }

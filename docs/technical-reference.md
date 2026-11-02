@@ -2,15 +2,17 @@
 
 The machines as a programmer meets them: the memory maps, the registers, the
 formats on the media, the way the processors behave, and the order in which the
-bus answers. Every table here is written against the sources named beside it, and
-the maps exist twice on purpose — once in Rust for the emulator, once in assembly
-for the ROMs — so the two are changed together.
+bus answers. Every table here is written against the sources named beside it.
+The maps exist in two languages on purpose — in Rust for the emulator, in
+assembly for the ROMs — so both are changed together.
 
 | Fact | Written in |
 | --- | --- |
 | The 1982 map and registers | `rust/crates/kestrel-machine/src/bus.rs`, `roms/kestrel/kestrel.inc` |
 | The 1992 map and registers | `rust/crates/kestrel-machine/src/bus.rs`, `roms/kestrel16/kestrel16.inc` |
-| The profile table, the decode, the devices | `src/kestrel/machine.rs`, `rust/crates/kestrel-machine/src/devices.rs` |
+| The profile table | `rust/crates/kestrel-machine/src/profile.rs` |
+| The decode and the I/O page | `rust/crates/kestrel-machine/src/bus.rs` |
+| The devices | `rust/crates/kestrel-machine/src/devices.rs` |
 | The processors | `rust/crates/kestrel-machine/src/cpu6502.rs`, `cpu65816.rs` |
 
 ---
@@ -35,20 +37,20 @@ for the ROMs — so the two are changed together.
 
 ## The two profiles
 
-Everything that differs between the machines is one table, `makeProfile` in
-`src/kestrel/machine.rs`. Nothing else in the emulator knows which machine it
-is running.
+Everything that differs between the machines is two constants, `KESTREL` and
+`KESTREL16`, in `rust/crates/kestrel-machine/src/profile.rs`. Nothing else in the
+emulator knows which machine it is running.
 
 | | Kestrel | Kestrel 16 |
 | --- | --- | --- |
 | Clock | 1 000 000 Hz | 8 000 000 Hz |
 | Frame rate | 50 Hz | 50 Hz |
 | Cycles a frame | 20 000 | 160 000 |
-| RAM | 32 KiB (`$0000`–`$7FFF`) | 1 MiB, banks `$00`, `$08`–`$0F` |
+| RAM | 32 KiB (`$0000`–`$7FFF`) | 1 MiB over banks `$00`–`$0F`; ROM and I/O stand in front of parts of `$00` and `$01` |
 | Screen | 40 × 25 at `$8000` | 80 × 50 at `$00:8000` |
 | Attributes | 1000 bytes at `$8400` | 4000 bytes at `$00:8FA0` |
 | I/O page | `$8800`, 256 bytes | `$00:A000`, 256 bytes |
-| Cartridge | 4 KiB at `$9000` | 8 KiB at `$00:C000`, RAM in `$04`–`$07` |
+| Cartridge | a 4 KiB image at `$9000` | a 128 KiB image, at `$00:C000`–`$DFFF` and in banks `$04`–`$07` |
 | KERNAL | 8 KiB at `$E000` | 8 KiB at `$00:E000` |
 | Language | 16 KiB at `$A000` | 64 KiB in bank `$01` |
 | Disk | 512 × 256 bytes | 4096 × 512 bytes |
@@ -165,8 +167,11 @@ whole of the choice.
 | `2` | red | `6` | blue | `10` | light red | `14` | light blue |
 | `3` | cyan | `7` | yellow | `11` | dark grey | `15` | light grey |
 
-**The Kestrel 16.** Sixteen codes packed the other way round: bits 0–2 are the
-gun strengths and bit 3 is brightness.
+**The Kestrel 16.** Sixteen codes in a second encoding: bit 0 is blue, bit 1
+red, bit 2 green — a set bit is a gun at full strength — and bit 3 is brightness.
+Seven is therefore light grey and eight dark grey, where the Kestrel's seven is
+yellow and its eight is orange. The numbering is the machine's; the window maps
+each model's codes to its own palette.
 
 | Code | | Code | | Code | | Code | |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -181,8 +186,8 @@ that suits each machine's decade.
 ## The bus, and the order it answers in
 
 A read or a write is decoded in one order, and the order matters where regions
-abut. `Machine::read` and `Machine::write` in `src/kestrel/machine.rs` are the
-whole of it.
+abut. `Bus::read` and `Bus::write` in `rust/crates/kestrel-machine/src/bus.rs`
+are the whole of it.
 
 **The Kestrel**, in order:
 
@@ -228,15 +233,16 @@ memory, abandons what was running, and puts the prompt back. Both KERNALs clear
 the interrupt-disable flag on the way in, so a machine that has just been
 interrupted can read its keyboard again.
 
-A frame is 20 000 cycles on the Kestrel and 160 000 on the Kestrel 16: 1 MHz and
-8 MHz divided by 50. The command line's `--frames N` counts these; `--speed`
-chooses how fast the host runs them.
+A frame is 20 000 cycles on the Kestrel and 160 000 on the Kestrel 16 — 1 MHz
+and 8 MHz divided by 50. The command line's `--frames N` says how many to run;
+the window's speed setting decides how fast the host paces them, and the ROM
+cannot tell the difference.
 
 ## The keyboard
 
 Both machines have a controller: a queue the ROM drains through the I/O page. A
-key is queued by the host with `Machine::type`, read with a read of `$00`, and its
-arrival announced by `$01`. The buffers hold sixteen keys on the Kestrel and
+key is queued by the host with `Machine::type_key`, read with a read of `$00`, and
+its arrival announced by `$01`. The buffers hold sixteen keys on the Kestrel and
 thirty-two on the Kestrel 16, which is a real limit: a pasted line can overflow
 it and lose the Return.
 
@@ -261,7 +267,7 @@ which is why a program that saves a file exercises the ROM rather than the host.
 | Sectors | 512 | 4096 |
 | Bytes a sector | 256 | 512 |
 | Volume size | 131 072 bytes | 2 097 152 bytes |
-| Image extension | `.dsk` | `.dsk` |
+| Usual image name | `*.dsk` | `*.dsk` |
 | Fresh volume's name | `KESWARP` | — |
 
 A disk image of any other size is refused when mounted.
@@ -321,12 +327,14 @@ services at `$00:E054` and `$00:E057`.
 
 Each assembler writes an image of bytes from its `.s` file, and the machine is
 given those bytes and nothing else. The programs assemble them when they start,
-so there is no separate build for a ROM; `kestrel_asm` and `kestrel16_asm` will
-also write one to a file with `--bin`, which is what a cartridge or a socket ROM
-of your own is made with. The Kestrel's socket takes one of `basic` or `monitor` —
-the **ROM socket** group on the window's **Machine** page — and changing it
-cold-boots the machine,
-because the reset vector in the new image is where the processor starts.
+so there is no separate build for a ROM. `kestrel_asm` and `kestrel16_asm` will
+also write an image to a file with `--bin`, which is how a cartridge or a socket
+ROM of your own is made.
+
+The Kestrel's socket takes one of `basic` or `monitor`. It is changed from the
+**ROM socket** group on the window's **Machine** page, or with `--rom` on the
+command line, and either way the machine cold-boots: the reset vector is in the
+new image, and that is where the processor starts.
 
 The reset vector is `$FFFC` on the Kestrel. On the Kestrel 16 the processor reads
 its vectors from the top of bank zero, and leaves reset in emulation mode; the
@@ -360,8 +368,8 @@ been wrong about them before:
 - **`BRA` has no inverse.** A branch that cannot reach becomes a `JMP`, not an
   inverse branch over one.
 
-`illegalOpcodes()` and `lastIllegalOpcode()` report what a machine fetched that
-it could not execute, which is how a runaway ROM is caught in a test.
+`illegal_opcodes()` and `last_illegal_opcode()` report what a machine fetched
+that it could not execute, which is how a runaway ROM is caught in a test.
 
 ## Kestrel BASIC's numbers
 

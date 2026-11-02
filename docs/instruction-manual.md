@@ -57,7 +57,7 @@ Or, with the start script in the root of the tree:
 ```
 
 `./start.sh` keeps the machine's output clean: the build is silent unless it
-fails, and its log is in `build/start.log`.
+fails, and everything it builds lands in `rust/target/release`.
 
 **In a virtual machine.** The tree carries a `Vagrantfile` that makes an Ubuntu
 22.04 build machine, installs the tools, and builds and tests everything:
@@ -118,7 +118,7 @@ Letters arrive as typed, upper or lower. The Kestrel's BASIC is case-blind about
 keywords, so `print 2+2` and `PRINT 2+2` are the same statement, and a program
 typed in lower case lists back the way it was typed.
 
-`Ctrl+Q` closes the window, which is the polite way to leave a machine on.
+`Ctrl+Q` closes the window.
 
 ## The window
 
@@ -186,16 +186,19 @@ set to; what is on the disk and the tape is the media's business.
 **Disks.** A disk image is the volume's sectors and nothing else — `131072`
 bytes for the Kestrel (512 × 256), `2097152` for the Kestrel 16 (4096 × 512).
 An image of any other size is refused, because half a disk is a worse lie than
-no disk. A freshly formatted volume is named `KESWARP` on the Kestrel; BASIC has
-no `FORMAT`, so the disk arrives formatted and is formatted again from **Media ▸
-Floppy disk ▸ Format disk**, or from the disk page of the settings.
+no disk. The 1982 machine's `FORMAT` names a fresh volume `KESWARP`; the 1992
+one leaves the name blank until a way to pass one exists. Either can be formatted
+again from **Media ▸ Floppy disk ▸ Format disk**, or from the disk page of the
+settings.
 
 **Tape.** The cassette is a byte stream with a play head. The Kestrel's BASIC has
-no tape words: the monitor ROM's `S` and `L` are what write and read it. The
-Kestrel 16 has the registers and no block format yet.
+no tape words: the monitor ROM's `S` and `L` write and read blocks of memory.
+The Kestrel 16's `CSAVE` and `CLOAD` move the program store as named blocks with
+a length and a check byte.
 
-**Cartridge.** A 4 KiB image fitted at `$9000` on the Kestrel, 8 KiB at `$00:C000`
-on the Kestrel 16 (with four banks of cartridge RAM above it).
+**Cartridge.** A 4 KiB image at `$9000` on the Kestrel. On the Kestrel 16 the
+image is 128 KiB, and the machine shows it twice: through an 8 KiB window at
+`$00:C000`–`$DFFF`, and across banks `$04`–`$07`.
 
 **The ROM socket.** The Kestrel's language socket takes one 16 KiB image at a
 time: Kestrel BASIC, or the monitor ROM. Which one is in it changes the machine,

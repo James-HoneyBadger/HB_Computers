@@ -13,7 +13,7 @@ needs and nothing else.
 ```bash
 cd roms/kestrel                 # .include is resolved from the working directory
 kestrel_asm basic.s --name basic --origin $A000 --size 16384 \
-             --bin ../../build/basic.bin --listing basic.lst --symbols basic.sym
+             --bin /tmp/basic.bin --listing /tmp/basic.lst --symbols /tmp/basic.sym
 ```
 
 The origin may be written in hex with `$`, in hex with `0x`, or in decimal, and
@@ -26,7 +26,7 @@ the same goes for every number in the source.
 | `--size` | The size of the image; the rest is filled |
 | `--fill` | The fill byte, `$FF` for an erased EPROM by default |
 | `--bin` | Write the image |
-| `--header` | Write a C header of the bytes, for a host that wants them as C |
+| `--header` | Write a C++ header of the bytes, for a host that includes them |
 | `--symbols` | Write every label's address |
 | `--listing` | Write the listing: addresses, bytes and source |
 
@@ -64,7 +64,7 @@ work.
 ```bash
 cd roms/kestrel16
 kestrel16_asm basic.s --name basic --origin 0x10000 --size 65536 \
-               --bin ../../build/basic16.bin
+               --bin /tmp/basic16.bin
 ```
 
 An origin may be twenty-four bits, so a ROM can be a bank of its own.
@@ -130,13 +130,18 @@ READY.
 | Option | Meaning |
 | --- | --- |
 | `--model kestrel\|kestrel16` | Which machine to power on; `kestrel` by default |
-| `--frames N` | How many frames to run before the screen is printed |
-| `--speed 1\|2\|4\|8\|turbo` | How fast the host clocks it; `turbo` by default |
+| `--frames N` | Frames to run before typing and again after it (default 40) |
 | `--type "LINE"` | Type a line at the prompt and let the machine answer; may be repeated |
-| `--file FILE` | Type every line of a file, in order, before any `--type` lines |
-| `--rom ID` | Which ROM to put in the 1982 machine's socket: `basic`, `monitor` |
-| `--tape FILE` | Insert this cassette image; the machine gets a blank one otherwise |
+| `--file FILE` | Type every line of a file, in order, before any `--type` line |
+| `--rom basic\|monitor` | Which ROM is in the Kestrel's socket (see below) |
+| `--roms DIR` | Load the assembled images from `DIR` instead of assembling them |
+| `--disk IMAGE` | Put a volume in the drive; it is written back when the run ends |
+| `--tape IMAGE` | Put a cassette in the deck; the machine gets a blank one otherwise |
 | `--no-screen` | Print nothing |
+
+There is no `--speed`: the command line runs a fixed number of frames rather
+than a wall clock, so the pace is not a variable. The window is where speed
+means something.
 
 The machine types at the speed it could be typed at: a key goes in only when the
 keyboard controller has room for it, and each line waits for the buffer to empty
@@ -173,11 +178,10 @@ are sitting at.
 ```
 
 ```text
-Which machine?
-  1  Kestrel      (6502, 1982)
-  2  Kestrel 16   (65816, 1992)
-> 2
-Kestrel 16 powered on. /help lists the commands; a line without a
+which machine?
+  1  Kestrel (1982, BASIC V2.0 in the socket)
+  2  Kestrel 16 (1992)   [1] 2
+kestrel_emu: Kestrel 16 powered on. /help lists the commands; a line without a
 leading / is typed at the machine.
 +--------------------------------------------------------------------------------+
 |KESTREL 16 BASIC 2.0|
@@ -202,13 +206,16 @@ the machine, a key at a time and at the speed the machine could be typed at.
 | Command | Does |
 | --- | --- |
 | `/model kestrel\|kestrel16` | power that machine on. A different model is a different machine, so it is a cold boot |
-| `/speed 1\|2\|4\|8\|turbo` | how fast the host clocks it |
+| `/speed 1\|2\|4\|8\|turbo` | noted and reported; a session runs frames, not a clock |
 | `/frames N` | frames to run after each line typed (default 20) |
 | `/run [N]` | run N frames (default 50) |
 | `/break` | the BREAK key |
 | `/rom basic\|monitor` | which ROM is in the Kestrel's socket |
+| `/disk [FILE]` | mount a volume, or write the one in the drive back to its file |
+| `/tape [FILE]` | insert a cassette, or write the one in the deck back to its file |
 | `/screen` | draw the tube |
 | `/status` | clock, frame, cycles |
+| `/help` | the command list |
 | `/quit` | leave |
 
 The tube is drawn without its blank tail, since a terminal is not a 40 × 25
@@ -219,11 +226,11 @@ noise when nobody is watching.
 | Option | Meaning |
 | --- | --- |
 | `--model` | which machine; asked for when there is a keyboard and no flag |
-| `--speed` | as above |
-| `--frames` | as above |
-| `--rom` | as above |
+| `--speed` | noted for the session; a session runs frames, not a clock |
+| `--frames` | frames run after each line typed |
+| `--rom basic\|monitor` | which ROM is in the Kestrel's socket |
+| `--roms DIR` | images to load from disk instead of assembling the ROMs |
 | `--type "LINE"` | type a line before the prompt appears; may be repeated |
-| `--file FILE` | type every line of a file, in order |
 
 ---
 
@@ -242,7 +249,7 @@ with a lamp for each piece of hardware. `Settings` -- `F12` -- opens a second
 window shaped after WinUAE's: a tree of properties down the left, the chosen
 page in groups on the right, and `OK`, `Cancel` and `Reset` along the foot. It
 sets the machine, the clock, the ROM and the cartridge, the disk and the tape,
-the zoom and the sound; `Ctrl+Q` leaves the machine on.
+the zoom and the sound; `Ctrl+Q` closes the window.
 
 ---
 
@@ -250,7 +257,7 @@ the zoom and the sound; `Ctrl+Q` leaves the machine on.
 
 ```bash
 cd rust
-cargo build --release    # the three programs, in rust/target/release
+cargo build --release    # the five programs, in rust/target/release
 cargo test               # every suite
 ```
 

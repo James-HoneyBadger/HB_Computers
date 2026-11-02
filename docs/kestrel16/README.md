@@ -45,20 +45,23 @@ rather than one page. Bank zero keeps the shape the Kestrel had.
 | `$00` | `$8FA0`–`$9F3F` | One attribute byte per cell |
 | `$00` | `$A000`–`$A0FF` | The I/O page |
 | `$00` | `$A100`–`$BFFF` | Nothing responds: reads are zero, writes are lost |
-| `$00` | `$C000`–`$DFFF` | Cartridge ROM, 8 KiB |
-| `$00` | `$E000`–`$FFFF` | The KERNAL |
-| `$01` | `$0000`–`$FFFF` | The language ROM |
-| `$04`–`$07` | | A cartridge, 256 KiB |
+| `$00` | `$C000`–`$DFFF` | The cartridge's first 8 KiB, in a window |
+| `$00` | `$E000`–`$FFFF` | The KERNAL, with its vectors at the top |
+| `$01` | `$0000`–`$FFFF` | The language ROM, whole |
 | `$02` | | RAM: the filesystem's header, directory and one sector's buffer |
-| `$03` | | RAM: the language's strings and arrays, in a bank of their own |
+| `$03` | | RAM: the language's strings, its array table and heap, and its `DEF FN` texts |
+| `$04`–`$07` | | The cartridge image, when one is fitted; RAM when none is |
 | `$08`–`$0F` | | RAM |
-| `$04`–`$07` | | RAM too, when no cartridge is fitted |
 
-A megabyte is all sixteen banks; what the table above lists as ROM, cartridge and
-I/O is what stands in front of it.
+A megabyte is all sixteen banks; what the table lists as ROM, cartridge and I/O
+stands in front of it. The cartridge itself is one 128 KiB image, and it appears
+in two places at once: the eight kilobytes at `$00:C000`–`$DFFF`, and the whole
+of it across banks `$04` and `$05`, with `$06` and `$07` reading `$FF` beyond
+the end of the image. Writes to either place are lost.
 
-The map is written twice — `rust/crates/kestrel-machine/src/bus.rs` for the emulator
-and `roms/kestrel16/kestrel16.inc` for the ROMs — and the two are changed
+The map is written three times — `rust/crates/kestrel-machine/src/bus.rs` for the
+decode, `rust/crates/kestrel-machine/src/profile.rs` for the sizes and addresses,
+and `roms/kestrel16/kestrel16.inc` for the ROMs — and the three are changed
 together.
 
 ### The I/O page
@@ -128,15 +131,15 @@ a table at `$00:E000`, which is what a caller in bank zero uses:
 | `$E030` | `DOSDELETE` — A = a name; its sectors go back to the free map |
 | `$E033` | `DOSSTATUS` — `0` when the disk controller is content |
 | `$E036` | `DOSFORMAT` — write a new volume over whatever is on the disk |
-| `$E039` | `SETINK` |
-| `$E03C` | `SETPAPER` |
-| `$E03F` | `SOUND` |
-| `$E042` | `FRAMES` — the frame counter |
+| `$E039` | `SETINK` — A = a colour code |
+| `$E03C` | `SETPAPER` — A = a colour code |
+| `$E03F` | `SOUND` — A = the note the latch plays |
+| `$E042` | `FRAMES` — the frame counter: A = its low byte, X = its high byte |
 | `$E045` | `MEMTOP` — X = `$7F00`, the first byte above the free RAM |
-| `$E048` | `PEEKBYTE` — A = bank, X = address |
+| `$E048` | `PEEKBYTE` — A = bank, X = address; returns the byte in A |
 | `$E04B` | `POKEBYTE` — A = bank, X = address, Y = value |
-| `$E04E` | `GETKEY` |
-| `$E051` | `NEWLINE` |
+| `$E04E` | `GETKEY` — as `CHRIN`: the next key, waiting |
+| `$E051` | `NEWLINE` — end the line, scrolling if the tube is full |
 | `$E054` | `TAPESAVE` — A = a name; the program store goes onto the cassette as one more block |
 | `$E057` | `TAPELOAD` — A = a name; the first block of that name on the cassette becomes the program store |
 
@@ -264,9 +267,9 @@ RUN
 DONE
 ```
 
-### What it does not do yet
+### What it does not do
 
-The honest list, because a manual that hides it is worse than useless:
+The limits, stated plainly:
 
 - **loops that span lines belong in a program** — a loop typed at the prompt runs
   only as far as the end of its line, because each new line starts with no loops

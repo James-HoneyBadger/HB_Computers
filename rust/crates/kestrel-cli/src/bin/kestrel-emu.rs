@@ -185,13 +185,16 @@ impl Emulator {
 fn help(frames: i32) {
     println!(
         "  /model kestrel|kestrel16   power on that machine (cold boot)\n\
-         \x20 /speed 1|2|4|8|turbo      how fast the host clocks it\n\
+         \x20 /speed 1|2|4|8|turbo      noted; a session runs frames, not a clock\n\
          \x20 /frames N                 frames run after each line (now {frames})\n\
-         \x20 /run [N]                  run N frames\n\
+         \x20 /run [N]                  run N frames (default 50)\n\
          \x20 /break                    the BREAK key\n\
          \x20 /rom basic|monitor        the Kestrel's socket ROM\n\
+         \x20 /disk [FILE]              mount a volume, or write the one in the drive back\n\
+         \x20 /tape [FILE]              insert a cassette, or write the one in the deck back\n\
          \x20 /screen                   draw the tube\n\
          \x20 /status                   clock, frame, cycles\n\
+         \x20 /help                     this list\n\
          \x20 /quit                     leave\n\
          anything else is typed at the machine"
     );
@@ -320,12 +323,14 @@ fn ask_which_machine() -> Model {
 fn usage() {
     println!(
         "usage: kestrel-emu [--model kestrel|kestrel16] [--speed 1|2|4|8|turbo]\n\
-         \x20                  [--frames N] [--type \"LINE\"]... [--roms DIR]\n\
+         \x20                  [--frames N] [--type \"LINE\"]... [--rom basic|monitor]\n\
+         \x20                  [--roms DIR]\n\
          \n\
          \x20 --model   which machine to power on; without it, it asks\n\
-         \x20 --speed   how fast the host clocks it\n\
+         \x20 --speed   noted for the session; a session runs frames, not a clock\n\
          \x20 --frames  frames run after each line typed (default 20)\n\
          \x20 --type    a line to type before the session starts; may be repeated\n\
+         \x20 --rom     which ROM is in the Kestrel's socket: basic or monitor\n\
          \x20 --roms    images to load from disk instead of assembling the ROMs\n\
          \n\
          Inside a session, a line beginning with / is a command: /help lists them."
@@ -338,6 +343,7 @@ fn main() -> ExitCode {
     let mut frames = 20;
     let mut lines: Vec<String> = Vec::new();
     let mut images_arg: Option<PathBuf> = None;
+    let mut rom: Option<String> = None;
 
     let mut index = 0;
     while index < arguments.len() {
@@ -374,6 +380,13 @@ fn main() -> ExitCode {
             "--speed" => {
                 let _ = value(&mut index);
             }
+            "--rom" => match value(&mut index) {
+                Some(id) => rom = Some(id),
+                None => {
+                    eprintln!("kestrel_emu: --rom needs a name");
+                    return ExitCode::from(2);
+                }
+            },
             "--roms" => images_arg = value(&mut index).map(PathBuf::from),
             "--help" | "-h" => {
                 usage();
@@ -405,6 +418,12 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
+    if let Some(id) = &rom {
+        if let Err(message) = emulator.mount_socket_rom(id) {
+            eprintln!("kestrel_emu: {message}");
+            return ExitCode::from(2);
+        }
+    }
     for line in &lines {
         emulator.type_line(line);
     }
