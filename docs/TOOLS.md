@@ -232,14 +232,17 @@ noise when nobody is watching.
 The same machines with a tube you can watch and a keyboard you can use.
 
 ```bash
-./start.sh                    # the Kestrel
-./start.sh --model kestrel16  # the Kestrel 16
-./start.sh --shot tube.png    # photograph it and exit, for CI
+./start.sh                 # the Kestrel
+./start.sh kestrel16       # the Kestrel 16
+./start.sh window --shot tube.png   # photograph it and exit, for CI
 ```
 
-The window offers the machine's speed, its ROM socket and cartridge (on the 1982
-machine, which has them), and its disk and cassette. `Ctrl+Q` leaves the machine
-on.
+The window is the machine on a bench: the tube, a menu bar, and a status line
+with a lamp for each piece of hardware. `Settings` -- `F12` -- opens a second
+window shaped after WinUAE's: a tree of properties down the left, the chosen
+page in groups on the right, and `OK`, `Cancel` and `Reset` along the foot. It
+sets the machine, the clock, the ROM and the cartridge, the disk and the tape,
+the zoom and the sound; `Ctrl+Q` leaves the machine on.
 
 ---
 

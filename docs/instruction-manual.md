@@ -122,22 +122,64 @@ typed in lower case lists back the way it was typed.
 
 ## The window
 
+The window is the machine on a bench: the tube in the middle, a menu bar above
+it, and a status line below it that says what is fitted — the clock, the frame,
+the cycle count, and a lamp each for the disk, the tape and the cartridge.
+
 | Menu | What it holds |
 | --- | --- |
-| **Machine ▸ Speed** | 1, 2, 4 or 8 MHz, or as fast as this computer. The machines come up at their own clock: 1 MHz for the Kestrel, 8 MHz for the Kestrel 16 |
-| **Machine ▸ ROM socket** | (Kestrel only) which ROM is in the language socket; changing it cold-boots the machine |
-| **Machine ▸ Cartridge** | fit an expansion image — 4 KiB on the Kestrel, 8 KiB on the Kestrel 16 — or eject it |
-| **Machine ▸ BREAK** | the warm start, on the `Pause` key |
-| **Machine ▸ Sound** | whether the host makes the beep the sound latch asks for |
-| **Media ▸ Mount disk image…** | a `.dsk` volume |
-| **Media ▸ Save disk image…** | write the current volume back to a file |
-| **Media ▸ Format disk** | a blank volume, named `KESWARP` |
-| **Media ▸ Insert tape… / Save tape… / Eject tape** | cassette images |
-| **Help ▸ Commands** | the command list, the same one `HELP` prints |
+| **Machine** | reset, BREAK, pause, and a fresh build of the ROMs |
+| **Media ▸ Floppy disk / Tape / Cartridge** | mount, save, format and eject, without opening the settings |
+| **Settings ▸ Settings…** | the settings window, on `F12` or `Ctrl+,` |
+| **Settings ▸ Save / Load configuration…** | the switches as a small text file |
+| **View** | zoom, the border colour, the cursor, and a screenshot |
+| **Help ▸ Commands** | the command list for the machine that is running |
+
+The window is shaped after WinUAE, which is where an emulator's front end has
+settled: the settings are a **sheet of their own**, opened over the machine, and
+the machine stands still while its switches are out.
+
+| Key | Does |
+| --- | --- |
+| `F12`, `Ctrl+,` | open and close the settings |
+| `Esc` | close the settings, putting everything back |
+| `Ctrl+R` | reset the machine |
+| `Ctrl+P` | pause and resume |
+| `Ctrl+Q` | quit |
+
+### The settings sheet
+
+A tree of properties down the left, the chosen page on the right, and `OK`,
+`Cancel` and `Reset` along the foot. A page is a set of groups: labelled boxes,
+one for each thing being set.
+
+| Page | What it sets |
+| --- | --- |
+| **Quickstart** | which machine, with its own clock, in one click |
+| **Machine** | what the machine is made of, and (Kestrel only) which ROM is in the language socket |
+| **CPU & speed** | 1, 2, 4 or 8 MHz, or as fast as this computer |
+| **ROM** | where the ROM images are read from, and a rebuild |
+| **Cartridge** | the expansion cartridge, its size and where it sits |
+| **Floppy disk** | the volume, its name and size, and mount, save, format, eject |
+| **Tape** | the cassette's state and length, and insert, save, rewind, eject |
+| **Display** | zoom, the border colour, the cursor, and the sixteen colours |
+| **Sound** | whether the host makes the beep the sound latch asks for |
+| **About** | the version, the keys, and what a dropped file becomes |
+
+`OK` applies the page — a different machine is powered on, which loses whatever
+was in memory. `Cancel` puts every switch back as it was. `Media` actions take
+effect at once, because a disk is hardware and not a setting.
 
 Speed is a convenience, not a disguise: the processor is the same one at any
 setting, and a program that depends on timing only works at the machine's own
 clock.
+
+### Configurations
+
+**Settings ▸ Save configuration…** writes the switches as `name=value` lines —
+the machine, the speed, the zoom, the border, the cursor and the sound — and
+**Load configuration…** reads them back. A configuration says what the bench is
+set to; what is on the disk and the tape is the media's business.
 
 ## Media
 
@@ -146,7 +188,7 @@ bytes for the Kestrel (512 × 256), `2097152` for the Kestrel 16 (4096 × 512).
 An image of any other size is refused, because half a disk is a worse lie than
 no disk. A freshly formatted volume is named `KESWARP` on the Kestrel; BASIC has
 no `FORMAT`, so the disk arrives formatted and is formatted again from **Media ▸
-Format disk**.
+Floppy disk ▸ Format disk**, or from the disk page of the settings.
 
 **Tape.** The cassette is a byte stream with a play head. The Kestrel's BASIC has
 no tape words: the monitor ROM's `S` and `L` are what write and read it. The

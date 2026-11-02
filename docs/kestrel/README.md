@@ -186,8 +186,8 @@ time (see `$0C`–`$11` above). Everything above that is Kestrel DOS, in the KER
 - **Sector 3 onwards** hold files: 252 bytes of data, a pointer to the next
   sector, and how much of this one is used.
 - A freshly formatted volume is named `KESWARP`. BASIC has no `FORMAT`; the disk
-  arrives formatted and is formatted again from the window's **Media ▸ Format
-  disk**.
+  arrives formatted and is formatted again from the window's **Media ▸ Floppy
+  disk ▸ Format disk**.
 
 From BASIC: `SAVE "NAME"`, `LOAD "NAME"`, `CATALOG`, and `DELETE` removes a line
 rather than a file. `CATALOG` lists the volume; a file that will not load reports
@@ -331,7 +331,8 @@ how the cassette is used at all: BASIC has no tape words.
 `S aaaa bbbb` takes the block from `aaaa` to `bbbb` *inclusive*, so
 `S 0900 0902` writes three bytes behind a four-byte header — the load address and
 the length — and `L` puts them back where they came from. Both words need a
-cassette in the deck: the window inserts one with **Media ▸ Insert tape…**, and `kestrel --tape`
+cassette in the deck: the window inserts one with **Media ▸ Tape ▸ Insert tape…**,
+and `kestrel --tape`
 takes an image, or hands the machine a blank one. With the drawer empty, `S` and
 `L` both say `no tape`.
 
@@ -341,8 +342,8 @@ last saw, which is what a monitor without a `BRK` vector of its own can honestly
 report.
 
 The socket holds one ROM at a time, and which one it is changes the machine: the
-window's **ROM** menu swaps them and cold-boots, and `kestrel --rom monitor` does
-the same from the command line.
+**ROM socket** group on the settings window's **Machine** page swaps them and
+cold-boots, and `kestrel --rom monitor` does the same from the command line.
 
 ---
 

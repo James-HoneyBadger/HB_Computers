@@ -324,7 +324,8 @@ given those bytes and nothing else. The programs assemble them when they start,
 so there is no separate build for a ROM; `kestrel_asm` and `kestrel16_asm` will
 also write one to a file with `--bin`, which is what a cartridge or a socket ROM
 of your own is made with. The Kestrel's socket takes one of `basic` or `monitor` —
-**Machine ▸ ROM socket** in the window — and changing it cold-boots the machine,
+the **ROM socket** group on the window's **Machine** page — and changing it
+cold-boots the machine,
 because the reset vector in the new image is where the processor starts.
 
 The reset vector is `$FFFC` on the Kestrel. On the Kestrel 16 the processor reads
