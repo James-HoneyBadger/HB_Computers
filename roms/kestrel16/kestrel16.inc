@@ -19,6 +19,7 @@ KEYBUF          = $000300
 KEYBUF_SIZE     = 32
 LINEBUF         = $000500
 PROGSTART       = $000800
+PROG_LIMIT      = $007E00       ; the program may not grow past here
 RAMTOP          = $007F00
 
 ; The tube: 80 x 50 cells, then one attribute byte each.
@@ -121,6 +122,33 @@ ZP_SCRATCH2     = $27
 ZP_SCRATCH3     = $28
 ZP_MUL1         = $29           ; 16-bit scratch, for the cursor arithmetic
 ZP_MUL2         = $2B
+
+; The filesystem's own direct page, above the language's. It has one because it
+; is the only part of the machine that is neither the KERNAL nor a language: it
+; has to keep pointers alive across calls to CHROUT, which is allowed to use
+; every register the processor has.
+ZP_DOSNM        = $66           ; 24-bit: the name the call is about, in bank zero
+ZP_DOSFIRST     = $69           ; 16-bit: the first sector of the file DOSFIND found
+ZP_DOSCOUNT     = $6B           ; 16-bit: the sectors it occupies, or the allocator's need
+ZP_DOSIDX       = $6D           ; 16-bit: the directory entry under the head
+ZP_DOSLEN       = $6F           ; 16-bit: bytes: a file's length, or a program's
+ZP_DOSLEFT      = $71           ; 16-bit: a count that runs down
+ZP_DOSSRC       = $73           ; 24-bit: where a move reads
+ZP_DOSDST       = $76           ; 24-bit: where it writes
+ZP_DOSSEC       = $79           ; 16-bit: the sector under the head
+ZP_DOSSIZE      = $7B           ; 16-bit: how much of it this pass moves
+ZP_DOSSCAN      = $7D           ; 16-bit: a sector the allocator is looking at
+ZP_DOSOFF       = $7F           ; 16-bit: an offset into the directory
+ZP_DOSCUR       = $81           ; 16-bit: an offset into whatever is being printed
+ZP_DOSFLAG      = $83           ; a byte: what the last look found
+ZP_DOSPTR       = $84           ; 24-bit: the buffer the filesystem is looking at
+ZP_DOSBANK      = $87           ; a byte: the bank it was looking in
+
+; The program store, which the language and the filesystem both walk: records
+; from PROGSTART, a zero number at the end, and the address of that zero number
+; in BASIC's ZP_PROGTOP -- which the DOS writes when it loads a program, so the
+; language knows where its own program ends.
+PROG_TOP        = $50           ; 16-bit, the same word BASIC calls ZP_PROGTOP
 
 ; The KERNAL's jump table: every service is a fixed address, which is how the
 ; language bank, and any program a person writes, reaches the machine.

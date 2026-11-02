@@ -701,10 +701,11 @@ FMT_NAME:
         LDA #$10
         STA [ZP_PTR],Y
 
-        ; Sector 0 is the header itself and the directory has not been written
-        ; yet, so a freshly formatted volume is free except for sector 0.
+        ; Sector 0 is the header and sector 1 is the directory: both are the
+        ; system's, so both are taken before a file can be given anything, and
+        ; everything else is free.
         LDY #32
-        LDA #%00000001
+        LDA #%00000011
         STA [ZP_PTR],Y
 
         ; Write it out, and say whether the controller agreed.
@@ -752,68 +753,1054 @@ DOSSTATUS:
         PLP
         RTS
 
-; The other services are not written yet, and say so rather than guessing.
+; ---------------------------------------------------------------------------
+; Kestrel DOS 2.0
+;
+; Two sectors of system area, then whatever the free map says is free:
+;
+;   sector 0        "HBDOS20", the volume's name, its sector count, the free map
+;   sector 1        sixteen entries of thirty-two bytes
+;   sector 2 up     file data, whole sectors
+;
+; A file is a run of consecutive sectors, so an entry is a name, where the run
+; starts and how many sectors it is: there is nothing chained and nothing to
+; follow, and one sector of buffer reads any file there is. The 1982 DOS had to
+; chain its sectors because a 1982 file was a stream of bytes; here the files
+; are a program store, and its sectors are written and read in order.
+;
+; The free map is one bit per sector, set when the sector is free. It runs from
+; offset 32 to the end of the header -- 480 bytes, 3840 bits -- so the top 256
+; sectors of the volume have no bit and are never allocated.
+;
+; Every entry below leaves the accumulator eight bits wide and the index
+; registers sixteen, as the KERNAL does, and returns a status in A: zero for
+; what was asked for, and one of DOS_MISSING, DOS_IO or DOS_FULL for what was
+; not.
+; ---------------------------------------------------------------------------
+
+DOS_BANK        = 2             ; the RAM the filesystem works in: nobody else's
+DOS_HDRBUF      = $020000       ; sector 0, the volume header
+DOS_DIRBUF      = $020200       ; sector 1, the directory
+DOS_SECBUF      = $020400       ; one file sector, on its way in or out
+DOS_HDR_LO      = DOS_HDRBUF & $FFFF
+DOS_DIR_LO      = DOS_DIRBUF & $FFFF
+DOS_SEC_LO      = DOS_SECBUF & $FFFF
+
+DOS_ENTRIES     = 16
+DOS_ENTRY_SIZE  = 32
+DOS_NAME_LEN    = 16
+DOS_ENT_FIRST   = 16
+DOS_ENT_COUNT   = 18
+DOS_NAME_OFF    = 8             ; where the volume's name starts in the header
+DOS_MAP_OFFSET  = 32            ; and where the free map does
+DOS_MAP_SECTORS = 3840          ; the sectors the map has a bit for
+DOS_FIRST_DATA  = 2             ; 0 and 1 belong to the system
+DOS_SECTOR_SIZE = 512
+
+DOS_OK          = 0
+DOS_MISSING     = 1             ; no such file
+DOS_IO          = 2             ; the controller would not
+DOS_FULL        = 3             ; no room in the directory or on the volume
+
+; ---------------------------------------------------------------------------
+; The buffers, and the one place a sector pointer is set
+; ---------------------------------------------------------------------------
+
+; DOS_POINT: X = a buffer's address in bank two, ZP_DOSPTR = that buffer. X is
+; left alone, so a caller can keep its own index in it.
+DOS_POINT:
+        REP #$20
+        TXA
+        STA ZP_DOSPTR
+        SEP #$20
+        LDA #DOS_BANK
+        STA ZP_DOSPTR+2
+        REP #$10
+        RTS
+
+; DOS_MOVE: the sector in ZP_DOSSEC goes to or from the buffer in ZP_DOSPTR.
+; Y = DISK_READ or DISK_WRITE. A = the controller's status.
+;
+; The machine's own pointer is set here, from the filesystem's, every time:
+; ZP_PTR is what CHROUT and PRINT move, and a read after a catalogue would
+; otherwise land somewhere nobody asked for.
+DOS_MOVE:
+        PHP
+        SEP #$20
+        REP #$10
+        LDA ZP_DOSPTR
+        STA ZP_PTR
+        LDA ZP_DOSPTR+1
+        STA ZP_PTR+1
+        LDA ZP_DOSPTR+2
+        STA ZP_PTR+2
+        LDX ZP_DOSSEC
+        JSR SECTMOVE            ; Y still holds the command
+        ; SECTMOVE ends with PLP, so the flags here are ours: compare the status
+        ; rather than trusting a branch flag from inside it.
+        CMP #0
+        PLP
+        RTS
+
+DOS_RDHDR:
+        LDX #DOS_HDR_LO
+        JSR DOS_POINT
+        REP #$20
+        STZ ZP_DOSSEC
+        SEP #$20
+        LDY #DISK_READ
+        JMP DOS_MOVE
+
+DOS_WRHDR:
+        LDX #DOS_HDR_LO
+        JSR DOS_POINT
+        REP #$20
+        STZ ZP_DOSSEC
+        SEP #$20
+        LDY #DISK_WRITE
+        JMP DOS_MOVE
+
+DOS_RDDIR:
+        LDX #DOS_DIR_LO
+        JSR DOS_POINT
+        REP #$20
+        LDA.W #1
+        STA ZP_DOSSEC
+        SEP #$20
+        LDY #DISK_READ
+        JMP DOS_MOVE
+
+DOS_WRDIR:
+        LDX #DOS_DIR_LO
+        JSR DOS_POINT
+        REP #$20
+        LDA.W #1
+        STA ZP_DOSSEC
+        SEP #$20
+        LDY #DISK_WRITE
+        JMP DOS_MOVE
+
+; DOS_RDSEC / DOS_WRSEC: the sector in ZP_DOSSEC, into or out of DOS_SECBUF.
+DOS_RDSEC:
+        LDX #DOS_SEC_LO
+        JSR DOS_POINT
+        LDY #DISK_READ
+        JMP DOS_MOVE
+
+DOS_WRSEC:
+        LDX #DOS_SEC_LO
+        JSR DOS_POINT
+        LDY #DISK_WRITE
+        JMP DOS_MOVE
+
+; ---------------------------------------------------------------------------
+; The free map
+; ---------------------------------------------------------------------------
+
+; DOS_MAPADDR: X = a sector, ZP_DOSPTR = its byte in the free map and
+; ZP_DOSFLAG = its bit. X comes back as the bit's number, so a caller that wants
+; the sector again has to keep it somewhere else.
+DOS_MAPADDR:
+        REP #$20
+        TXA
+        LSR A
+        LSR A
+        LSR A
+        CLC
+        ADC.W #(DOS_HDR_LO+DOS_MAP_OFFSET)
+        STA ZP_DOSPTR
+        SEP #$20
+        LDA #DOS_BANK
+        STA ZP_DOSPTR+2
+        REP #$20
+        TXA
+        AND.W #7
+        TAX
+        SEP #$20
+        LDA.L DOS_MAPBITS,X
+        STA ZP_DOSFLAG
+        REP #$10
+        RTS
+
+DOS_MAPBITS:
+        .byte 1, 2, 4, 8, 16, 32, 64, 128
+
+; DOS_MAPTEST: X = a sector. Carry set when the map says it is free.
+DOS_MAPTEST:
+        JSR DOS_MAPADDR
+        LDA [ZP_DOSPTR]
+        AND ZP_DOSFLAG
+        REP #$10
+        BEQ MAPTEST_TAKEN
+        SEC
+        RTS
+MAPTEST_TAKEN:
+        CLC
+        RTS
+
+; DOS_MAPSET: X = a sector, which the map now says is taken.
+DOS_MAPSET:
+        JSR DOS_MAPADDR
+        LDA [ZP_DOSPTR]
+        ORA ZP_DOSFLAG
+        STA [ZP_DOSPTR]
+        REP #$10
+        RTS
+
+; DOS_MAPFREE: X = a sector, which the map now says is free.
+DOS_MAPFREE:
+        JSR DOS_MAPADDR
+        LDA ZP_DOSFLAG
+        EOR #$FF
+        STA ZP_DOSFLAG          ; now the bit to clear
+        LDA [ZP_DOSPTR]
+        AND ZP_DOSFLAG
+        STA [ZP_DOSPTR]
+        REP #$10
+        RTS
+
+; DOS_ALLOCRUN: ZP_DOSCOUNT = how many sectors in a row are wanted. The first of
+; them comes back in ZP_DOSFIRST, all of them are marked taken, and carry is set
+; when the volume has no such run.
+;
+; A run rather than a chain to keep the reading of a file to one sector at a
+; time, and consecutive rather than scattered so that a file is never in more
+; pieces than a volume needs.
+DOS_ALLOCRUN:
+        REP #$20
+        LDA.W #DOS_FIRST_DATA
+        STA ZP_DOSSCAN
+ALLOC_TRY:
+        ; The width is set here and not only at the entry: the scan below runs in
+        ; eight-bit arithmetic, and the branch back to this label arrives with it.
+        ; A `CMP.W` read in eight-bit mode takes two bytes, not three, and leaves
+        ; the processor executing the middle of the instruction after it.
+        REP #$20
+        ; the run has to end where the map still has a bit for it
+        LDA ZP_DOSSCAN
+        CLC
+        ADC ZP_DOSCOUNT
+        CMP.W #DOS_MAP_SECTORS
+        BCS ALLOC_FULL
+        LDA ZP_DOSCOUNT
+        STA ZP_DOSLEFT
+        LDX ZP_DOSSCAN
+        SEP #$20
+ALLOC_SCAN:
+        JSR DOS_MAPTEST
+        BCC ALLOC_NEXT
+        INX
+        REP #$20
+        LDA ZP_DOSLEFT
+        DEC A
+        STA ZP_DOSLEFT
+        BEQ ALLOC_FOUND
+        SEP #$20
+        BRA ALLOC_SCAN
+ALLOC_NEXT:
+        REP #$20
+        LDA ZP_DOSSCAN
+        INC A
+        STA ZP_DOSSCAN
+        SEP #$20
+        BRA ALLOC_TRY
+ALLOC_FOUND:
+        ; X is one past the run: walk it from the bottom and mark it taken
+        TXA
+        SEC
+        SBC ZP_DOSCOUNT
+        STA ZP_DOSFIRST
+        STA ZP_DOSSCAN
+        LDA ZP_DOSCOUNT
+        STA ZP_DOSLEFT
+        SEP #$20
+ALLOC_MARK:
+        REP #$20
+        LDA ZP_DOSLEFT
+        BEQ ALLOC_DONE
+        DEC A
+        STA ZP_DOSLEFT
+        SEP #$20
+        LDX ZP_DOSSCAN
+        JSR DOS_MAPSET
+        REP #$20
+        LDA ZP_DOSSCAN
+        INC A
+        STA ZP_DOSSCAN
+        SEP #$20
+        BRA ALLOC_MARK
+ALLOC_DONE:
+        LDA #DOS_OK
+        CLC
+        RTS
+ALLOC_FULL:
+        SEP #$20
+        LDA #DOS_FULL
+        SEC
+        RTS
+
+; DOS_FREERUN: X = a sector, ZP_DOSCOUNT = how many run from it; their bits go
+; back to free.
+DOS_FREERUN:
+        REP #$20
+        TXA
+        STA ZP_DOSSCAN
+        LDA ZP_DOSCOUNT
+        STA ZP_DOSLEFT
+        SEP #$20
+FREERUN_LOOP:
+        REP #$20
+        LDA ZP_DOSLEFT
+        BEQ FREERUN_DONE
+        DEC A
+        STA ZP_DOSLEFT
+        SEP #$20
+        LDX ZP_DOSSCAN
+        JSR DOS_MAPFREE
+        REP #$20
+        LDA ZP_DOSSCAN
+        INC A
+        STA ZP_DOSSCAN
+        SEP #$20
+        BRA FREERUN_LOOP
+FREERUN_DONE:
+        SEP #$20
+        RTS
+
+; ---------------------------------------------------------------------------
+; The directory
+; ---------------------------------------------------------------------------
+
+; DOS_ENTRYADDR: X = an entry's number, ZP_DOSPTR = the entry in DOS_DIRBUF.
+DOS_ENTRYADDR:
+        REP #$20
+        TXA
+        ASL A
+        ASL A
+        ASL A
+        ASL A
+        ASL A                   ; thirty-two bytes an entry
+        CLC
+        ADC.W #DOS_DIR_LO
+        STA ZP_DOSPTR
+        SEP #$20
+        LDA #DOS_BANK
+        STA ZP_DOSPTR+2
+        REP #$10
+        RTS
+
+; DOS_FINDSLOT: the first entry with nothing in it, in X; carry set when all
+; sixteen are taken.
+DOS_FINDSLOT:
+        REP #$10
+        LDX #0
+FINDSLOT_LOOP:
+        CPX.W #DOS_ENTRIES
+        BCS FINDSLOT_NONE
+        JSR DOS_ENTRYADDR
+        LDY #0
+        LDA [ZP_DOSPTR],Y
+        BEQ FINDSLOT_YES
+        INX
+        BRA FINDSLOT_LOOP
+FINDSLOT_NONE:
+        SEC
+        RTS
+FINDSLOT_YES:
+        CLC
+        RTS
+
+; DOS_FINDINNER: the directory is already in DOS_DIRBUF. Finds the name in
+; ZP_DOSNM: X = its entry, ZP_DOSFIRST and ZP_DOSCOUNT as the entry has them,
+; and carry clear. Carry set when no entry has that name.
+DOS_FINDINNER:
+        REP #$10
+        LDX #0
+FINDINNER_LOOP:
+        CPX.W #DOS_ENTRIES
+        BCS FINDINNER_NONE
+        JSR DOS_ENTRYADDR
+        LDY #0
+        LDA [ZP_DOSPTR],Y
+        BEQ FINDINNER_NEXT
+FINDINNER_CMP:
+        LDA [ZP_DOSPTR],Y
+        STA ZP_DOSFLAG
+        LDA [ZP_DOSNM],Y
+        CMP ZP_DOSFLAG
+        BNE FINDINNER_NEXT
+        INY
+        CPY.W #DOS_NAME_LEN
+        BNE FINDINNER_CMP
+        LDY #DOS_ENT_FIRST
+        LDA [ZP_DOSPTR],Y
+        STA ZP_DOSFIRST
+        INY
+        LDA [ZP_DOSPTR],Y
+        STA ZP_DOSFIRST+1
+        LDY #DOS_ENT_COUNT
+        LDA [ZP_DOSPTR],Y
+        STA ZP_DOSCOUNT
+        INY
+        LDA [ZP_DOSPTR],Y
+        STA ZP_DOSCOUNT+1
+        CLC
+        RTS
+FINDINNER_NEXT:
+        INX
+        BRA FINDINNER_LOOP
+FINDINNER_NONE:
+        SEC
+        RTS
+
+; DOS_CLEARENTRY: X = an entry's number, all thirty-two bytes set to zero, which
+; is what an entry with nothing in it is.
+DOS_CLEARENTRY:
+        JSR DOS_ENTRYADDR
+        LDY #0
+        LDA #0
+CLEARENTRY_LOOP:
+        STA [ZP_DOSPTR],Y
+        INY
+        CPY.W #DOS_ENTRY_SIZE
+        BNE CLEARENTRY_LOOP
+        RTS
+
+; ---------------------------------------------------------------------------
+; The program store
+; ---------------------------------------------------------------------------
+
+; DOS_PROGSIZE: ZP_DOSLEN = the length of the program store in bytes, the zero
+; number that ends it included. Carry is set when the walk reached the end of the
+; program area without meeting one.
+;
+; This is prog.inc's walk, in this bank because the filesystem is here and the
+; language is not: a record is a two-byte number, the text, and a zero, and the
+; zero number ends the store.
+DOS_PROGSIZE:
+        REP #$20
+        LDA.W #PROGSTART
+        STA ZP_DOSSRC
+        SEP #$20
+        STZ ZP_DOSSRC+2         ; the store is in bank zero
+        REP #$10
+PROGSIZE_LOOP:
+        LDY #0
+        LDA [ZP_DOSSRC],Y
+        BNE PROGSIZE_TEXT
+        INY
+        LDA [ZP_DOSSRC],Y
+        BNE PROGSIZE_TEXT
+        ; the end: the terminator is part of the file
+        REP #$20
+        LDA ZP_DOSSRC
+        SEC
+        SBC.W #PROGSTART
+        CLC
+        ADC.W #2
+        STA ZP_DOSLEN
+        SEP #$20
+        CLC
+        RTS
+PROGSIZE_TEXT:
+        ; the text: from two bytes in, until its terminator. Walked with the
+        ; pointer rather than an index so that a store with no terminator in it
+        ; stops at the end of the program area instead of running off the bank.
+        REP #$20
+        LDA ZP_DOSSRC
+        CLC
+        ADC.W #2
+        STA ZP_DOSSRC
+        SEP #$20
+PROGSIZE_TEXT_LOOP:
+        LDA [ZP_DOSSRC]
+        BEQ PROGSIZE_NEXT
+        INC ZP_DOSSRC
+        REP #$20
+        LDA ZP_DOSSRC
+        CMP.W #PROG_LIMIT
+        BCS PROGSIZE_FULL
+        SEP #$20
+        BRA PROGSIZE_TEXT_LOOP
+PROGSIZE_NEXT:
+        INC ZP_DOSSRC           ; past the text's terminator: the next record
+        REP #$20
+        LDA ZP_DOSSRC
+        CMP.W #(PROG_LIMIT-2)   ; the terminator still has to fit
+        BCS PROGSIZE_FULL
+        SEP #$20
+        BRA PROGSIZE_LOOP
+PROGSIZE_FULL:
+        SEP #$20
+        SEC
+        RTS
+
+; DOS_SECTORS: ZP_DOSLEN bytes fill how many sectors? The answer goes in
+; ZP_DOSCOUNT. Nothing here is ever empty: a program holds at least the two bytes
+; of its terminator, so a length of zero is a mistake rather than a small file.
+DOS_SECTORS:
+        REP #$20
+        LDA ZP_DOSLEN
+        BEQ DOS_SECTORS_NONE
+        CLC
+        ADC.W #(DOS_SECTOR_SIZE-1)
+        LSR A
+        LSR A
+        LSR A
+        LSR A
+        LSR A
+        LSR A
+        LSR A
+        LSR A
+        LSR A
+        STA ZP_DOSCOUNT
+        SEP #$20
+        RTS
+DOS_SECTORS_NONE:
+        STA ZP_DOSCOUNT
+        SEP #$20
+        RTS
+
+; ---------------------------------------------------------------------------
+; Printing, while a pointer has to survive it
+; ---------------------------------------------------------------------------
+
+; DOS_SAY: X = the address of a zero-terminated text in this bank, printed with a
+; newline after it.
+DOS_SAY:
+        PHP
+        REP #$20
+        TXA
+        STA ZP_DOSPTR
+        LDA.W #0
+        STA ZP_DOSCUR
+        SEP #$20
+        STZ ZP_DOSPTR+2         ; the texts are in the KERNAL's own bank
+DOS_SAY_LOOP:
+        REP #$10
+        LDY ZP_DOSCUR
+        LDA [ZP_DOSPTR],Y
+        BEQ DOS_SAY_DONE
+        JSR CHROUT
+        SEP #$20
+        REP #$10
+        REP #$20
+        LDA ZP_DOSCUR
+        INC A
+        STA ZP_DOSCUR
+        SEP #$20
+        BRA DOS_SAY_LOOP
+DOS_SAY_DONE:
+        JSR NEWLINE
+        PLP
+        RTS
+
+; DOS_PUTC: print the byte at ZP_DOSPTR, ZP_DOSCUR bytes in, and step on. The
+; offset lives in memory because CHROUT is allowed to use every register, and a
+; line that scrolls the screen takes them all.
+DOS_PUTC:
+        REP #$10
+        LDY ZP_DOSCUR
+        LDA [ZP_DOSPTR],Y
+        JSR CHROUT
+        SEP #$20
+        REP #$10
+        REP #$20
+        LDA ZP_DOSCUR
+        INC A
+        STA ZP_DOSCUR
+        SEP #$20
+        RTS
+
+; ---------------------------------------------------------------------------
+; CATALOG: the volume's name, and a line for each file there is.
+; ---------------------------------------------------------------------------
+
 DOSCATALOG:
         PHP
         SEP #$20
         REP #$10
-        ; The line starts before the read: `[` goes out first, and only then is the
-        ; buffer pointer set, because CHROUT moves ZP_PTR as it prints.
+        JSR DOS_RDHDR
+        CMP #0
+        BNE CAT_IOERR
+        JSR DOS_RDDIR
+        CMP #0
+        BNE CAT_IOERR
+
+        ; the volume's name, in brackets, all sixteen bytes of it
         LDA #'['
         JSR CHROUT
+        LDX #(DOS_HDR_LO+DOS_NAME_OFF)
+        JSR DOS_POINT
+        REP #$20
+        LDA.W #0
+        STA ZP_DOSCUR
         SEP #$20
-        REP #$10
-        LDA #2
-        STA ZP_PTR+2
-        STZ ZP_PTR
-        STZ ZP_PTR+1
-        LDX #0
-        LDY #DISK_READ
-        ; The sector routines end with PLP, so the flags that come back are the
-        ; caller's, not the status: compare before branching on it.
-        JSR READSECT
-        CMP #0
-        BEQ CAT_OK
-        ; A read that fails says so, with the controller's code, rather than
-        ; printing half a line as though all were well.
-        PHA
-        LDA #'?'
-        JSR CHROUT
-        PLA
-        CLC
-        ADC #'0'
-        JSR CHROUT
-        JSR NEWLINE
-        LDA #1
-        PLP
-        RTS
-CAT_OK:
-        LDY #8
-        LDX #0
-CAT_NAME:
-        LDA [ZP_PTR],Y
-        JSR CHROUT
-        INY
-        INX
-        CPX #16
-        BNE CAT_NAME
+CAT_VOLUME:
+        JSR DOS_PUTC
+        REP #$20
+        LDA ZP_DOSCUR
+        CMP.W #DOS_NAME_LEN
+        SEP #$20
+        BCC CAT_VOLUME
         LDA #']'
         JSR CHROUT
         JSR NEWLINE
+
+        ; and a line for each entry that has a name in it
         LDA #0
+        STA ZP_DOSFLAG          ; nothing listed yet
+        REP #$20
+        STZ ZP_DOSIDX
+        SEP #$20
+CAT_LOOP:
+        REP #$20
+        LDA ZP_DOSIDX
+        CMP.W #DOS_ENTRIES
+        SEP #$20
+        BCS CAT_END
+        LDX ZP_DOSIDX
+        JSR DOS_ENTRYADDR
+        LDY #0
+        LDA [ZP_DOSPTR],Y
+        BEQ CAT_NEXT
+        LDA #1
+        STA ZP_DOSFLAG
+        REP #$20
+        LDA.W #0
+        STA ZP_DOSCUR
+        SEP #$20
+CAT_NAME:
+        REP #$10
+        LDY ZP_DOSCUR
+        LDA [ZP_DOSPTR],Y
+        CMP #32                 ; the name stops at its first space
+        BEQ CAT_NAME_END
+        JSR CHROUT
+        SEP #$20
+        REP #$10
+        REP #$20
+        LDA ZP_DOSCUR
+        INC A
+        STA ZP_DOSCUR
+        CMP.W #DOS_NAME_LEN
+        SEP #$20
+        BCC CAT_NAME
+CAT_NAME_END:
+        JSR NEWLINE
+CAT_NEXT:
+        REP #$20
+        LDA ZP_DOSIDX
+        INC A
+        STA ZP_DOSIDX
+        SEP #$20
+        BRA CAT_LOOP
+CAT_END:
+        LDA ZP_DOSFLAG
+        BNE CAT_OK
+        LDX #DOS_TXT_EMPTY
+        JSR DOS_SAY
+CAT_OK:
+        LDA #DOS_OK
         PLP
         RTS
-CAT_ERR2:
-        LDA #1
+CAT_IOERR:
+        LDX #DOS_TXT_DISK
+        JSR DOS_SAY
+        LDA #DOS_IO
         PLP
         RTS
 
+; ---------------------------------------------------------------------------
+; FIND: where a name is.
+; ---------------------------------------------------------------------------
+
+; DOSFIND: A = a sixteen-bit pointer to a sixteen-byte space-padded name in bank
+; zero. X = the entry it is in, ZP_DOSFIRST = that entry's first sector, and
+; carry set when no entry has that name.
 DOSFIND:
-DOSLOAD:
-DOSSAVE:
-DOSDELETE:
-        LDA #1
+        PHP
+        REP #$20
+        STA ZP_DOSNM
+        SEP #$20
+        STZ ZP_DOSNM+2          ; the name is in bank zero
+        REP #$10
+        JSR DOS_RDDIR
+        CMP #0
+        BNE DOSFIND_IOERR
+        JSR DOS_FINDINNER
+        BCS DOSFIND_NONE
+        TXA
+        PLP
+        CLC
         RTS
+DOSFIND_NONE:
+        LDA #DOS_MISSING
+        PLP
+        SEC
+        RTS
+DOSFIND_IOERR:
+        LDA #DOS_IO
+        PLP
+        SEC
+        RTS
+
+; ---------------------------------------------------------------------------
+; SAVE: the program store becomes a file.
+; ---------------------------------------------------------------------------
+
+; DOSSAVE: A = the name, as DOSFIND takes it. Whatever program is in the store
+; is written as that file; a file of the same name is replaced, not added to.
+DOSSAVE:
+        PHP
+        REP #$20
+        STA ZP_DOSNM
+        SEP #$20
+        STZ ZP_DOSNM+2
+        REP #$10
+        JSR DOS_RDHDR
+        CMP #0
+        BNE SAVE_IOERR
+        JSR DOS_RDDIR
+        CMP #0
+        BNE SAVE_IOERR
+
+        ; A file of the same name goes first: its sectors back to the map and its
+        ; entry cleared, before anything is allocated for the new one.
+        JSR DOS_FINDINNER
+        BCS SAVE_SLOT
+        STX ZP_DOSIDX
+        LDX ZP_DOSFIRST
+        JSR DOS_FREERUN
+        LDX ZP_DOSIDX
+        JSR DOS_CLEARENTRY
+
+SAVE_SLOT:
+        JSR DOS_PROGSIZE
+        BCS SAVE_TOOBIG
+        JSR DOS_SECTORS
+        REP #$20
+        LDA ZP_DOSCOUNT
+        BNE SAVE_HAVE_SIZE
+        SEP #$20
+        BRA SAVE_NO_ROOM        ; an empty store is a mistake, not a small file
+SAVE_HAVE_SIZE:
+        SEP #$20
+        JSR DOS_FINDSLOT
+        BCS SAVE_NO_SLOT
+        STX ZP_DOSIDX
+        JSR DOS_ALLOCRUN
+        BCS SAVE_NO_ROOM
+
+        ; the sectors, one at a time, from the store into the buffer
+        REP #$20
+        LDA ZP_DOSLEN
+        STA ZP_DOSLEFT
+        LDA ZP_DOSFIRST
+        STA ZP_DOSSEC
+        LDA.W #PROGSTART
+        STA ZP_DOSSRC
+        SEP #$20
+        STZ ZP_DOSSRC+2
+SAVE_SECTOR:
+        ; The buffer is cleared before every sector, and not once at the start: a
+        ; file whose last sector is short would otherwise carry the bytes of the
+        ; sector written before it into the file.
+        LDX #DOS_SEC_LO
+        JSR DOS_POINT
+        LDY #0
+        LDA #0
+SAVE_CLEAR:
+        STA [ZP_DOSPTR],Y
+        INY
+        CPY.W #DOS_SECTOR_SIZE
+        BNE SAVE_CLEAR
+
+        ; what is left, or a whole sector if there is more than that
+        REP #$20
+        LDA ZP_DOSLEFT
+        CMP.W #DOS_SECTOR_SIZE
+        BCC SAVE_SHORT
+        LDA.W #DOS_SECTOR_SIZE
+SAVE_SHORT:
+        STA ZP_DOSSIZE
+        SEP #$20
+        LDY #0
+SAVE_COPY:
+        CPY ZP_DOSSIZE
+        BCS SAVE_WRITE
+        LDA [ZP_DOSSRC]
+        STA [ZP_DOSPTR],Y
+        INC ZP_DOSSRC
+        INY
+        BRA SAVE_COPY
+SAVE_WRITE:
+        JSR DOS_WRSEC
+        CMP #0
+        BNE SAVE_IOERR
+        REP #$20
+        LDA ZP_DOSLEFT
+        SEC
+        SBC ZP_DOSSIZE
+        STA ZP_DOSLEFT
+        LDA ZP_DOSSEC
+        INC A
+        STA ZP_DOSSEC
+        LDA ZP_DOSLEFT
+        BEQ SAVE_DATA_DONE
+        SEP #$20
+        BRA SAVE_SECTOR
+
+SAVE_DATA_DONE:
+        ; and the entry: the name, where the data starts, how much there is. The
+        ; reserved bytes are already zero -- the slot was empty or cleared.
+        SEP #$20
+        LDX ZP_DOSIDX
+        JSR DOS_ENTRYADDR
+        LDY #0
+SAVE_NAME:
+        LDA [ZP_DOSNM],Y
+        STA [ZP_DOSPTR],Y
+        INY
+        CPY.W #DOS_NAME_LEN
+        BNE SAVE_NAME
+        LDY #DOS_ENT_FIRST
+        LDA ZP_DOSFIRST
+        STA [ZP_DOSPTR],Y
+        INY
+        LDA ZP_DOSFIRST+1
+        STA [ZP_DOSPTR],Y
+        LDY #DOS_ENT_COUNT
+        LDA ZP_DOSCOUNT
+        STA [ZP_DOSPTR],Y
+        INY
+        LDA ZP_DOSCOUNT+1
+        STA [ZP_DOSPTR],Y
+
+        ; the directory first, then the header: a map that has given away sectors
+        ; no entry mentions is a leak, but a file with no sectors in the map is a
+        ; file somebody will overwrite.
+        JSR DOS_WRDIR
+        CMP #0
+        BNE SAVE_IOERR
+        JSR DOS_WRHDR
+        CMP #0
+        BNE SAVE_IOERR
+        LDA #DOS_OK
+        PLP
+        CLC
+        RTS
+SAVE_TOOBIG:
+SAVE_NO_SLOT:
+SAVE_NO_ROOM:
+        LDX #DOS_TXT_FULL
+        JSR DOS_SAY
+        LDA #DOS_FULL
+        PLP
+        SEC
+        RTS
+SAVE_IOERR:
+        LDX #DOS_TXT_DISK
+        JSR DOS_SAY
+        LDA #DOS_IO
+        PLP
+        SEC
+        RTS
+
+; ---------------------------------------------------------------------------
+; LOAD: a file becomes the program store.
+; ---------------------------------------------------------------------------
+
+; DOSLOAD: A = the name, as DOSFIND takes it. The file's sectors are read into
+; the store, and ZP_PROGTOP is left at the zero number that ends it, so the
+; language can RUN what came back.
+DOSLOAD:
+        PHP
+        REP #$20
+        STA ZP_DOSNM
+        SEP #$20
+        STZ ZP_DOSNM+2
+        REP #$10
+        JSR DOS_RDDIR
+        CMP #0
+        BNE LOAD_IOERR
+        JSR DOS_FINDINNER
+        BCS LOAD_MISSING
+
+        ; An empty store first, with the language's own end in it, so a file that
+        ; turns out to be nothing leaves an empty program rather than half of two.
+        REP #$20
+        LDA.W #0
+        STA.L PROGSTART
+        LDA.W #PROGSTART
+        STA.L PROG_TOP
+        STA ZP_DOSSRC           ; where the bytes are going, straight after
+        SEP #$20
+        STZ ZP_DOSSRC+2
+        REP #$20
+        LDA ZP_DOSFIRST
+        STA ZP_DOSSEC
+        LDA ZP_DOSCOUNT
+        STA ZP_DOSLEFT
+        SEP #$20
+
+LOAD_SECTOR:
+        REP #$20
+        LDA ZP_DOSLEFT
+        BEQ LOAD_DONE
+        DEC A
+        STA ZP_DOSLEFT
+        SEP #$20
+        JSR DOS_RDSEC
+        CMP #0
+        BNE LOAD_IOERR
+
+        ; how much of the store is left to fill: a program may not pass
+        ; PROG_LIMIT, and a file that would is a file from somewhere else
+        REP #$20
+        LDA.W #PROG_LIMIT
+        SEC
+        SBC ZP_DOSSRC
+        CMP.W #DOS_SECTOR_SIZE
+        BCC LOAD_PART
+        LDA.W #DOS_SECTOR_SIZE
+LOAD_PART:
+        STA ZP_DOSSIZE
+        SEP #$20
+        LDX #DOS_SEC_LO
+        JSR DOS_POINT
+        LDY #0
+LOAD_COPY:
+        CPY ZP_DOSSIZE
+        BCS LOAD_NEXT
+        LDA [ZP_DOSPTR],Y
+        STA [ZP_DOSSRC]
+        INC ZP_DOSSRC
+        INY
+        BRA LOAD_COPY
+LOAD_NEXT:
+        REP #$20
+        LDA ZP_DOSSEC
+        INC A
+        STA ZP_DOSSEC
+        SEP #$20
+        BRA LOAD_SECTOR
+
+LOAD_DONE:
+        ; where the program ends is where its zero number is, which is the same
+        ; walk SAVE took. It is not the size of the file: the last sector is
+        ; padded, and a program that ended at the padding would grow a sector
+        ; every time it was loaded and saved.
+        ;
+        ; The store is PROGSTART up to the terminator, and PROGTOP is the address
+        ; of the terminator itself -- the bytes of the file, less the two the
+        ; number takes -- which is the same end NEW leaves for an empty program.
+        JSR DOS_PROGSIZE
+        BCS LOAD_BAD
+        REP #$20
+        LDA.W #PROGSTART
+        CLC
+        ADC ZP_DOSLEN
+        SEC
+        SBC.W #2
+        STA.L PROG_TOP
+        SEP #$20
+        LDA #DOS_OK
+        PLP
+        CLC
+        RTS
+LOAD_BAD:
+        REP #$20
+        LDA.W #0
+        STA.L PROGSTART
+        LDA.W #PROGSTART
+        STA.L PROG_TOP
+        SEP #$20
+        LDX #DOS_TXT_BADFILE
+        JSR DOS_SAY
+        LDA #DOS_IO
+        PLP
+        SEC
+        RTS
+LOAD_MISSING:
+        LDX #DOS_TXT_NOFILE
+        JSR DOS_SAY
+        LDA #DOS_MISSING
+        PLP
+        SEC
+        RTS
+LOAD_IOERR:
+        LDX #DOS_TXT_DISK
+        JSR DOS_SAY
+        LDA #DOS_IO
+        PLP
+        SEC
+        RTS
+
+; ---------------------------------------------------------------------------
+; DELETE: a file's sectors go back to the map and its entry is emptied.
+; ---------------------------------------------------------------------------
+
+DOSDELETE:
+        PHP
+        REP #$20
+        STA ZP_DOSNM
+        SEP #$20
+        STZ ZP_DOSNM+2
+        REP #$10
+        JSR DOS_RDHDR
+        CMP #0
+        BNE DELETE_IOERR
+        JSR DOS_RDDIR
+        CMP #0
+        BNE DELETE_IOERR
+        JSR DOS_FINDINNER
+        BCS DELETE_MISSING
+        STX ZP_DOSIDX
+        LDX ZP_DOSFIRST
+        JSR DOS_FREERUN          ; which is why the entry's number is kept
+        LDX ZP_DOSIDX
+        JSR DOS_CLEARENTRY
+        JSR DOS_WRDIR
+        CMP #0
+        BNE DELETE_IOERR
+        JSR DOS_WRHDR
+        CMP #0
+        BNE DELETE_IOERR
+        LDA #DOS_OK
+        PLP
+        CLC
+        RTS
+DELETE_MISSING:
+        LDX #DOS_TXT_NOFILE
+        JSR DOS_SAY
+        LDA #DOS_MISSING
+        PLP
+        SEC
+        RTS
+DELETE_IOERR:
+        LDX #DOS_TXT_DISK
+        JSR DOS_SAY
+        LDA #DOS_IO
+        PLP
+        SEC
+        RTS
+
+DOS_TXT_EMPTY:
+        .text "EMPTY"
+        .byte 0
+DOS_TXT_DISK:
+        .text "?DISK"
+        .byte 0
+DOS_TXT_FULL:
+        .text "?DISK FULL"
+        .byte 0
+DOS_TXT_NOFILE:
+        .text "?NOT FOUND"
+        .byte 0
+DOS_TXT_BADFILE:
+        .text "?BAD FILE"
+        .byte 0
 
 FMT_SIGNATURE:
         .text "HBDOS20"

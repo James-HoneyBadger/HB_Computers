@@ -49,13 +49,17 @@ ZP_BASE         = $60           ; 16-bit: where the running line's text starts
 ZP_OFF          = $62           ; 16-bit: how far into it a statement begins
 ZP_LIMIT        = $64           ; 16-bit: a FOR's limit, safe from EXPR's scratch
 
-PROG_LIMIT      = $7E00         ; the program may not grow past here
 FOR_BASE        = $7E00         ; FOR frames, ten bytes each
 FOR_MAX         = 6
 GOSUB_BASE      = $7EC0         ; GOSUB frames, four bytes each
 GOSUB_MAX       = 16
 
 VARS            = $0007C0       ; twenty-six words, A to Z
+
+; The name a SAVE, LOAD or DELETE is about, in bank zero: the filesystem takes a
+; sixteen-bit pointer to it, so it has to live where a sixteen-bit pointer can
+; reach it, and it has to still be there after the read the call makes.
+DOSNAME         = $000700       ; sixteen bytes, upper case, space padded
 
 ENTRY:
         SEP #$20
@@ -163,6 +167,18 @@ KW_FORMAT_END:
 KW_CATALOG:
         .text "CATALOG"
 KW_CATALOG_END:
+KW_DIR:
+        .text "DIR"
+KW_DIR_END:
+KW_SAVE:
+        .text "SAVE"
+KW_SAVE_END:
+KW_LOAD:
+        .text "LOAD"
+KW_LOAD_END:
+KW_DELETE:
+        .text "DELETE"
+KW_DELETE_END:
 KW_REM:
         .text "REM"
 KW_REM_END:
@@ -229,6 +245,18 @@ TXT_NOLINE_END:
 TXT_NOROOM:
         .text "?NO ROOM"
 TXT_NOROOM_END:
+TXT_SAVED:
+        .text "SAVED"
+TXT_SAVED_END:
+TXT_LOADED:
+        .text "LOADED"
+TXT_LOADED_END:
+TXT_DELETED:
+        .text "DELETED"
+TXT_DELETED_END:
+TXT_NONAME:
+        .text "?FILENAME"
+TXT_NONAME_END:
 
 SAY_BANNER:
         LDA #<TXT_BANNER
@@ -259,6 +287,50 @@ SAY_NOROOM:
         LDA #BANK_BASIC
         STA ZP_PTR+2
         LDX.W #TXT_NOROOM_END - TXT_NOROOM
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_SAVED:
+        LDA #<TXT_SAVED
+        STA ZP_PTR
+        LDA #>TXT_SAVED
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_SAVED_END - TXT_SAVED
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_LOADED:
+        LDA #<TXT_LOADED
+        STA ZP_PTR
+        LDA #>TXT_LOADED
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_LOADED_END - TXT_LOADED
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_DELETED:
+        LDA #<TXT_DELETED
+        STA ZP_PTR
+        LDA #>TXT_DELETED
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_DELETED_END - TXT_DELETED
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
+SAY_NONAME:
+        LDA #<TXT_NONAME
+        STA ZP_PTR
+        LDA #>TXT_NONAME
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_NONAME_END - TXT_NONAME
         JSL L_PRINT
         JSR SAY_NEWLINE
         RTS
@@ -356,6 +428,11 @@ IS_ALPHA_NO:
 
 ; MATCHKW: X = keyword, Y = its length. Carry set when the line starts with it,
 ; and the line pointer has stepped past the keyword and any spaces after it.
+;
+; X is the keyword's whole sixteen-bit address and not its low byte: `#<KW_x`
+; fits in a byte and reads as though it were one, and it only works for as long
+; as the table stays inside the bank's first page. It stopped being true the day
+; the table grew past it, and every keyword past the first page became `?WHAT?`.
 MATCHKW:
         SEP #$20
         STX ZP_KW
@@ -495,7 +572,7 @@ EXEC_STMT:
         JSR SKIPSP
         LDA [ZP_SRC]
         BEQ EXEC_DONE
-        LDX.W #<KW_PRINT
+        LDX.W #(KW_PRINT & $FFFF)
         LDY.W #KW_PRINT_END - KW_PRINT
         JSR MATCHKW
         BCS DO_PRINT
@@ -506,67 +583,83 @@ EXEC_STMT:
         JSR SKIPSP
         BRA DO_PRINT
 EXEC_TRY_LET:
-        LDX.W #<KW_LET
+        LDX.W #(KW_LET & $FFFF)
         LDY.W #KW_LET_END - KW_LET
         JSR MATCHKW
         BCS DO_LET
-        LDX.W #<KW_CLS
+        LDX.W #(KW_CLS & $FFFF)
         LDY.W #KW_CLS_END - KW_CLS
         JSR MATCHKW
         BCS DO_CLS
-        LDX.W #<KW_FORMAT
+        LDX.W #(KW_FORMAT & $FFFF)
         LDY.W #KW_FORMAT_END - KW_FORMAT
         JSR MATCHKW
         BCS DO_FORMAT
-        LDX.W #<KW_CATALOG
+        LDX.W #(KW_CATALOG & $FFFF)
         LDY.W #KW_CATALOG_END - KW_CATALOG
         JSR MATCHKW
         BCS DO_CATALOG
-        LDX.W #<KW_REM
+        LDX.W #(KW_DIR & $FFFF)
+        LDY.W #KW_DIR_END - KW_DIR
+        JSR MATCHKW
+        BCS DO_CATALOG
+        LDX.W #(KW_SAVE & $FFFF)
+        LDY.W #KW_SAVE_END - KW_SAVE
+        JSR MATCHKW
+        BCS DO_SAVE
+        LDX.W #(KW_LOAD & $FFFF)
+        LDY.W #KW_LOAD_END - KW_LOAD
+        JSR MATCHKW
+        BCS DO_LOAD
+        LDX.W #(KW_DELETE & $FFFF)
+        LDY.W #KW_DELETE_END - KW_DELETE
+        JSR MATCHKW
+        BCS DO_DELETE
+        LDX.W #(KW_REM & $FFFF)
         LDY.W #KW_REM_END - KW_REM
         JSR MATCHKW
         BCS DO_REM
-        LDX.W #<KW_NEW
+        LDX.W #(KW_NEW & $FFFF)
         LDY.W #KW_NEW_END - KW_NEW
         JSR MATCHKW
         BCS DO_NEW
-        LDX.W #<KW_RUN
+        LDX.W #(KW_RUN & $FFFF)
         LDY.W #KW_RUN_END - KW_RUN
         JSR MATCHKW
         BCS DO_RUN
-        LDX.W #<KW_LIST
+        LDX.W #(KW_LIST & $FFFF)
         LDY.W #KW_LIST_END - KW_LIST
         JSR MATCHKW
         BCS DO_LIST
-        LDX.W #<KW_GOTO
+        LDX.W #(KW_GOTO & $FFFF)
         LDY.W #KW_GOTO_END - KW_GOTO
         JSR MATCHKW
         BCS DO_GOTO
-        LDX.W #<KW_IF
+        LDX.W #(KW_IF & $FFFF)
         LDY.W #KW_IF_END - KW_IF
         JSR MATCHKW
         BCS DO_IF
-        LDX.W #<KW_GOSUB
+        LDX.W #(KW_GOSUB & $FFFF)
         LDY.W #KW_GOSUB_END - KW_GOSUB
         JSR MATCHKW
         BCS DO_GOSUB
-        LDX.W #<KW_RETURN
+        LDX.W #(KW_RETURN & $FFFF)
         LDY.W #KW_RETURN_END - KW_RETURN
         JSR MATCHKW
         BCS DO_RETURN
-        LDX.W #<KW_FOR
+        LDX.W #(KW_FOR & $FFFF)
         LDY.W #KW_FOR_END - KW_FOR
         JSR MATCHKW
         BCS DO_FOR
-        LDX.W #<KW_NEXT
+        LDX.W #(KW_NEXT & $FFFF)
         LDY.W #KW_NEXT_END - KW_NEXT
         JSR MATCHKW
         BCS DO_NEXT
-        LDX.W #<KW_ELSE
+        LDX.W #(KW_ELSE & $FFFF)
         LDY.W #KW_ELSE_END - KW_ELSE
         JSR MATCHKW
         BCS DO_ELSE
-        LDX.W #<KW_END
+        LDX.W #(KW_END & $FFFF)
         LDY.W #KW_END_END - KW_END
         JSR MATCHKW
         BCS DO_END
@@ -593,6 +686,100 @@ DO_FORMAT:
 DO_CATALOG:
         JSL L_DOSCATALOG
         BRA EXEC_DONE
+
+; SAVE, LOAD and DELETE all begin with a quoted name, which goes into DOSNAME in
+; bank zero -- the filesystem takes a sixteen-bit pointer to it, and it has to
+; outlive the read the call makes. On failure the filesystem has already said
+; what was wrong (`?DISK`, `?NOT FOUND`, `?DISK FULL`), so the language only says
+; what it did when it did it.
+DO_SAVE:
+        JSR PARSEFN
+        BCS SAVE_NONAME
+        REP #$20
+        LDA.W #DOSNAME
+        SEP #$20
+        JSL L_DOSSAVE
+        CMP #0
+        BNE EXEC_DONE
+        JSR SAY_SAVED
+        BRA EXEC_DONE
+SAVE_NONAME:
+        JSR SAY_NONAME
+        BRA EXEC_DONE
+DO_LOAD:
+        JSR PARSEFN
+        BCS LOAD_NONAME
+        REP #$20
+        LDA.W #DOSNAME
+        SEP #$20
+        JSL L_DOSLOAD
+        CMP #0
+        BNE EXEC_DONE
+        ; The program that was running is not there any more: its text was
+        ; overwritten by the file, so the line stops rather than running on into
+        ; whatever came back.
+        LDA #3
+        STA ZP_JFLAG
+        JSR RESET_STACKS
+        JSR SAY_LOADED
+        BRA EXEC_DONE
+LOAD_NONAME:
+        JSR SAY_NONAME
+        BRA EXEC_DONE
+DO_DELETE:
+        JSR PARSEFN
+        BCS DELETE_NONAME
+        REP #$20
+        LDA.W #DOSNAME
+        SEP #$20
+        JSL L_DOSDELETE
+        CMP #0
+        BNE EXEC_DONE
+        JSR SAY_DELETED
+        BRA EXEC_DONE
+DELETE_NONAME:
+        JSR SAY_NONAME
+        BRA EXEC_DONE
+
+; PARSEFN: the quoted name after SAVE, LOAD or DELETE goes to DOSNAME, upper
+; case and padded with spaces to the sixteen bytes the directory holds. Carry is
+; set when there was no quoted name at all.
+PARSEFN:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        CMP #'"'
+        BNE PARSEFN_NONE
+        INC ZP_SRC
+        LDX.W #0
+        LDA #32
+PARSEFN_BLANK:
+        STA.L DOSNAME,X         ; bank zero, whatever the data bank is
+        INX
+        CPX.W #16
+        BNE PARSEFN_BLANK
+        LDX.W #0
+PARSEFN_LOOP:
+        LDA [ZP_SRC]
+        BEQ PARSEFN_DONE
+        CMP #'"'
+        BEQ PARSEFN_CLOSE
+        CPX.W #16
+        BCS PARSEFN_SKIP        ; a name may be longer; the directory's is not
+        JSR TO_UPPER
+        STA.L DOSNAME,X
+        INX
+PARSEFN_SKIP:
+        INC ZP_SRC
+        BRA PARSEFN_LOOP
+PARSEFN_CLOSE:
+        INC ZP_SRC
+PARSEFN_DONE:
+        CLC
+        RTS
+PARSEFN_NONE:
+        SEC
+        RTS
+
 DO_CLS:
         JSL L_CLS
         JSR SAY_BANNER
@@ -747,7 +934,7 @@ EXPR_OR:
         PHX
 EXPR_OR_LOOP:
         JSR SKIPSP
-        LDX.W #<KW_OR
+        LDX.W #(KW_OR & $FFFF)
         LDY.W #KW_OR_END - KW_OR
         JSR MATCHKW
         BCC EXPR_OR_DONE
@@ -776,7 +963,7 @@ EXPR_AND:
         PHX
 EXPR_AND_LOOP:
         JSR SKIPSP
-        LDX.W #<KW_AND
+        LDX.W #(KW_AND & $FFFF)
         LDY.W #KW_AND_END - KW_AND
         JSR MATCHKW
         BCC EXPR_AND_DONE
@@ -802,7 +989,7 @@ EXPR_AND_DONE:
 
 EXPR_NOT:
         JSR SKIPSP
-        LDX.W #<KW_NOT
+        LDX.W #(KW_NOT & $FFFF)
         LDY.W #KW_NOT_END - KW_NOT
         JSR MATCHKW
         BCC EXPR_CMP

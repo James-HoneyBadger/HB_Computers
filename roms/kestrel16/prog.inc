@@ -627,7 +627,7 @@ DO_IF:
         CMP.W #0
         SEP #$20
         BEQ DO_IF_FALSE
-        LDX.W #<KW_THEN
+        LDX.W #(KW_THEN & $FFFF)
         LDY.W #KW_THEN_END - KW_THEN
         JSR MATCHKW
         BCC DO_IF_NOTTHEN
@@ -655,7 +655,7 @@ DO_IF_SKIP:
         INC ZP_SRC
         BRA DO_IF_SKIP
 DO_IF_TRY_ELSE:
-        LDX.W #<KW_ELSE
+        LDX.W #(KW_ELSE & $FFFF)
         LDY.W #KW_ELSE_END - KW_ELSE
         JSR MATCHKW
         BCS DO_IF_SKIP_END
@@ -717,7 +717,7 @@ DO_FOR_EQ:
         INC ZP_SRC
         JSR EXPR
         JSR STORE_VAR
-        LDX.W #<KW_TO
+        LDX.W #(KW_TO & $FFFF)
         LDY.W #KW_TO_END - KW_TO
         JSR MATCHKW
         BCC DO_FOR_BAD
