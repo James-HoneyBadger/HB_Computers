@@ -175,3 +175,26 @@ fn refusals() {
     expect_refused("  .byte 12AB", "a number that runs into a letter");
     expect_refused("  .byte $", "empty hexadecimal number");
 }
+
+/// The same rule on the 6502: a form that cannot hold the operand is an error,
+/// because the low byte of a larger value assembles something else.
+#[test]
+fn an_operand_too_wide_for_its_form_is_refused() {
+    for source in ["  STX $1234,Y\n", "  LDA ($1234),Y\n"] {
+        let case = unique("too-wide");
+        let file = case.with_extension("s");
+        std::fs::write(&file, source).expect("a source file");
+        let output = Command::new(TOOL)
+            .arg(&file)
+            .args(["--origin", "0x8000", "--size", "16", "--bin"])
+            .arg(case.with_extension("bin"))
+            .output()
+            .expect("the assembler to run");
+        assert_eq!(output.status.code(), Some(1), "{source}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("does not fit"),
+            "{source} said {:?}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}

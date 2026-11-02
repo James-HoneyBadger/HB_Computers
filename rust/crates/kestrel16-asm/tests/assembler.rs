@@ -224,3 +224,31 @@ fn refusals() {
     expect_refused("  WIBBLE #$12", "an identifier where an opcode should be");
     expect_refused("  .byte $", "empty hexadecimal number");
 }
+
+/// An operand that does not fit the form it ends up in is a diagnostic, not a
+/// truncated encoding. `STX $1234,Y` has no absolute,Y form, so emitting the low
+/// byte would assemble a store somewhere else entirely.
+#[test]
+fn an_operand_too_wide_for_its_form_is_refused() {
+    for (source, expected) in [
+        ("  STX $1234,Y\n", "does not fit direct page,Y"),
+        ("  LDA.W #$123456\n", "does not fit immediate"),
+        ("  STA ($1234)\n", "does not fit"),
+    ] {
+        let case = unique("too-wide");
+        let file = case.with_extension("s");
+        std::fs::write(&file, source).expect("a source file");
+        let output = Command::new(TOOL)
+            .arg(&file)
+            .args(["--origin", "0x8000", "--size", "16", "--bin"])
+            .arg(case.with_extension("bin"))
+            .output()
+            .expect("the assembler to run");
+        assert_eq!(output.status.code(), Some(1), "{source}");
+        let message = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            message.contains(expected),
+            "{source} should have said {expected:?}, said {message:?}"
+        );
+    }
+}

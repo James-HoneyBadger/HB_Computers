@@ -428,6 +428,55 @@ impl Assembler {
             self.emit_byte(current, stmt, emit, ((offset >> 8) & 0xFF) as u8)?;
             return Ok(());
         }
+        // An operand that does not fit the form it ended up in is an error
+        // rather than a truncated encoding: `JMP $123456` has no long form, and
+        // emitting `$12 34` would assemble a jump somewhere else entirely.
+        let fits = match mode {
+            Mode::Imp | Mode::Acc => true,
+            Mode::Imp8 | Mode::Imm8 => (-128..=0xFF).contains(&value),
+            Mode::Imm16 => (0..=0xFFFF).contains(&value) || (-0x8000..=-1).contains(&value),
+            Mode::Imm => {
+                if stmt.imm_bytes == 1 {
+                    (-128..=0xFF).contains(&value)
+                } else {
+                    (0..=0xFFFF).contains(&value) || (-0x8000..=-1).contains(&value)
+                }
+            }
+            Mode::Dp
+            | Mode::DpX
+            | Mode::DpY
+            | Mode::DpInd
+            | Mode::DpIndX
+            | Mode::DpIndY
+            | Mode::DpLong
+            | Mode::DpLongY
+            | Mode::SrS
+            | Mode::SrSY => (0..=0xFF).contains(&value),
+            // `JMP`, `JSR` and their indexed forms stay in the program bank: a
+            // label carries its own bank in its value and the instruction uses
+            // the low sixteen bits of it, which is what the chip does. A literal
+            // that is too wide for a byte or a word is the mistake worth
+            // refusing, and that is where the checks below are.
+            Mode::Abs
+            | Mode::AbsX
+            | Mode::AbsY
+            | Mode::AbsInd
+            | Mode::AbsIndX
+            | Mode::AbsIndLong => {
+                (0..=0xFF_FFFF).contains(&value) || (-0x80_0000..=-1).contains(&value)
+            }
+            Mode::Long | Mode::LongX => {
+                (0..=0xFF_FFFF).contains(&value) || (-0x80_0000..=-1).contains(&value)
+            }
+            Mode::Blk | Mode::Rel | Mode::Rel16 => true,
+        };
+        if !fits {
+            return Err(Error::new(
+                &stmt.file,
+                stmt.line,
+                format!("{}: {value} does not fit {}", stmt.mnemonic, mode.name()),
+            ));
+        }
         self.emit_byte(current, stmt, emit, op.code)?;
         match mode {
             Mode::Imp | Mode::Acc => Ok(()),

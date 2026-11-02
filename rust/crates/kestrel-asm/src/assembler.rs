@@ -397,6 +397,23 @@ impl Assembler {
             }
             return Ok(());
         }
+        // An operand that does not fit the form it was given is an error, not a
+        // truncation: `STX $1234,Y` has no absolute,Y form, and emitting the low
+        // byte would assemble a program that does something else.
+        let fits = match mode {
+            Mode::Imp | Mode::Acc => value == 0 || stmt.operand.is_none(),
+            Mode::Imm | Mode::Zp | Mode::ZpX | Mode::ZpY | Mode::IndX | Mode::IndY => {
+                (0..=0xFF).contains(&value)
+            }
+            _ => (0..=0xFFFF).contains(&value),
+        };
+        if !fits {
+            return Err(Error::new(
+                &stmt.file,
+                stmt.line,
+                format!("{}: {value} does not fit {}", stmt.mnemonic, mode),
+            ));
+        }
         self.emit_byte(current, stmt, emit, op.code)?;
         match mode {
             Mode::Imp | Mode::Acc => Ok(()),
