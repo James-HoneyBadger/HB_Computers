@@ -8,11 +8,10 @@
 ; are sixteen bits wide, its variables are words, and its expressions are
 ; evaluated on the processor's own stack.
 ;
-; What is here: the line reader, the statement dispatcher, integer expressions
-; with the four arithmetic operators and parentheses, variables A to Z, PRINT
-; with strings and separators, LET, CLS, REM, END and NEW. What is not here yet
-; -- the stored program, and the control flow that needs one -- is the next
-; thing to go in.
+; What is here: stored programs, integer expressions, variables A to Z, PRINT
+; with strings and separators, LET, branches, subroutines, FOR/NEXT with STEP,
+; and the disk commands FORMAT, CATALOG, SAVE, LOAD and DELETE. Strings as
+; values, arrays and functions are still beyond this language.
 
         .include "kestrel16.inc"
 
@@ -134,7 +133,7 @@ STORE_NUM_LOOP:
         ADC ZP_TMP16
         STA ZP_TMP16
         SEP #$20
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA STORE_NUM_LOOP
 STORE_NUM_DONE:
         JMP STORE_LINE
@@ -236,6 +235,9 @@ KW_NOT_END:
 TXT_NEXTFOR:
         .text "?NEXT WITHOUT FOR"
 TXT_NEXTFOR_END:
+TXT_FORNEXT:
+        .text "?FOR WITHOUT NEXT"
+TXT_FORNEXT_END:
 TXT_RETGOSUB:
         .text "?RETURN WITHOUT GOSUB"
 TXT_RETGOSUB_END:
@@ -345,6 +347,17 @@ SAY_NEXTFOR:
         JSL L_PRINT
         JSR SAY_NEWLINE
         RTS
+SAY_FORNEXT:
+        LDA #<TXT_FORNEXT
+        STA ZP_PTR
+        LDA #>TXT_FORNEXT
+        STA ZP_PTR+1
+        LDA #BANK_BASIC
+        STA ZP_PTR+2
+        LDX.W #TXT_FORNEXT_END - TXT_FORNEXT
+        JSL L_PRINT
+        JSR SAY_NEWLINE
+        RTS
 SAY_RETGOSUB:
         LDA #<TXT_RETGOSUB
         STA ZP_PTR
@@ -385,6 +398,22 @@ SAY_WHAT:
 ; Reading the line
 ; ---------------------------------------------------------------------------
 
+; SRC_STEP: ZP_SRC goes on by one, in sixteen bits.
+;
+; A memory increment is as wide as the accumulator, and the text is read in
+; eight-bit mode, where `INC ZP_SRC` steps the low byte and carries into
+; nothing: a statement or a string that crossed a page boundary put the pointer
+; back at the top of the page it was already on, and the machine read its own
+; line for ever. Called with the accumulator eight bits wide, as everything
+; between statements is.
+SRC_STEP:
+        REP #$20
+        LDA ZP_SRC
+        INC A
+        STA ZP_SRC
+        SEP #$20
+        RTS
+
 SKIPSP:
         PHP
         SEP #$20
@@ -392,7 +421,7 @@ SKIPSP_LOOP:
         LDA [ZP_SRC]
         CMP #32
         BNE SKIPSP_DONE
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA SKIPSP_LOOP
 SKIPSP_DONE:
         PLP
@@ -499,7 +528,7 @@ EXEC_SEQ:
         BEQ EXEC_SEQ_END
         CMP #':'
         BNE EXEC_SEQ_ONE
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA EXEC_SEQ
 EXEC_SEQ_ONE:
         JSR EXEC_STMT
@@ -579,7 +608,7 @@ EXEC_STMT:
         LDA [ZP_SRC]
         CMP #'?'
         BNE EXEC_TRY_LET
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR SKIPSP
         BRA DO_PRINT
 EXEC_TRY_LET:
@@ -676,7 +705,7 @@ DO_REM:
 DO_REM_LOOP:
         LDA [ZP_SRC]
         BEQ DO_REM_DONE
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA DO_REM_LOOP
 DO_REM_DONE:
         JMP EXEC_DONE
@@ -749,7 +778,7 @@ PARSEFN:
         LDA [ZP_SRC]
         CMP #'"'
         BNE PARSEFN_NONE
-        INC ZP_SRC
+        JSR SRC_STEP
         LDX.W #0
         LDA #32
 PARSEFN_BLANK:
@@ -769,10 +798,10 @@ PARSEFN_LOOP:
         STA.L DOSNAME,X
         INX
 PARSEFN_SKIP:
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA PARSEFN_LOOP
 PARSEFN_CLOSE:
-        INC ZP_SRC
+        JSR SRC_STEP
 PARSEFN_DONE:
         CLC
         RTS
@@ -810,7 +839,7 @@ DO_ASSIGN:
         SEC
         SBC #'A'
         STA ZP_VAR              ; the expression may use ZP_CH as scratch
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #'='
@@ -818,7 +847,7 @@ DO_ASSIGN:
         JSR SAY_WHAT
         RTS
 ASSIGN_STORE:
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR EXPR
         REP #$20
         LDA ZP_VAR
@@ -843,6 +872,10 @@ DO_PRINT_STMT:
 PRINT_LOOP:
         JSR SKIPSP
         LDA [ZP_SRC]
+        BEQ PRINT_END
+        ; A colon ends the statement, not the item: `PRINT "A": PRINT "B"` is
+        ; two statements on one line, and the next one starts after the colon.
+        CMP #':'
         BEQ PRINT_END
         CMP #'"'
         BEQ PRINT_STRING
@@ -876,6 +909,8 @@ PRINT_ITEM:
         BEQ PRINT_VALUE
         CMP #','
         BEQ PRINT_VALUE
+        CMP #':'                ; a colon ends the statement, not the item
+        BEQ PRINT_VALUE
         JSR SAY_WHAT
         RTS
 PRINT_VALUE:
@@ -884,27 +919,27 @@ PRINT_VALUE:
         STA ZP_FLAG             ; decides whether the line ends
         BRA PRINT_LOOP
 PRINT_STRING:
-        INC ZP_SRC
+        JSR SRC_STEP
 PRINT_STR_LOOP:
         LDA [ZP_SRC]
         BEQ PRINT_END
         CMP #'"'
         BEQ PRINT_STR_CLOSE
         JSL L_CHROUT
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA PRINT_STR_LOOP
 PRINT_STR_CLOSE:
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA #0
         STA ZP_FLAG
         BRA PRINT_LOOP
 PRINT_SEMI:
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA #1
         STA ZP_FLAG
         BRA PRINT_LOOP
 PRINT_COMMA:
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA #32
         JSL L_CHROUT
         LDA #1                  ; a comma continues the line: `PRINT 1,` waits
@@ -1020,11 +1055,11 @@ EXPR_CMP:
         PLX                     ; not a comparison: the value itself
         RTS
 EXPR_CMP_EQ:
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA #1
         BRA EXPR_CMP_GO
 EXPR_CMP_LT:
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA [ZP_SRC]
         CMP #'='
         BEQ EXPR_CMP_LE
@@ -1033,22 +1068,22 @@ EXPR_CMP_LT:
         LDA #3
         BRA EXPR_CMP_GO
 EXPR_CMP_LE:
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA #5
         BRA EXPR_CMP_GO
 EXPR_CMP_NE:
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA #2
         BRA EXPR_CMP_GO
 EXPR_CMP_GT:
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA [ZP_SRC]
         CMP #'='
         BEQ EXPR_CMP_GE
         LDA #4
         BRA EXPR_CMP_GO
 EXPR_CMP_GE:
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA #6
 EXPR_CMP_GO:
         STA ZP_CNT2             ; the operator
@@ -1137,7 +1172,7 @@ EXPR_LOOP:
         PLX
         RTS
 EXPR_ADD:
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR TERM
         PLY
         REP #$20
@@ -1151,7 +1186,7 @@ EXPR_ADD:
         PHX
         BRA EXPR_LOOP
 EXPR_SUB:
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR TERM
         PLY
         REP #$20
@@ -1178,7 +1213,7 @@ TERM_LOOP:
         PLX
         RTS
 TERM_MUL:
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR FACTOR
         PLY
         REP #$20
@@ -1194,7 +1229,7 @@ TERM_MUL:
         PHX
         BRA TERM_LOOP
 TERM_DIV:
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR FACTOR
         PLY
         REP #$20
@@ -1312,22 +1347,22 @@ FACTOR:
         BCS FACTOR_VAR
         BRA FACTOR_NUM
 FACTOR_PLUS:
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA FACTOR
 FACTOR_PAREN:
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR EXPR
         PHX
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #')'
         BNE FACTOR_PAREN_DONE
-        INC ZP_SRC
+        JSR SRC_STEP
 FACTOR_PAREN_DONE:
         PLX
         RTS
 FACTOR_NEG:
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR FACTOR
         REP #$20
         TXA
@@ -1367,7 +1402,7 @@ FN_LOOP:
         ADC ZP_A
         STA ZP_VAL
         SEP #$20
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA FN_LOOP
 FN_DONE:
         REP #$20
@@ -1383,7 +1418,7 @@ FACTOR_VAR:
         SEC
         SBC #'A'
         STA ZP_CH
-        INC ZP_SRC
+        JSR SRC_STEP
         LDA ZP_CH
         REP #$20
         AND.W #$00FF

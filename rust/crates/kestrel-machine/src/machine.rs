@@ -500,6 +500,160 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
+    /// A program is a run of records in bank zero, and its text crosses a page
+    /// every two hundred-odd bytes. The text pointer is stepped in the eight-bit
+    /// mode the language runs in between statements, where `INC` moves the low
+    /// byte and carries into nothing: a line that straddled a page boundary put
+    /// the pointer back at the top of the page and the machine read it for ever.
+    ///
+    /// Line ten is 243 bytes -- two for its number, 240 of remark and a
+    /// terminator -- so line twenty's text begins at `$08F5` and its string
+    /// runs over `$0900`.
+    #[test]
+    fn a_1992_line_that_crosses_a_page_still_runs() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced(&format!("10 REM {}", "P".repeat(236)));
+        machine.type_line_paced("20 PRINT \"ACROSS THE PAGE BOUNDARY\"");
+        machine.type_line_paced("30 PRINT 6*7");
+        machine.type_line_paced("RUN");
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen
+                .lines()
+                .any(|row| row.trim() == "ACROSS THE PAGE BOUNDARY"),
+            "the string on the far side of the boundary printed:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "42"),
+            "and the line after it ran:\n{screen}"
+        );
+        assert!(
+            !screen.contains("?WHAT?"),
+            "nothing in that program was unreadable:\n{screen}"
+        );
+    }
+
+    /// `FOR I=5 TO 1` has no passes in it: the body is skipped to the matching
+    /// `NEXT` and no frame is pushed. The 1982 machine always answered this way
+    /// and the manual says so; this machine used to run the body once.
+    #[test]
+    fn a_1992_loop_past_its_limit_runs_no_times() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 FOR I=5 TO 1",
+            "20 PRINT \"BODY\"",
+            "30 NEXT I",
+            "40 PRINT \"AFTER\"",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "AFTER"),
+            "the line after the loop ran:\n{screen}"
+        );
+        assert!(
+            !screen.lines().any(|row| row.trim() == "BODY"),
+            "and the body did not -- the line was typed, but never printed:\n{screen}"
+        );
+    }
+
+    /// The skipped body is found by reading the program as text, so the scan has
+    /// to know a nested `FOR` from a `NEXT`, a quoted literal from a statement,
+    /// and a remark from either. One program covers all four: the outer loop
+    /// never runs, and everything it must step over is in its body.
+    #[test]
+    fn a_1992_skipped_loop_finds_its_own_next() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in [
+            "10 FOR I=1 TO 0",
+            "20 FOR J=1 TO 3",
+            "30 PRINT \"NEVER\"",
+            "40 NEXT J",
+            "50 PRINT \"FOR NEXT IN A STRING\"",
+            "60 REM A REMARK ABOUT NEXT AND FOR",
+            "70 NEXT I",
+            "80 FOR K=1 TO 0: PRINT \"NEVER\"; : NEXT K: PRINT \"ONE LINE\"",
+            "90 PRINT \"FOUND IT\"",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "FOUND IT"),
+            "the scan found the outer loop's NEXT:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "ONE LINE"),
+            "and went on with the line the NEXT was on:\n{screen}"
+        );
+        assert!(
+            !screen.lines().any(|row| row.trim().contains("NEVER") && !row.contains("PRINT")),
+            "nothing in either body ran:\n{screen}"
+        );
+    }
+
+    /// A `FOR` with no `NEXT` cannot skip its body, and says which mistake it is.
+    #[test]
+    fn a_1992_loop_without_a_next_says_so() {
+        let mut machine = boot(Model::Kestrel16);
+        for line in ["10 FOR I=1 TO 0", "20 PRINT \"NEVER\"", "RUN"] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.contains("?FOR WITHOUT NEXT"),
+            "the machine names the mistake:\n{screen}"
+        );
+        assert!(
+            !screen
+                .lines()
+                .any(|row| row.trim().contains("NEVER") && !row.contains("PRINT")),
+            "and does not run the body:\n{screen}"
+        );
+    }
+
+    /// A colon separates statements, and `PRINT` is one of them: it stops at the
+    /// colon instead of trying to read it as another item to print, which is
+    /// what used to happen, so `PRINT "A": PRINT "B"` said `A?WHAT?B`.
+    #[test]
+    fn a_1992_colon_separates_statements() {
+        let mut machine = boot(Model::Kestrel16);
+        machine.type_line_paced("PRINT 1+1: PRINT \"C\"");
+        machine.type_line_paced("LET A=7: PRINT A");
+        machine.type_line_paced("FOR I=1 TO 3: PRINT I;: NEXT I");
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "2"),
+            "the value before the colon printed:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "C"),
+            "and so did the statement after it:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "7"),
+            "an assignment ends at the colon too:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.starts_with("123")),
+            "and a whole loop on one line runs, which the prompt can hold:\n{screen}"
+        );
+        assert!(!screen.contains("?WHAT?"), "nothing there was unreadable:\n{screen}");
+    }
+
     #[test]
     fn the_1992_machine_formats_a_volume() {
         let path = std::env::temp_dir().join("kestrel-dos2-format.dsk");
@@ -560,6 +714,209 @@ mod tests {
             "and the program still runs:\n{}",
             again.screen_text()
         );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// The same round trip on the 1992 machine, through Kestrel DOS 2.0: a volume
+    /// is formatted, a program is saved to it, and a second machine that has never
+    /// seen the program reads the catalogue, loads the file and runs it. The
+    /// deletion at the end is checked against the volume itself, because a screen
+    /// that has already shown the name cannot say it is gone.
+    #[test]
+    fn a_1992_program_outlives_the_machine_that_saved_it() {
+        let path = std::env::temp_dir().join("kestrel16-dos-round-trip.dsk");
+        std::fs::write(&path, vec![0u8; 4096 * 512]).expect("a blank volume");
+
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_disk_image(&path).expect("a disk in the drive");
+        machine.type_line_paced("FORMAT");
+        machine.type_line_paced("10 PRINT \"SAVED OK\"");
+        machine.type_line_paced("20 PRINT 6*7");
+        machine.type_line_paced("SAVE \"TEST\"");
+        machine.run_frames(40);
+        assert!(
+            machine.screen_text().contains("SAVED"),
+            "the machine says the save happened:\n{}",
+            machine.screen_text()
+        );
+        machine.save_disk_image(&path).expect("the volume written back");
+
+        // A different machine, the same disk.
+        let mut again = boot(Model::Kestrel16);
+        again.mount_disk_image(&path).expect("the saved volume");
+        again.type_line_paced("CATALOG");
+        let screen = again.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "TEST"),
+            "the catalogue knows the file:\n{screen}"
+        );
+        assert!(
+            !screen.contains("EMPTY"),
+            "and does not call a volume with a file on it empty:\n{screen}"
+        );
+
+        again.type_line_paced("NEW");
+        again.type_line_paced("LIST");
+        assert!(
+            !again.screen_text().lines().any(|row| row.contains("SAVED OK")),
+            "NEW throws the program away before LOAD is asked for it:\n{}",
+            again.screen_text()
+        );
+        again.type_line_paced("LOAD \"TEST\"");
+        again.type_line_paced("RUN");
+        let screen = again.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "SAVED OK"),
+            "the program came back off the disk and ran:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "42"),
+            "and ran all of it:\n{screen}"
+        );
+
+        again.type_line_paced("DELETE \"TEST\"");
+        again.run_frames(40);
+        again.save_disk_image(&path).expect("the deletion written back");
+        let image = std::fs::read(&path).expect("the volume");
+        assert_eq!(
+            &image[512..528],
+            &[0u8; 16][..],
+            "DELETE empties the entry, so the name is gone"
+        );
+        assert_eq!(
+            image[32], 0b0000_0011,
+            "and gives the file's sector back to the map, which holds the header\n\
+             (bit 0) and the directory (bit 1) and nothing else"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// The filesystem walks the program store a byte at a time, and a program
+    /// bigger than a sector makes that walk pass a page boundary -- where an
+    /// eight-bit `INC` on the pointer starts the page again, so the save wrote
+    /// the same bytes twice and the load read them twice. This program is four
+    /// sectors, and the last line's answer is only there if all of it came back.
+    #[test]
+    fn a_1992_program_larger_than_a_sector_round_trips() {
+        let path = std::env::temp_dir().join("kestrel16-dos-big.dsk");
+        std::fs::write(&path, vec![0u8; 4096 * 512]).expect("a blank volume");
+
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_disk_image(&path).expect("a disk in the drive");
+        machine.type_line_paced("FORMAT");
+        for i in 1..=40 {
+            machine.type_line_paced(&format!("{i}0 PRINT \"LINE {i}\""));
+        }
+        machine.type_line_paced("500 PRINT 6*7");
+        machine.type_line_paced("SAVE \"BIG\"");
+        machine.run_frames(60);
+        assert!(
+            machine.screen_text().contains("SAVED"),
+            "the machine says the save happened:\n{}",
+            machine.screen_text()
+        );
+        machine.save_disk_image(&path).expect("the volume written back");
+
+        let mut again = boot(Model::Kestrel16);
+        again.mount_disk_image(&path).expect("the saved volume");
+        again.type_line_paced("LOAD \"BIG\"");
+        again.type_line_paced("RUN");
+        again.run_frames(80);
+
+        let screen = again.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "LINE 20"),
+            "the middle of the program came back:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "LINE 40"),
+            "and so did its last line:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "42"),
+            "which ran, so the store is whole and not written twice:\n{screen}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// Put a call in RAM, point the processor at it and read what is left behind:
+    /// how a KERNAL service is called by a program on this machine, and the only
+    /// way to see what one returns without the language standing in between.
+    fn call_kernal(machine: &mut Machine, code: &[u8]) -> (u8, u16, bool) {
+        for (index, byte) in code.iter().enumerate() {
+            machine.bus.write(0x0600 + index as u32, *byte);
+        }
+        match machine.cpu {
+            Cpu::Mos65816(ref mut cpu) => {
+                let mut registers = cpu.registers();
+                registers.pc = 0x0600;
+                registers.pbr = 0;
+                registers.dbr = 0;
+                registers.d = 0;
+                registers.emulation = false;
+                // eight-bit accumulator, sixteen-bit index registers: the state
+                // the KERNAL's jump table expects a caller to be in
+                registers.p = 0x30;
+                registers.s = 0x01F3;
+                cpu.set_registers(&registers);
+            }
+            _ => panic!("the 1992 machine has a 65816"),
+        }
+        // Run until the call has come back and the processor is spinning at the
+        // jump: the status is whatever the service left, and a fixed number of
+        // frames would read the middle of an interrupt instead.
+        for _ in 0..4_000_000 {
+            match machine.cpu {
+                Cpu::Mos65816(ref cpu) if cpu.registers().pc == 0x060A => break,
+                _ => machine.run_cycles(1),
+            }
+        }
+        match machine.cpu {
+            Cpu::Mos65816(ref cpu) => {
+                let registers = cpu.registers();
+                (registers.c as u8, registers.x, registers.p & 0x01 != 0)
+            }
+            _ => panic!("the 1992 machine has a 65816"),
+        }
+    }
+
+    /// `DOSFIND`, as the manual promises it: A = a sixteen-bit pointer to a
+    /// sixteen-byte space-padded name, X = the directory entry, `$69` and `$6A`
+    /// = its first sector, and carry set when the volume has no such name.
+    #[test]
+    fn the_1992_dos_finds_a_name_where_it_says_it_does() {
+        let path = std::env::temp_dir().join("kestrel16-dos-find.dsk");
+        std::fs::write(&path, vec![0u8; 4096 * 512]).expect("a blank volume");
+        let mut machine = boot(Model::Kestrel16);
+        machine.mount_disk_image(&path).expect("a disk in the drive");
+        machine.type_line_paced("FORMAT");
+        machine.type_line_paced("10 PRINT 1");
+        machine.type_line_paced("SAVE \"TEST\"");
+        machine.run_frames(40);
+
+        // clear of the call below, which goes at $0600
+        for (at, name) in [(0x0640u32, "NOPE"), (0x0650, "TEST")] {
+            let mut padded = [32u8; 16];
+            padded[..name.len()].copy_from_slice(name.as_bytes());
+            for (index, byte) in padded.iter().enumerate() {
+                machine.bus.write(at + index as u32, *byte);
+            }
+        }
+
+        // REP #$20 / LDA.W #$0650 / SEP #$20 / JSR $E027 / JMP to itself
+        let found = [0xC2, 0x20, 0xA9, 0x50, 0x06, 0xE2, 0x20, 0x20, 0x27, 0xE0, 0x4C, 0x0A, 0x06];
+        let (status, entry, missing) = call_kernal(&mut machine, &found);
+        let first = u16::from(machine.bus.read(0x69)) | (u16::from(machine.bus.read(0x6A)) << 8);
+        assert_eq!(status, 0, "DOSFIND says it found the name");
+        assert!(!missing, "and clears carry");
+        assert_eq!(entry, 0, "TEST is the first entry");
+        assert_eq!(first, 2, "and its data starts at the first free sector");
+
+        // The same call with the name that is not on the volume.
+        let absent = [0xC2, 0x20, 0xA9, 0x40, 0x06, 0xE2, 0x20, 0x20, 0x27, 0xE0, 0x4C, 0x0A, 0x06];
+        let (status, _, missing) = call_kernal(&mut machine, &absent);
+        assert_eq!(status, 1, "a name that is not there is an error");
+        assert!(missing, "and the carry says so, which is the documented answer");
         let _ = std::fs::remove_file(&path);
     }
 

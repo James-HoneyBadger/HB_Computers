@@ -61,7 +61,7 @@ cargo build --release
 cargo test
 ```
 
-Forty-three tests: the two assemblers, the two processors, the bus and its
+Seventy-seven tests: the two assemblers, the two processors, the bus and its
 devices, both machines booting their assemblers' ROMs and answering at the
 keyboard, every sample program in [samples/](samples), and the emulator's own
 front end.

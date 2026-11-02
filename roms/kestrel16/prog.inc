@@ -652,14 +652,14 @@ DO_IF_SKIP:
         JSR TO_UPPER
         CMP #'E'
         BEQ DO_IF_TRY_ELSE
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA DO_IF_SKIP
 DO_IF_TRY_ELSE:
         LDX.W #(KW_ELSE & $FFFF)
         LDY.W #KW_ELSE_END - KW_ELSE
         JSR MATCHKW
         BCS DO_IF_SKIP_END
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA DO_IF_SKIP
 DO_IF_SKIP_END:
         RTS
@@ -670,7 +670,7 @@ DO_ELSE:
 DO_ELSE_LOOP:
         LDA [ZP_SRC]
         BEQ DO_ELSE_DONE
-        INC ZP_SRC
+        JSR SRC_STEP
         BRA DO_ELSE_LOOP
 DO_ELSE_DONE:
         RTS
@@ -707,14 +707,14 @@ DO_FOR:
         SEC
         SBC #'A'
         STA ZP_VAR
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR SKIPSP
         LDA [ZP_SRC]
         CMP #'='
         BEQ DO_FOR_EQ
         BRA DO_FOR_BAD
 DO_FOR_EQ:
-        INC ZP_SRC
+        JSR SRC_STEP
         JSR EXPR
         JSR STORE_VAR
         LDX.W #(KW_TO & $FFFF)
@@ -723,12 +723,53 @@ DO_FOR_EQ:
         BCC DO_FOR_BAD
         JSR EXPR
         STX ZP_LIMIT            ; its own word: EXPR's scratch is not free
-        ; One step at a time, upwards: STEP is the next thing to go in, and a
-        ; step the machine could not honour would be worse than one it refuses.
+        LDX.W #(KW_STEP & $FFFF)
+        LDY.W #KW_STEP_END - KW_STEP
+        JSR MATCHKW
+        BCC DO_FOR_DEFAULT_STEP
+        JSR EXPR
+        REP #$20
+        CPX.W #0
+        SEP #$20
+        BEQ DO_FOR_BAD
+        STX ZP_NEWLEN
+        BRA DO_FOR_TEST
+DO_FOR_DEFAULT_STEP:
         REP #$20
         LDA.W #1
         STA ZP_NEWLEN
         SEP #$20
+        ; A loop whose start is already past its limit has no passes in it at
+        ; all -- `FOR I=5 TO 1` runs nothing -- and the 1982 machine already
+        ; answered that way. The body is skipped to the NEXT that matches this
+        ; FOR, and no frame goes on the stack, because there is nothing to come
+        ; back to.
+DO_FOR_TEST:
+        LDA ZP_VAR
+        JSR LOAD_VAR            ; X = the start, which STORE_VAR put away
+        REP #$20
+        TXA
+        EOR.W #$8000
+        STA ZP_VAL              ; the start, biased into unsigned order
+        LDA ZP_LIMIT
+        EOR.W #$8000
+        STA ZP_A                ; and the limit, the same way
+        LDA ZP_NEWLEN
+        BMI DO_FOR_DOWN
+        LDA ZP_VAL
+        CMP ZP_A
+        SEP #$20
+        BCC DO_FOR_FRAME        ; below the limit: the body runs
+        BEQ DO_FOR_FRAME        ; at it: one pass
+        BRA DO_FOR_SKIP
+DO_FOR_DOWN:
+        LDA ZP_VAL
+        CMP ZP_A
+        SEP #$20
+        BCS DO_FOR_FRAME        ; above the limit, counting down: it runs
+        BEQ DO_FOR_FRAME
+DO_FOR_SKIP:
+        JMP FOR_SKIP
 DO_FOR_FRAME:
         LDA ZP_FORSP
         CMP #FOR_MAX
@@ -768,6 +809,101 @@ DO_FOR_BAD:
         STA ZP_JFLAG
         RTS
 
+; FOR_SKIP: the text after a FOR statement that has no passes in it, skipped to
+; the NEXT that matches it, with ZP_SRC left after that NEXT and its variable.
+;
+; The scan counts FORs and NEXTs as words at statement boundaries, steps over
+; quoted literals because the letters inside one are not statements, and treats
+; a remark as the rest of its line. A line ends at its terminator, past which
+; the next record's number and text begin; a zero number there is the end of the
+; program, and then there is no NEXT to find.
+FOR_SKIP:
+        REP #$20
+        LDA.W #1
+        STA ZP_TMP16            ; how many FORs deep the scan is
+        SEP #$20
+FOR_SKIP_LOOP:
+        JSR SKIPSP
+        LDA [ZP_SRC]
+        BNE FOR_SKIP_TOKEN
+        BRA FOR_SKIP_NEXTLINE
+FOR_SKIP_TOKEN:
+        CMP #'"'
+        BEQ FOR_SKIP_STRING
+        LDX.W #(KW_REM & $FFFF)
+        LDY.W #KW_REM_END - KW_REM
+        JSR MATCHKW
+        BCS FOR_SKIP_REMARK
+        LDX.W #(KW_FOR & $FFFF)
+        LDY.W #KW_FOR_END - KW_FOR
+        JSR MATCHKW
+        BCS FOR_SKIP_DEEPER
+        LDX.W #(KW_NEXT & $FFFF)
+        LDY.W #KW_NEXT_END - KW_NEXT
+        JSR MATCHKW
+        BCS FOR_SKIP_SHALLOWER
+        JSR SRC_STEP
+        BRA FOR_SKIP_LOOP
+FOR_SKIP_DEEPER:
+        REP #$20
+        INC ZP_TMP16
+        SEP #$20
+        BRA FOR_SKIP_LOOP
+FOR_SKIP_SHALLOWER:
+        REP #$20
+        DEC ZP_TMP16
+        LDA ZP_TMP16
+        SEP #$20
+        BNE FOR_SKIP_LOOP
+        JSR IS_ALPHA            ; `NEXT I` names its variable; skip it too
+        BCC FOR_SKIP_DONE
+        JSR SRC_STEP
+FOR_SKIP_DONE:
+        RTS
+FOR_SKIP_STRING:
+        JSR SRC_STEP            ; past the opening quote
+FOR_SKIP_STRING_LOOP:
+        LDA [ZP_SRC]
+        BEQ FOR_SKIP_NEXTLINE   ; a quote that never closes ends its line
+        CMP #'"'
+        BEQ FOR_SKIP_STRING_END
+        JSR SRC_STEP
+        BRA FOR_SKIP_STRING_LOOP
+FOR_SKIP_STRING_END:
+        JSR SRC_STEP
+        BRA FOR_SKIP_LOOP
+FOR_SKIP_REMARK:
+        LDA [ZP_SRC]            ; the rest of the line is prose, not statements
+        BEQ FOR_SKIP_NEXTLINE
+        JSR SRC_STEP
+        BRA FOR_SKIP_REMARK
+FOR_SKIP_NEXTLINE:
+        REP #$20
+        LDA ZP_SRC
+        INC A                   ; past the terminator: the next record's number
+        TAX
+        SEP #$20
+        LDA $0000,X
+        BNE FOR_SKIP_NUMBER
+        LDA $0001,X
+        BNE FOR_SKIP_NUMBER
+        BRA FOR_SKIP_NONEXT     ; a zero number: there is no next record
+FOR_SKIP_NUMBER:
+        REP #$20
+        TXA
+        CLC
+        ADC.W #2
+        STA ZP_SRC              ; past the number: the next line's text
+        SEP #$20
+        LDA #0
+        STA ZP_SRC+2
+        BRA FOR_SKIP_LOOP
+FOR_SKIP_NONEXT:
+        JSR SAY_FORNEXT
+        LDA #3
+        STA ZP_JFLAG
+        RTS
+
 DO_NEXT:
         JSR SKIPSP
         LDA #$FF
@@ -779,7 +915,7 @@ DO_NEXT:
         SEC
         SBC #'A'
         STA ZP_VAR
-        INC ZP_SRC
+        JSR SRC_STEP
 DO_NEXT_FIND:
         LDA ZP_FORSP
         BEQ DO_NEXT_NONE

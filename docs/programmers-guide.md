@@ -108,7 +108,7 @@ same list again at `$00:FF00` in four-byte entries — `JSL` and `RTL` — becau
 `JSR` from bank one cannot reach bank zero. Code in bank one calls the long
 table.
 
-### Two rules the ROMs follow
+### Three rules the ROMs follow
 
 **The accumulator's width is a convention, not a guess.** `SEP #$20` makes it a
 byte, `REP #$20` a word. Every immediate between a `SEP` and its matching `REP`
@@ -124,6 +124,14 @@ four. Say `AND.W #1`.
 **The tube's position is the row and column pair.** `ZP_ROW` and `ZP_COL` are the
 only copy, and a routine turns them into an address. An offset kept alongside
 them drifts, and the drift shows up as text in the wrong place.
+
+**A memory increment is as wide as the accumulator.** `INC addr` moves one byte in
+eight-bit mode and two in sixteen, which is why a sixteen-bit pointer is never
+stepped by a bare `INC`: the low byte would wrap at the end of the page and the
+pointer would start the page again. `SRC_STEP` in the Kestrel 16's language and
+`DOS_STEP` in its KERNAL set the width, step the word and put the width back. A
+loop that reads text a character at a time is where this goes wrong, and the
+symptom is a long program that runs for ever and a short one that never fails.
 
 ### A routine, beginning to end
 

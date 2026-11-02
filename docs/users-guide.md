@@ -353,13 +353,27 @@ than its predecessor, and honest about it:
 | --- | --- |
 | `PRINT` | expressions and strings, `;` for no space, `,` for a space, a trailing `;` leaves the line open. `?` is shorthand |
 | `LET A=41` | or `A=41`; variables are `A` to `Z`, sixteen bits each |
+| `RUN` [`n`] / `LIST` [`n`] | run the stored program, or show it from line `n` |
+| `GOTO n` | continue at line `n` |
+| `IF cond THEN …` [`ELSE` …] | one branch or the other; a line number after `THEN` jumps |
+| `GOSUB n` / `RETURN` | sixteen levels of subroutine |
+| `FOR v=a TO b` [`STEP s`] … `NEXT v` | a loop; `s` defaults to `1` and may be negative, but not zero |
+| `FORMAT` / `CATALOG` | write a volume, or list what is on it |
+| `SAVE "NAME"` / `LOAD "NAME"` / `DELETE "NAME"` | the program store and Kestrel DOS 2.0 |
 | `CLS` | clears the screen and prints the banner |
 | `REM` | a remark |
 | `END` | ends the line |
 | `NEW` | starts again |
 
+A line that begins with a number is stored rather than run, and a number on its
+own removes that line.
+
+A colon separates statements, so one line may hold several: `PRINT 1+1: PRINT "C"`
+prints `2` and then `C`.
+
 Expressions are `+ - * /` with parentheses and unary minus; `*` and `/` bind
-tighter than `+` and `-`.
+tighter than `+` and `-`. Comparisons (`=` `<>` `<` `>` `<=` `>=`) give `-1` or
+`0`, and `AND`, `OR` and `NOT` combine them.
 
 ```basic
 PRINT 30000+1
@@ -382,11 +396,13 @@ PRINT A$
 
 ### What it does not do yet
 
-- **no `STEP`** — `FOR` counts up by one, and loops belong in a program;
+- **loops that span lines belong in a program** — a loop typed at the prompt runs
+  only as far as the end of its line, because each new line starts with no loops
+  pending; a loop whose `FOR` and `NEXT` share a line runs at the prompt;
 - **no strings as values** — `PRINT "text"` works, `A$` does not;
 - **no arrays and no functions** — no `DIM`, no `ABS`, no `DEF FN`;
-- **no filesystem in the language** — the disk device moves sectors; Kestrel DOS
-  2.0's table answers an error until it is written;
+- **a filesystem, in part** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD` and `DELETE`
+  work; there is no `FIND` statement;
 - **no cassette blocks** — the tape is a byte stream and the block format is not
   written.
 
@@ -477,6 +493,7 @@ compared with the `.expected` file beside it, so these programs run as written.
 | [05-table](../samples/kestrel16/05-table.bas) | a table, one row to a line |
 | [06-limits](../samples/kestrel16/06-limits.bas) | what the language does not do yet |
 | [07-branches-and-loops](../samples/kestrel16/07-branches-and-loops.bas) | `IF`/`THEN`, `GOSUB`/`RETURN` and `FOR`/`NEXT` in one program |
+| [08-for-step](../samples/kestrel16/08-for-step.bas) | positive and negative `STEP`, a loop that runs no times, `STEP 0` rejected |
 
 Run one:
 

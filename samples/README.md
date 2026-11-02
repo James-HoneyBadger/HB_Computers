@@ -40,9 +40,9 @@ Or type them in at the window, or from `./start.sh cli`.
 
 ## Kestrel 16 (1992), Kestrel 16 BASIC 2.0
 
-Some of these are direct statements, typed one at a time; the one that needs a
-stored program numbers its lines and ends with `RUN`, so the file can be typed at
-the machine as it stands.
+Some are direct statements, typed one at a time; the control-flow samples number
+their lines and end with `RUN`, so each file can be typed at the machine as it
+stands.
 
 | File | What it shows |
 | --- | --- |
@@ -53,3 +53,4 @@ the machine as it stands.
 | `05-table.bas` | a table, one row to a line |
 | `06-limits.bas` | what the language does not do yet, said plainly |
 | `07-branches-and-loops.bas` | `IF`/`THEN`, `GOSUB`/`RETURN` and `FOR`/`NEXT` |
+| `08-for-step.bas` | positive and negative `STEP`, a loop past its limit, `STEP 0` rejected |

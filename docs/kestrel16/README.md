@@ -169,13 +169,16 @@ THE ANSWER IS 42
 | `GOTO n` | Continue at line `n` |
 | `IF cond THEN … [ELSE …]` | One branch or the other; a line number after `THEN` jumps |
 | `GOSUB n` / `RETURN` | Sixteen levels of subroutine |
-| `FOR v=a TO b` … `NEXT v` | A loop; the body runs no times if `a` is already past `b` |
+| `FOR v=a TO b [STEP s]` … `NEXT v` | A loop; `s` may be positive or negative, defaults to `1`, and may not be zero |
 | `NEW` | Throw the program and the variables away |
 | `LET` | `LET A=41`, or `A=41`; variables are `A` to `Z`, sixteen bits each |
 | `CLS` | Clear the screen and print the banner |
 | `REM` | A remark |
 | `END` | Finish the line |
 | `NEW` | Start again |
+
+A colon separates statements, so a line may hold several:
+`PRINT "A";: PRINT "B"` prints `AB`.
 
 Expressions are `+ - * /` with parentheses and unary minus; `*` and `/` bind
 tighter than `+` and `-`. Comparisons (`=` `<>` `<` `>` `<=` `>=`) give `-1` or
@@ -216,20 +219,33 @@ Lines are held in bank zero from `$0800`, as records of a number, the text and a
 zero, in ascending order — there are no link pointers to be left pointing into a
 line that was edited, and a line is found by scanning. The program may not pass
 `$7E00`; past it the machine says `?NO ROOM`. A jump to a line that is not there
-says `?NO LINE` and stops the program.
+says `?NO LINE` and stops the program, and so do a `NEXT` with no `FOR` behind it
+(`?NEXT WITHOUT FOR`) and a `FOR` with no `NEXT` to reach (`?FOR WITHOUT NEXT`).
+
+A loop whose start is already past its limit has no passes in it at all, and its
+body is skipped rather than run once:
+
+```basic
+10 FOR I=5 TO 1
+20 PRINT "NEVER"
+30 NEXT I
+40 PRINT "DONE"
+RUN
+DONE
+```
 
 ### What it does not do yet
 
 The honest list, because a manual that hides it is worse than useless:
 
-- **no `STEP`** — a `FOR` counts up by one, and that is the only step there is;
-- **loops belong in a program** — a `FOR` typed at the prompt has no line to come
-  back to when the next line is typed;
+- **loops that span lines belong in a program** — a loop typed at the prompt runs
+  only as far as the end of its line, because each new line starts with no loops
+  and no subroutines pending. A whole loop on one line, colons and all, runs;
 - **no strings as values** — `PRINT "text"` works, `A$` does not;
 - **no arrays, no functions** — no `DIM`, no `ABS` or `LEN`, no `DEF FN`;
-- **a filesystem, in part** — `FORMAT` and `CATALOG` work, and `FIND`, `SAVE`,
-  `LOAD` and `DELETE` answer `1` (an error) until they are written. The volume
-  format below is fixed, so anything written against it keeps working;
+- **a filesystem, in part** — `FORMAT`, `CATALOG`, `SAVE`, `LOAD` and `DELETE`
+  work; there is no `FIND` statement. The volume format below is fixed, so
+  anything written against it keeps working;
 - **no cassette blocks** — the tape is a byte stream and the KERNAL has the
   registers, but the block format is not written.
 
@@ -246,11 +262,13 @@ volume. The header is sector 0:
 | 8 | 16 | the volume name, space padded |
 | 24 | 2 | the sector count, low byte first |
 | 26 | 6 | reserved |
-| 32 | 480 | the free map: one bit per sector, set means free |
+| 32 | 480 | the free map: one bit per sector, set means taken — the same way round as the 1982 DOS |
 
 The map is nearly a whole sector because 4096 sectors need 4096 bits. That is the
 one place this filesystem cannot simply be the 1982 one with larger numbers, and
-it is why the map starts at a fixed offset rather than following the name.
+it is why the map starts at a fixed offset rather than following the name. Four
+hundred and eighty bytes hold 3840 bits, so the top 256 sectors of the volume
+have no bit of their own and are never allocated.
 
 Sector 1 is the directory: sixteen entries of thirty-two bytes.
 
@@ -285,7 +303,7 @@ cd roms/kestrel16
     --origin 65536 --size 65536 --fill 0xFF --bin basic.bin --listing basic.lst
 ```
 
-### Two rules the ROMs follow
+### Three rules the ROMs follow
 
 **The accumulator's width is a convention, not a guess.** `SEP #$20` makes the
 accumulator a byte and `REP #$20` makes it a word; every immediate between a
@@ -293,6 +311,13 @@ accumulator a byte and `REP #$20` makes it a word; every immediate between a
 `.W`. The assembler cannot see the flags, so the source says what it means, and
 an immediate that does not fit its width is an error rather than a silent
 truncation.
+
+**A memory increment is as wide as the accumulator.** In eight-bit mode `INC addr`
+moves one byte and the byte above it is left alone, so a sixteen-bit pointer that
+passes a page boundary starts the page again. Every pointer here is stepped by a
+routine that sets the width first — `SRC_STEP` for the line being read, `DOS_STEP`
+for the filesystem's — and a bare `INC` on a word is a bug that shows itself only
+in a program long enough to cross a page.
 
 **The tube's position is the row and column pair.** `ZP_ROW` and `ZP_COL` are the
 only copy and `CELLOFFSET` turns them into an address. An offset kept alongside

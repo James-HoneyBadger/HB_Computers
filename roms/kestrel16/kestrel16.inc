@@ -142,7 +142,6 @@ ZP_DOSOFF       = $7F           ; 16-bit: an offset into the directory
 ZP_DOSCUR       = $81           ; 16-bit: an offset into whatever is being printed
 ZP_DOSFLAG      = $83           ; a byte: what the last look found
 ZP_DOSPTR       = $84           ; 24-bit: the buffer the filesystem is looking at
-ZP_DOSBANK      = $87           ; a byte: the bank it was looking in
 
 ; The program store, which the language and the filesystem both walk: records
 ; from PROGSTART, a zero number at the end, and the address of that zero number

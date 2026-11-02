@@ -648,7 +648,7 @@ SECTMOVE:
 ;   sector 0, offset 0   "HBDOS20" and a zero
 ;   offset 8             the volume name, sixteen bytes, space padded
 ;   offset 24            the sector count, low byte first
-;   offset 26            the free map: one bit per sector, a set bit is free
+;   offset 26            the free map: one bit per sector, a set bit is *taken*
 ;
 ; A 512-byte sector and 4096 of them means the map needs 512 bytes on its own, so
 ; it starts at offset 32 and runs to the end of the header.
@@ -768,9 +768,11 @@ DOSSTATUS:
 ; chain its sectors because a 1982 file was a stream of bytes; here the files
 ; are a program store, and its sectors are written and read in order.
 ;
-; The free map is one bit per sector, set when the sector is free. It runs from
-; offset 32 to the end of the header -- 480 bytes, 3840 bits -- so the top 256
-; sectors of the volume have no bit and are never allocated.
+; The free map is one bit per sector, set when the sector is *taken* -- the same
+; way round as the 1982 DOS and its FORMAT, which is what makes the two volumes
+; the same format at two sizes. It runs from offset 32 to the end of the header:
+; 480 bytes, 3840 bits, so the top 256 sectors of the volume have no bit and are
+; never allocated.
 ;
 ; Every entry below leaves the accumulator eight bits wide and the index
 ; registers sixteen, as the KERNAL does, and returns a status in A: zero for
@@ -925,13 +927,14 @@ DOS_MAPADDR:
 DOS_MAPBITS:
         .byte 1, 2, 4, 8, 16, 32, 64, 128
 
-; DOS_MAPTEST: X = a sector. Carry set when the map says it is free.
+; DOS_MAPTEST: X = a sector. Carry set when the map says it is free -- which is
+; a clear bit, because a set bit is a sector with something in it.
 DOS_MAPTEST:
         JSR DOS_MAPADDR
         LDA [ZP_DOSPTR]
         AND ZP_DOSFLAG
         REP #$10
-        BEQ MAPTEST_TAKEN
+        BNE MAPTEST_TAKEN
         SEC
         RTS
 MAPTEST_TAKEN:
@@ -1064,6 +1067,19 @@ FREERUN_LOOP:
         SEP #$20
         BRA FREERUN_LOOP
 FREERUN_DONE:
+        SEP #$20
+        RTS
+
+; DOS_STEP: ZP_DOSSRC goes on by one, in sixteen bits.
+;
+; A memory increment is as wide as the accumulator, and every walk here is in
+; eight-bit mode: `INC ZP_DOSSRC` there steps the low byte and carries into
+; nothing, so a pointer that passes a page boundary starts the page again.
+DOS_STEP:
+        REP #$20
+        LDA ZP_DOSSRC
+        INC A
+        STA ZP_DOSSRC
         SEP #$20
         RTS
 
@@ -1215,7 +1231,7 @@ PROGSIZE_TEXT:
 PROGSIZE_TEXT_LOOP:
         LDA [ZP_DOSSRC]
         BEQ PROGSIZE_NEXT
-        INC ZP_DOSSRC
+        JSR DOS_STEP
         REP #$20
         LDA ZP_DOSSRC
         CMP.W #PROG_LIMIT
@@ -1223,7 +1239,7 @@ PROGSIZE_TEXT_LOOP:
         SEP #$20
         BRA PROGSIZE_TEXT_LOOP
 PROGSIZE_NEXT:
-        INC ZP_DOSSRC           ; past the text's terminator: the next record
+        JSR DOS_STEP            ; past the text's terminator: the next record
         REP #$20
         LDA ZP_DOSSRC
         CMP.W #(PROG_LIMIT-2)   ; the terminator still has to fit
@@ -1531,7 +1547,7 @@ SAVE_COPY:
         BCS SAVE_WRITE
         LDA [ZP_DOSSRC]
         STA [ZP_DOSPTR],Y
-        INC ZP_DOSSRC
+        JSR DOS_STEP
         INY
         BRA SAVE_COPY
 SAVE_WRITE:
@@ -1675,7 +1691,7 @@ LOAD_COPY:
         BCS LOAD_NEXT
         LDA [ZP_DOSPTR],Y
         STA [ZP_DOSSRC]
-        INC ZP_DOSSRC
+        JSR DOS_STEP
         INY
         BRA LOAD_COPY
 LOAD_NEXT:
