@@ -252,3 +252,23 @@ fn an_operand_too_wide_for_its_form_is_refused() {
         );
     }
 }
+
+/// `PEI` takes a direct page address and reads its pointer from there. It had no
+/// bare-operand form in the parser at all, so the instruction the manual lists
+/// could not be assembled.
+#[test]
+fn pei_takes_a_direct_page_operand() {
+    let case = unique("pei");
+    let file = case.with_extension("s");
+    std::fs::write(&file, "  PEI $12\n  PEA $1234\n").expect("a source file");
+    let binary = case.with_extension("bin");
+    let output = Command::new(TOOL)
+        .arg(&file)
+        .args(["--origin", "0x8000", "--size", "8", "--fill", "0", "--bin"])
+        .arg(&binary)
+        .output()
+        .expect("the assembler to run");
+    assert!(output.status.success(), "{:?}", String::from_utf8_lossy(&output.stderr));
+    let bytes = std::fs::read(&binary).expect("an image");
+    assert_eq!(&bytes[..5], &[0xD4, 0x12, 0xF4, 0x34, 0x12], "PEI $12 ; PEA $1234");
+}

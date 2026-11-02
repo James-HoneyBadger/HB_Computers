@@ -432,6 +432,11 @@ impl SourceParser {
         }
         stmt.mode = if opcode::op_supports(&name, Mode::Dp) {
             Mode::Dp
+        } else if opcode::op_supports(&name, Mode::DpInd) {
+            // `PEI` takes a direct page address and reads the pointer from it;
+            // it is the one instruction whose bare operand is neither a value
+            // nor a plain address.
+            Mode::DpInd
         } else if opcode::op_supports(&name, Mode::Abs) {
             Mode::Abs
         } else if opcode::op_supports(&name, Mode::Long) {
