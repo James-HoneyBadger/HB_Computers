@@ -879,6 +879,10 @@ LOOKSLIKE_MAYBEDIGIT:
         BCS LOOKSLIKE_TWO
 LOOKSLIKE_SKIP:
         INY
+        LDA (B_TMPP),Y
+        CMP #'$'                ; A0$ is a name too, and three characters long
+        BNE LOOKSLIKE_TWO
+        INY
 LOOKSLIKE_TWO:
         LDA (B_TMPP),Y
         CMP #'='
@@ -909,7 +913,8 @@ PRINT_ITEMS:
         CMP #':'
         BEQ PRINT_NL
         CMP #'"'
-        BEQ PRINT_STRING
+        BEQ PRINT_ITEMS_LITERAL
+PRINT_ITEMS_EXPR:
         JSR EXPR
         LDA B_FLAGS
         AND #2
@@ -924,6 +929,39 @@ PRINT_ITEMS:
 PRINT_ITEMS_STRING:
         JSR STRPRINT
         JMP PRINT_SEPARATOR
+; A literal with nothing after it but the end of the statement, a ';' or a ','
+; is printed straight from the source, which is the common case and needs no
+; string built on the heap. A literal with an operator after it -- "A"+"B", or
+; a comparison -- is part of an expression, and the expression parser takes it.
+PRINT_ITEMS_LITERAL:
+        LDA B_IPTR
+        STA B_TMPP
+        LDA B_IPTR+1
+        STA B_TMPP+1
+        LDY #1
+PRINT_ITEMS_LITERAL_SCAN:
+        LDA (B_TMPP),Y
+        BEQ PRINT_STRING        ; no closing quote: print what is there
+        CMP #'"'
+        BEQ PRINT_ITEMS_LITERAL_AFTER
+        INY
+        BNE PRINT_ITEMS_LITERAL_SCAN
+        JMP PRINT_STRING
+PRINT_ITEMS_LITERAL_AFTER:
+        INY
+        LDA (B_TMPP),Y
+        CMP #' '
+        BEQ PRINT_ITEMS_LITERAL_AFTER
+        CMP #0
+        BEQ PRINT_STRING
+        CMP #':'
+        BEQ PRINT_STRING
+        CMP #';'
+        BEQ PRINT_STRING
+        CMP #','
+        BEQ PRINT_STRING
+        JMP PRINT_ITEMS_EXPR
+
 PRINT_STRING:
         JSR ADV                 ; past the opening quote
 PRINT_STRING_LOOP:
@@ -1572,7 +1610,7 @@ DO_INPUT:
         JSR SKIPSP
         JSR CURCHAR
         CMP #'"'
-        BNE INPUT_VAR
+        BNE INPUT_ASK           ; no prompt of its own: the question mark is it
         JSR ADV
 INPUT_PROMPT_LOOP:
         JSR CURCHAR
@@ -1602,10 +1640,13 @@ INPUT_VAR:
         STA B_VNAME1
         LDA B_TEMP2
         STA B_VNAME2
-        LDA B_VNAMET
+        LDA B_TEMP3             ; the type, which is what makes A$ a string
         STA B_VNAMET
 INPUT_READ:
         JSR K_GETLINE
+        LDA B_VNAMET
+        CMP #T_STR
+        BEQ INPUT_READ_STRING
         LDA #<INBUF
         STA B_IPTR
         LDA #>INBUF
@@ -1626,6 +1667,27 @@ INPUT_READ:
         BNE INPUT_DONE
         JSR ADV
         JMP INPUT_VAR
+; A string variable takes the line as it was typed, quotes and all being just
+; characters: reading it as a number would ask again for ever.
+INPUT_READ_STRING:
+        LDA #<INBUF
+        STA B_STRPTR
+        LDA #>INBUF
+        STA B_STRPTR+1
+        LDA ZP_INLEN
+        STA B_STRLEN
+        LDA B_VNAME1
+        STA B_TEMP
+        LDA B_VNAME2
+        STA B_TEMP2
+        LDA B_VNAMET
+        STA B_TEMP3
+        LDA B_FLAGS             ; STRASSIGN is being handed a string, not an
+        ORA #2                  ; expression that produced one
+        STA B_FLAGS
+        JSR STRASSIGN
+        JMP INPUT_DONE
+
 INPUT_REDO:
         LDA #<TXT_REDO
         STA ZP_STRPTR
@@ -1640,6 +1702,13 @@ INPUT_REDO:
         JSR K_CHROUT
         JMP INPUT_READ
 INPUT_DONE:
+        ; The line that was read is in INBUF, which is where the statement was
+        ; being read from: point the statement past it, or the executor reads
+        ; the answer as the rest of the statement.
+        LDA #<TXT_NOTHING
+        STA B_IPTR
+        LDA #>TXT_NOTHING
+        STA B_IPTR+1
         CLC
         RTS
 
@@ -2627,6 +2696,9 @@ TXT_IN:
         .text " IN "
         .byte 0
 
+TXT_NOTHING:
+        .byte 0
+
 TXT_REDO:
         .text "?REDO FROM START"
         .byte 13, 0
@@ -2686,9 +2758,11 @@ TXT_HELP:
         .byte 13
         .text "  four dimensions at most"
         .byte 13, 13
-        .text "FUNCTIONS OF YOUR OWN"
+        .text "FUNCTIONS OF YOUR OWN  (a line of the program)"
         .byte 13
-        .text "  DEF FN A(X)=X*X+1   PRINT FN A(3)"
+        .text "  10 DEF FN A(X)=X*X+1"
+        .byte 13
+        .text "  20 PRINT FN A(3)"
         .byte 13, 13
         .text "TAPE  the monitor ROM has S and L"
         .byte 13, 13, 0

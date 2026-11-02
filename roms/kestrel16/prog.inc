@@ -474,9 +474,7 @@ DO_LIST_WALK:
         JSR PP_SET_QP
         PLX
         JSR PRNUM
-        LDA #32
-        JSL L_CHROUT
-        LDA #32
+        LDA #32                 ; one space: the stored text has no leading one
         JSL L_CHROUT
         LDY.W #2
 DO_LIST_TEXT:

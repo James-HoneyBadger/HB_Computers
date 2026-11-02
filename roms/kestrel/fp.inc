@@ -924,6 +924,10 @@ FINT_SHIFT:
         STA B_TMP
         DEX
         BNE FINT_SHIFT
+        LDA B_TMP               ; what is about to be thrown away counts too: a
+        ORA B_WORK+2            ; half is a fraction, and a negative number with
+        ORA B_WORK+3            ; a fraction floors downwards
+        STA B_TMP
         LDA #0
         STA B_WORK+2
         STA B_WORK+3

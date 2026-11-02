@@ -698,9 +698,9 @@ PARSENAME:
         JSR CURCHAR
         JSR UPPER
         CMP #'A'
-        BCC PARSENAME_TYPE
+        BCC PARSENAME_DIGIT     ; below 'A' is a digit, a type or the end
         CMP #'Z'+1
-        BCS PARSENAME_DIGIT
+        BCS PARSENAME_DIGIT     ; and so is above 'Z'
         STA B_TEMP2
         JSR ADV
         JMP PARSENAME_TYPE

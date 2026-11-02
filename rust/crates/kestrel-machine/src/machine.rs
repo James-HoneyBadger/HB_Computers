@@ -1775,6 +1775,100 @@ mod tests {
         }
     }
 
+    /// `INPUT` asks with a question mark, and a string variable takes the line
+    /// as it was typed: reading the answer as a number would ask again for ever.
+    #[test]
+    fn the_1982_machine_inputs_a_string_as_typed() {
+        let mut machine = boot(Model::Kestrel);
+        machine.type_line_paced("INPUT A$");
+        machine.run_frames(40);
+        machine.type_line_paced("WORD HERE");
+        machine.run_frames(40);
+        machine.type_line_paced("PRINT \"[\";A$;\"]\"");
+        machine.run_frames(40);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "? WORD HERE"),
+            "the question mark prompt:\n{screen}"
+        );
+        assert!(
+            screen.lines().any(|row| row.trim() == "[WORD HERE]"),
+            "the line, in the string:\n{screen}"
+        );
+        assert!(
+            !screen.contains("REDO"),
+            "an answer was refused:\n{screen}"
+        );
+    }
+
+    /// `INT` is the whole part *below* a number, so a negative one with a
+    /// fraction floors downwards -- including the exact halves, whose fraction
+    /// lives in bits the small-number path was throwing away untested.
+    #[test]
+    fn the_1982_machine_floors_a_negative_number() {
+        let mut machine = boot(Model::Kestrel);
+        for line in [
+            "10 PRINT INT(2.5)",
+            "20 PRINT INT(-2.5)",
+            "30 PRINT INT(-0.5)",
+            "40 PRINT INT(-3.7)",
+            "50 PRINT INT(-10.5)",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(120);
+
+        let screen = machine.screen_text();
+        let rows: Vec<&str> = screen.lines().map(str::trim).collect();
+        for wanted in ["2", "-3", "-1", "-4", "-11"] {
+            assert!(rows.contains(&wanted), "no {wanted} in:\n{screen}");
+        }
+    }
+
+    /// A name is a letter and then, optionally, another letter or a digit: the
+    /// machine's own HELP says `A..Z  A0..Z9  A$..Z9$`, and the parser used to
+    /// route every digit past the second character.
+    #[test]
+    fn the_1982_machine_names_variables_with_a_digit() {
+        let mut machine = boot(Model::Kestrel);
+        for line in [
+            "10 A0=7",
+            "20 B9$=\"RED\"",
+            "30 DIM Q0(2)",
+            "40 Q0(1)=4",
+            "50 PRINT A0;B9$;Q0(1)",
+            "RUN",
+        ] {
+            machine.type_line_paced(line);
+        }
+        machine.run_frames(120);
+
+        let screen = machine.screen_text();
+        assert!(
+            screen.lines().any(|row| row.trim() == "7RED4"),
+            "the three values:\n{screen}"
+        );
+    }
+
+    /// A string literal may start an expression in `PRINT`: joining and
+    /// comparing literals is what the manual says `+` and the comparisons do.
+    #[test]
+    fn a_string_literal_can_start_an_expression() {
+        let mut machine = boot(Model::Kestrel);
+        machine.type_line_paced("PRINT \"A\"+\"B\"");
+        machine.type_line_paced("PRINT \"A\"<\"B\"");
+        machine.type_line_paced("PRINT \"LITERAL\"");
+        machine.run_frames(60);
+
+        let screen = machine.screen_text();
+        let rows: Vec<&str> = screen.lines().map(str::trim).collect();
+        assert!(rows.contains(&"AB"), "the joined literals:\n{screen}");
+        assert!(rows.contains(&"-1"), "the compared literals:\n{screen}");
+        assert!(rows.contains(&"LITERAL"), "the plain literal:\n{screen}");
+    }
+
     /// `INT` drops the fraction of a number of any size, not only of one that
     /// fits in the sixteen bits the small-number path works in.
     #[test]

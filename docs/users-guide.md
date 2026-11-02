@@ -67,7 +67,7 @@ blank line is nothing at all; the machine just prints its prompt again.
 | `PRINT item;item,item` | A `;` leaves the cursor where it is, so the next thing printed follows on. A `,` moves to the next column. A trailing `;` leaves the line open, which is why `PRINT 5;` shows `5READY.` |
 | `PRINT` | On its own, moves to a new line |
 | `?` | Shorthand for `PRINT` |
-| `INPUT A` | Waits for a line and stores what was typed. Anything unreadable asks again rather than stopping the program |
+| `INPUT A` | Asks with a `?`, then waits for a line and stores what was typed. A number that will not read asks again rather than stopping the program; `INPUT A$` takes the whole line as text, quotes and all being just characters |
 | `GET A$` | One key, without waiting for Return |
 
 Strings print as they are; numbers print in their shortest exact form, and a
