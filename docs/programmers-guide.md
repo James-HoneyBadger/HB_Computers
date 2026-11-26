@@ -279,7 +279,7 @@ Every crate carries the tests for what it is:
 
 ```bash
 ./start.sh test                     # all of them
-cd rust && cargo test -p kestrel-machine   # one crate, with its own output
+cd rust && cargo test --locked -p kestrel-machine   # one crate, with its own output
 ```
 
 The framework is Rust's: `#[test]`, `assert_eq!` and `cargo test`. What the

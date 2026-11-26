@@ -355,7 +355,7 @@ a file that will not fit in any hole is refused rather than split.
 The Kestrel 16 has no language socket. Its language is one whole bank, and a
 machine of 1992 sold its extra software on a cartridge instead of on a chip, so
 the bank holds what the machine was switched on with — Kestrel 16 BASIC 2.0 — and
-everything else lives in [the cartridge catalogue](../cartridges/README.md). The
+everything else lives in [the cartridge catalogue](../../cartridges/README.md). The
 1982 machine, by contrast, has a socket and a series of ROMs for it: see
 [the ROM catalogue](../../roms/README.md).
 

@@ -34,7 +34,7 @@ fetched from a ROM image and executed.
 
 ## What you need
 
-- a Rust toolchain (`cargo` and `rustc`);
+- Rust 1.95 (`cargo` and `rustc`); the repository pins the toolchain through rustup;
 - a display, if you want the window. Without one the machines, the two
   assemblers, the command line, the emulator and the tests all still work;
 - a terminal.
@@ -43,7 +43,7 @@ fetched from a ROM image and executed.
 
 ```bash
 cd rust
-cargo build --release
+cargo build --release --locked
 ```
 
 Or, with the start script in the root of the tree:
