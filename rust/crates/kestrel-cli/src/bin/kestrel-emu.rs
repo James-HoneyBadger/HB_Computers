@@ -418,6 +418,7 @@ fn main() -> ExitCode {
     let mut images_arg: Option<PathBuf> = None;
     let mut rom: Option<String> = None;
     let mut cartridge: Option<String> = None;
+    let mut list_languages = false;
 
     let mut index = 0;
     while index < arguments.len() {
@@ -442,7 +443,13 @@ fn main() -> ExitCode {
                 };
             }
             "--frames" => {
-                frames = value(&mut index).and_then(|text| text.parse().ok()).unwrap_or(20);
+                frames = match value(&mut index).and_then(|text| text.parse::<i32>().ok()) {
+                    Some(count) if count > 0 => count,
+                    _ => {
+                        eprintln!("kestrel_emu: --frames needs a positive integer");
+                        return ExitCode::from(2);
+                    }
+                };
             }
             "--type" => match value(&mut index) {
                 Some(text) => lines.push(text),
@@ -461,22 +468,14 @@ fn main() -> ExitCode {
                     return ExitCode::from(2);
                 }
             },
-            "--roms" => images_arg = value(&mut index).map(PathBuf::from),
-            "--languages" => {
-                let which = model.unwrap_or(Model::Kestrel);
-                match kestrel_machine::roms::shipped_languages(which) {
-                    Ok(names) => {
-                        for name in names {
-                            println!("{name}");
-                        }
-                        return ExitCode::SUCCESS;
-                    }
-                    Err(message) => {
-                        eprintln!("kestrel_emu: {message}");
-                        return ExitCode::from(1);
-                    }
+            "--roms" => match value(&mut index) {
+                Some(path) => images_arg = Some(PathBuf::from(path)),
+                None => {
+                    eprintln!("kestrel_emu: --roms needs a directory");
+                    return ExitCode::from(2);
                 }
-            }
+            },
+            "--languages" => list_languages = true,
             "--cart" => match value(&mut index) {
                 Some(which) => cartridge = Some(which),
                 None => {
@@ -495,6 +494,21 @@ fn main() -> ExitCode {
             }
         }
         index += 1;
+    }
+
+    if list_languages {
+        return match kestrel_machine::roms::shipped_languages(model.unwrap_or(Model::Kestrel)) {
+            Ok(names) => {
+                for name in names {
+                    println!("{name}");
+                }
+                ExitCode::SUCCESS
+            }
+            Err(message) => {
+                eprintln!("kestrel_emu: {message}");
+                ExitCode::from(1)
+            }
+        };
     }
 
     let interactive = std::io::stdin().is_terminal();

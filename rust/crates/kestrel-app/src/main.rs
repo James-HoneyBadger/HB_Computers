@@ -2226,7 +2226,14 @@ fn main() -> eframe::Result<()> {
     let mut language: Option<String> = None;
     let mut index = 0;
     while index < arguments.len() {
-        match arguments[index].as_str() {
+        let argument = arguments[index].as_str();
+        if matches!(argument, "--roms" | "--cart" | "--rom" | "--shot")
+            && arguments.get(index + 1).is_none_or(|value| value.starts_with("--"))
+        {
+            eprintln!("kestrel_computers: {argument} needs a value");
+            std::process::exit(2);
+        }
+        match argument {
             "--model" => {
                 index += 1;
                 model = match arguments.get(index).map(String::as_str) {
@@ -2260,7 +2267,7 @@ fn main() -> eframe::Result<()> {
                      \x20                         [--roms DIR] [--cart NAME|FILE] [--shot PNG]\n\
                      \n\
                      \x20 --model   which machine to power on (default kestrel)\n\
-                     \x20 --roms    where the assembled images are (default build/generated)\n\
+                     \x20 --roms    where the assembled images are (default: assemble from roms/)\n\
                      \x20 --rom     which language to put in the machine, by name from roms/\n\
                      \x20 --cart    a cartridge to fit, by name from cartridges/ or as an image\n\
                      \x20 --shot    write a PNG of the window once it has settled, then leave"
@@ -2323,7 +2330,9 @@ mod tests {
         // is read once the layout has stopped moving.
         for pass in 0..4 {
             input.time = Some(f64::from(pass) / 60.0);
-            let _ = ctx.run_ui(input.clone(), |ui| app.settings_window(ui.ctx()));
+            let mut output = ctx.run_ui(input.clone(), |ui| app.settings_window(ui.ctx()));
+            // This is a layout-only test: no renderer consumes the texture updates.
+            output.textures_delta.clear();
             used = ctx.globally_used_rect();
         }
         used

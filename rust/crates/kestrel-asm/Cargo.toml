@@ -3,6 +3,7 @@ name = "kestrel-asm"
 description = "The 6502 assembler that turns the Kestrel's ROM sources into the images it boots"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 
 [lib]

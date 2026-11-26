@@ -1,0 +1,27 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux desktop build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libx11-dev libxi-dev libgl1-mesa-dev libxkbcommon-dev libwayland-dev
+      - name: Build and test
+        working-directory: rust
+        run: |
+          cargo build --workspace --locked
+          cargo test --workspace --locked
+      - name: Boot both machines
+        run: |
+          rust/target/debug/kestrel --model kestrel --type "PRINT 2+2"
+          rust/target/debug/kestrel --model kestrel16 --type "PRINT 2+2"

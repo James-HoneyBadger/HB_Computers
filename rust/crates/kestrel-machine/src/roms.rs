@@ -52,20 +52,16 @@ impl ShippedRoms {
 }
 
 /// Where the assembly sources are: `KESTREL_SOURCES` if it is set, otherwise
-/// the first `roms/` found by walking up from this crate, from the running
-/// program, or from the working directory.
+/// the first `roms/` found by walking up from the running program, the
+/// working directory, or this crate (development fallback).
 ///
-/// The first of those is where the sources are during development. The other
-/// two are what makes a build useful away from the machine that made it: a
-/// program carries the source path of its own build inside it, so a copy taken
-/// somewhere else would otherwise look for `roms/` in a directory that is not
-/// there. Beside the program, or in the directory it is called from, is where
-/// a release keeps them.
+/// Prefer sources shipped with the executable over the original build checkout.
+/// The compile-time path is only a fallback for development and tests.
 pub fn source_directory() -> Result<PathBuf, String> {
     if let Some(path) = std::env::var_os("KESTREL_SOURCES") {
         return Ok(PathBuf::from(path));
     }
-    let mut starts = vec![PathBuf::from(env!("CARGO_MANIFEST_DIR"))];
+    let mut starts = Vec::new();
     if let Some(directory) = std::env::current_exe()
         .ok()
         .and_then(|program| program.parent().map(Path::to_path_buf))
@@ -75,6 +71,7 @@ pub fn source_directory() -> Result<PathBuf, String> {
     if let Ok(directory) = std::env::current_dir() {
         starts.push(directory);
     }
+    starts.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
     starts
         .iter()
         .find_map(|start| roms_below(start))

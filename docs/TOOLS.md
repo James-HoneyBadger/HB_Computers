@@ -285,8 +285,8 @@ before the window opens:
 
 ```bash
 cd rust
-cargo build --release    # the five programs, in rust/target/release
-cargo test               # every suite
+cargo build --release --locked    # the five programs, in rust/target/release
+cargo test --workspace --locked # every suite
 ```
 
 | Crate | Builds |

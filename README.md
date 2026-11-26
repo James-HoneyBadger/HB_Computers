@@ -1,4 +1,4 @@
-# The Kestrel
+# HB Computers — The Kestrel
 
 Two fictional home computers — one from 1982, one from 1992 — and the emulator
 that runs both.
@@ -43,7 +43,7 @@ processors are the parts the machines really had, and each is used whole.
 | | Kestrel (1982) | Kestrel 16 (1992) |
 | --- | --- | --- |
 | Processor | MOS 6502, 1 MHz | WDC 65C816, 8 MHz |
-| Memory | 64 KiB | 16 MiB of address space, 1 MiB of RAM |
+| Memory | 32 KiB RAM, 64 KiB address space | 16 MiB of address space, 1 MiB of RAM |
 | Screen | 40 × 25 cells | 80 × 50 cells |
 | Language | a 16 KiB socket ROM | a 64 KiB bank of its own |
 | Disk | 512 sectors of 256 bytes | 4096 sectors of 512 bytes |
@@ -51,14 +51,14 @@ processors are the parts the machines really had, and each is used whole.
 
 ## Building
 
-A Rust toolchain, and a desktop for the window. Everything is in
+Rust 1.95 or newer, and a desktop for the window. On Ubuntu, install the development packages listed in the Vagrantfile. The first build downloads dependencies; subsequent offline builds can use the Cargo cache. Everything is in
 [rust/](rust); the ROMs need no build of their own because the programs assemble
 them from [roms/](roms) when they start.
 
 ```bash
 cd rust
-cargo build --release
-cargo test
+cargo build --release --locked
+cargo test --workspace --locked
 ```
 
 The suites cover the two assemblers, the two processors, the bus and its devices,
@@ -135,3 +135,7 @@ Four books, two references and the machines' own manuals; [the index](docs/READM
 The machines' own books are the long form of the language and hardware chapters:
 [the Kestrel Owner's Manual](docs/kestrel/README.md) and
 [the Kestrel 16 Owner's Manual](docs/kestrel16/README.md).
+
+## License
+
+[MIT](LICENSE). Part of the Honey Badger Universe. See [CONTRIBUTING.md](CONTRIBUTING.md) for maintenance and contribution guidance.
