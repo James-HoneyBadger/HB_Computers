@@ -1,8 +1,9 @@
 [package]
 name = "kestrel-machine"
-description = "The Kestrel and the Kestrel 16: the profile, the devices, and (to come) the two processors"
+description = "The Kestrel and the Kestrel 16: the profile, the devices, and the two processors"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 
 [dependencies]

@@ -10,12 +10,12 @@ The port is far enough along to boot both machines and answer BASIC:
 
 ```bash
 cd rust
-cargo run --offline --bin kestrel -- --type 'PRINT 2+2*3'
-cargo run --offline --bin kestrel -- --model kestrel16 --type 'PRINT 1000*20'
-cargo run --offline --bin kestrel -- --file ../samples/kestrel/03-fibonacci.bas --type RUN
-cargo run --offline --bin kestrel_emu                 # the interactive one
-cargo run --offline --bin kestrel_computers           # the window
-cargo test --offline
+cargo run --locked --bin kestrel -- --type 'PRINT 2+2*3'
+cargo run --locked --bin kestrel -- --model kestrel16 --type 'PRINT 1000*20'
+cargo run --locked --bin kestrel -- --file ../samples/kestrel/03-fibonacci.bas --type RUN
+cargo run --locked --bin kestrel_emu                 # the interactive one
+cargo run --locked --bin kestrel_computers           # the window
+cargo test --locked
 ```
 
 The window is the one place the port cannot be proved by a diff: it is proved by
@@ -27,15 +27,10 @@ ROM or a tape, decided by the file's size.
 picture of the machine:
 
 ```bash
-xvfb-run -a cargo run --offline --bin kestrel_computers -- --shot shot.png
+xvfb-run -a cargo run --locked --bin kestrel_computers -- --shot shot.png
 ```
 
-Two deliberate simplifications, so nobody goes looking for them:
-
-- there are no disk or tape file dialogs: a file dropped on the window is the
-  modern answer, so `Tape > Stop` is the whole menu;
-- nothing survives a restart: eframe can persist settings, and nothing yet needs
-  to.
+The window supports mounting and saving media, and saving and loading text configuration files. See the [instruction manual](../docs/instruction-manual.md) for current controls.
 
 | Crate | Ported from | State |
 | --- | --- | --- |
@@ -65,10 +60,7 @@ Three kinds of test, in rising order of strength:
   three ROM sources and its image, symbol table, listing and header compared
   byte for byte with the ones the C++ build generated.
 
-The images the port loads are still assembled by the C++ build; a Rust-only
-checkout has no ROMs, so those tests say so rather than passing quietly.
-`crates/kestrel-asm` now assembles the same three ROMs to the same bytes, so
-which tool produces them no longer matters.
+The current Rust-only checkout assembles its ROMs at startup using the included assemblers. Historical C++ differential comparisons require separately generated reference artifacts.
 
 ## When the two trees disagree
 

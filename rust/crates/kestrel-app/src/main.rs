@@ -2323,7 +2323,9 @@ mod tests {
         // is read once the layout has stopped moving.
         for pass in 0..4 {
             input.time = Some(f64::from(pass) / 60.0);
-            let _ = ctx.run_ui(input.clone(), |ui| app.settings_window(ui.ctx()));
+            let mut output = ctx.run_ui(input.clone(), |ui| app.settings_window(ui.ctx()));
+            // This is a layout-only test: no renderer consumes the texture updates.
+            output.textures_delta.clear();
             used = ctx.globally_used_rect();
         }
         used

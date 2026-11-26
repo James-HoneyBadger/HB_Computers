@@ -41,9 +41,8 @@ TEXT
 }
 
 build_it() {
-    cd "$root/rust"
     local profile=${1:-release}
-    cargo build --offline --profile "$profile" --quiet
+    (cd "$root/rust" && cargo build --locked --profile "$profile" --quiet)
 }
 
 case "${1:-}" in
@@ -56,7 +55,7 @@ case "${1:-}" in
         ;;
     test)
         cd "$root/rust"
-        cargo test --offline
+        cargo test --workspace --locked
         ;;
     cli)
         shift

@@ -25,6 +25,8 @@ struct Options {
     roms: Option<PathBuf>,
     cartridge: Option<String>,
     screen: bool,
+    list_languages: bool,
+    list_cartridges: bool,
     disk: Option<PathBuf>,
     tape: Option<PathBuf>,
 }
@@ -63,6 +65,8 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
         roms: None,
         cartridge: None,
         screen: true,
+        list_languages: false,
+        list_cartridges: false,
         disk: None,
         tape: None,
     };
@@ -90,6 +94,9 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
                 options.frames = count
                     .parse()
                     .map_err(|_| format!("not a number of frames: {count}"))?;
+                if options.frames <= 0 {
+                    return Err("frames must be above zero".to_string());
+                }
             }
             "--type" => options.lines.push(value()?),
             "--file" => {
@@ -100,26 +107,9 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
             }
             "--rom" => options.rom = Some(value()?),
             "--roms" => options.roms = Some(PathBuf::from(value()?)),
-            "--languages" => {
-                for name in kestrel_machine::roms::shipped_languages(options.model)
-                    .map_err(|error| error.to_string())?
-                {
-                    println!("{name}");
-                }
-                return Err(String::new());
-            }
+            "--languages" => options.list_languages = true,
             "--cart" => options.cartridge = Some(value()?),
-            "--cartridges" => {
-                let names = kestrel_machine::roms::shipped_cartridges(options.model)
-                    .map_err(|error| error.to_string())?;
-                if names.is_empty() {
-                    println!("no cartridges for this model");
-                }
-                for name in names {
-                    println!("{name}");
-                }
-                return Err(String::new());
-            }
+            "--cartridges" => options.list_cartridges = true,
             "--disk" => options.disk = Some(PathBuf::from(value()?)),
             "--tape" => options.tape = Some(PathBuf::from(value()?)),
             "--no-screen" => options.screen = false,
@@ -135,6 +125,23 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
 }
 
 fn run(options: &Options) -> Result<(), String> {
+    if options.list_languages || options.list_cartridges {
+        if options.list_languages {
+            for name in kestrel_machine::roms::shipped_languages(options.model)? {
+                println!("{name}");
+            }
+        }
+        if options.list_cartridges {
+            let names = kestrel_machine::roms::shipped_cartridges(options.model)?;
+            if names.is_empty() {
+                println!("no cartridges for this model");
+            }
+            for name in names {
+                println!("{name}");
+            }
+        }
+        return Ok(());
+    }
     let mut machine = Machine::new(options.model);
     match options.roms.as_deref() {
         Some(directory) => machine
@@ -234,7 +241,7 @@ fn main() -> ExitCode {
                 eprintln!("kestrel: {message}");
                 usage();
             }
-            return ExitCode::from(2);
+            return if message.is_empty() { ExitCode::SUCCESS } else { ExitCode::from(2) };
         }
     };
     match run(&options) {

@@ -44,8 +44,9 @@ $build = <<~SHELL
   cd /vagrant
   export PATH="$HOME/.cargo/bin:$PATH"
   cd rust
-  cargo build --release
-  cargo test
+  rustup toolchain install 1.95.0 --profile minimal
+  cargo build --release --locked
+  cargo test --workspace --locked
 
   echo
   echo "The machines are built. From here:"

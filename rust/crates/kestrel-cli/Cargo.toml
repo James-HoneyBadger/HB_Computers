@@ -2,6 +2,7 @@
 name = "kestrel-cli"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "The Rust port's command line: boot a Kestrel, type at it, print the tube"
 
