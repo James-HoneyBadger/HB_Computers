@@ -37,9 +37,7 @@ assembly for the ROMs — so both are changed together.
 
 ## The two profiles
 
-Everything that differs between the machines is two constants, `KESTREL` and
-`KESTREL16`, in `rust/crates/kestrel-machine/src/profile.rs`. Nothing else in the
-emulator knows which machine it is running.
+The principal hardware parameters are the `KESTREL` and `KESTREL16` constants in `rust/crates/kestrel-machine/src/profile.rs`. Model-specific address decoding and processor behavior are implemented separately.
 
 | | Kestrel | Kestrel 16 |
 | --- | --- | --- |
@@ -90,7 +88,7 @@ last, then sets the scrolled flag in the I/O page.
 
 ## The Kestrel 16's map
 
-The 65816 sees twenty-four address lines, so the machine is sixteen 64 KiB banks.
+The 65816 addresses 256 banks of 64 KiB (16 MiB). The first sixteen banks contain 1 MiB of backing RAM, subject to the overlays below.
 Bank zero keeps the shape the Kestrel had, which is what makes them one family.
 
 | Bank | Address | What |
@@ -108,10 +106,10 @@ Bank zero keeps the shape the Kestrel had, which is what makes them one family.
 | `$01` | `$0000`–`$FFFF` | The language ROM, whole |
 | `$02` | | RAM: the filesystem's header, directory and sector buffer |
 | `$03` | | RAM: the language's strings (a slot a letter), its array table and its heap, where a string array keeps whole slots, and its twenty-six `DEF FN` texts |
-| `$04`–`$07` | | The cartridge's RAM, 256 KiB, when one is fitted |
+| `$04`–`$07` | | Cartridge read window: 128 KiB in $04–$05, $FF in $06–$07 when fitted; zero when absent |
 | `$08`–`$0F` | | RAM |
 
-A megabyte is all sixteen banks; what the table lists as ROM, cartridge and I/O
+A megabyte is the first sixteen banks; what the table lists as ROM, cartridge and I/O
 is what stands in front of it. The screen row is 80 cells, so row `r`, column `c`
 is `$00:8000 + r*80 + c`.
 
@@ -203,8 +201,7 @@ are the whole of it.
 
 **The Kestrel 16**, bank zero: the KERNAL first (it is at the top of the bank and
 wins over RAM), then the cartridge, the screen, the attributes, the I/O page, and
-RAM for everything else. Bank `$01` is the language ROM; banks `$04`–`$07` are
-the cartridge when it is fitted; the rest are RAM.
+RAM for remaining addresses below the I/O page; unmapped addresses above it read zero. Bank $01 is language ROM. Banks $04–$07 are cartridge read windows (zero without a cartridge); writes in those banks reach backing RAM. Other installed banks read RAM; addresses beyond installed RAM read zero.
 
 A ROM image mounted for the wrong machine, or of the wrong size, is refused
 rather than padded: the KERNAL must be exactly 8 KiB, the language exactly 16 KiB
@@ -363,7 +360,7 @@ slot, and the language starts as usual.
 | --- | --- | --- |
 | The slot answers at | `$9000`–`$9FFF` | `$00:C000`–`$00:DFFF` |
 | The image | 4096 bytes | 131 072 bytes |
-| The whole image also answers | — | banks `$04`–`$07`, as the cartridge's own RAM |
+| The whole image also answers | — | banks `$04`–`$05` (image); `$06`–`$07` read $FF when fitted |
 | The check | `CART_SCAN`, called from `RESET` in `roms/kestrel/kernal.s` | `CART_SCAN`, called from `RESET` in `roms/kestrel16/kernal.s` |
 | Where it goes | the word at `$9004` | the word at `$00:C004`, an address in bank zero |
 

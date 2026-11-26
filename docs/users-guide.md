@@ -539,12 +539,15 @@ PRINT -7/2
 The quotient of a division rounds towards zero, and the sign comes from the two
 operands. A divisor of zero says `?WHAT?`.
 
-Anything the machine cannot read is `?WHAT?`, and nothing is printed for it:
+Strings are supported. For example:
 
 ```basic
+A$="HELLO"
 PRINT A$
-?WHAT?
+HELLO
 ```
+
+An unrecognized statement such as `WIBBLE` produces `?WHAT?`.
 
 ### What it has not got
 
@@ -567,7 +570,7 @@ as it does on the 1982 machine.
   by;
 - **`PEEK` and `POKE` reach bank zero only** — the tube, the I/O page and the
   program;
-- **the filesystem is complete** — `FORMAT`, `CATALOG`, `DIR`, `SAVE`, `LOAD`,
+- **the supported filesystem commands** — `FORMAT`, `CATALOG`, `DIR`, `SAVE`, `LOAD`,
   `DELETE` and `FIND`;
 - **the cassette moves the program store and nothing else** — `CSAVE "NAME"` and
   `CLOAD "NAME"`, as many blocks as fit on the tape, and no way to list what is

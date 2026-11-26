@@ -1,84 +1,42 @@
-# The Rust port
+# Rust workspace
 
-This is the tree: `Rust and egui`, which replaced the C++20 and Qt 6 the machine
-was first written in. The port was done the only way a rewrite of this size
-survives -- one crate at a time, each with the tests that prove it -- and the C++
-tree was kept until the port could do everything it did, then deleted. Its last
-state is in the history, where `git log --follow` will find it.
+The current implementation uses Rust and egui. See [Quickstart](../QUICKSTART.md) for installation and [Architecture](../docs/ARCHITECTURE.md) for the design.
 
-The port is far enough along to boot both machines and answer BASIC:
+## Build and test
 
-```bash
-cd rust
+From this directory:
+
+```sh
+cargo build --workspace --locked
+cargo test --workspace --locked
 cargo run --locked --bin kestrel -- --type 'PRINT 2+2*3'
 cargo run --locked --bin kestrel -- --model kestrel16 --type 'PRINT 1000*20'
-cargo run --locked --bin kestrel -- --file ../samples/kestrel/03-fibonacci.bas --type RUN
-cargo run --locked --bin kestrel_emu                 # the interactive one
-cargo run --locked --bin kestrel_computers           # the window
-cargo test --locked
+cargo run --locked --bin kestrel_emu
+cargo run --locked --bin kestrel_computers
 ```
 
-The window is the one place the port cannot be proved by a diff: it is proved by
-being opened and typed at. It draws the tube from the attribute bytes, takes the
-keys a person presses, and drops files onto the machine -- a cartridge, a socket
-ROM or a tape, decided by the file's size.
+The repository pins Rust 1.95.0 using rustup. The GUI requires platform graphics dependencies; consult the root README and Vagrantfile for Linux prerequisites. For headless use without compiling the GUI, build the CLI package only with `cargo build --locked -p kestrel-cli`.
 
-`--shot FILE` photographs the window and leaves, so a headless job can keep a
-picture of the machine:
+## Workspace layout
 
-```bash
+| Crate | Responsibility |
+| --- | --- |
+| kestrel-machine | Profiles, bus, devices, CPU cores and ROM assembly/loading |
+| kestrel-asm | 6502 assembler and CLI |
+| kestrel16-asm | 65816 assembler and CLI |
+| kestrel-cli | Batch CLI and interactive terminal emulator |
+| kestrel-app | egui desktop emulator |
+
+ROM sources and cartridges live outside the workspace at the repository root. They are assembled in memory at runtime by default; keep them with a distributed binary or set KESTREL_SOURCES to the ROM directory. Explicit preassembled images use the --roms option.
+
+## Verification
+
+The workspace tests cover both processors, device behavior, assembler encodings, booting the source ROMs, BASIC, cartridges, all 42 sample programs, frontend argument validation and the GUI settings layout. The layout test is not a substitute for interactive desktop testing.
+
+On Linux with a working virtual display and graphics backend, the GUI can capture a screenshot:
+
+```sh
 xvfb-run -a cargo run --locked --bin kestrel_computers -- --shot shot.png
 ```
 
-The window supports mounting and saving media, and saving and loading text configuration files. See the [instruction manual](../docs/instruction-manual.md) for current controls.
-
-| Crate | Ported from | State |
-| --- | --- | --- |
-| `kestrel-machine` | the machine, its devices, the bus and the two processors | done |
-| `kestrel-asm`, `kestrel16-asm` | the two assemblers | done, and byte-identical on all five ROMs |
-| `kestrel-cli` | the command line and the interactive emulator | done |
-| `kestrel-app` | the window | done |
-
-## What proves it
-
-Three kinds of test, in rising order of strength:
-
-- **the ported suites.** `cpu6502.rs` and `cpu65816.rs` carry the C++ cores'
-  unit tests, ported rather than summarised — addressing, arithmetic and flags,
-  the decimal modes, the stack, interrupts, cycle counts.
-- **the ported tables.** Each core's opcode map is generated from the C++'s, so
-  an opcode is in both trees or in neither, at the same cycle count.
-- **the samples** (`crates/kestrel-cli/tests/samples.rs`). All twenty-four sample
-  programs in `samples/` are typed at the Rust machine and checked against the
-  same `.expected` files the C++ suite uses. That is the whole machine — bus,
-  processor, KERNAL and language ROM — agreeing screenful by screenful;
-- **the tools** (`crates/kestrel-cli/tests/emulator.rs`). The interactive
-  emulator's session commands, asked of the built binary, as the C++
-  `kestrel_emu_tests` asks them.
-- **the assembler** (`crates/kestrel-asm`). The C++ suite in
-  the C++ suite's tests are ported, and the binary is then run over the
-  three ROM sources and its image, symbol table, listing and header compared
-  byte for byte with the ones the C++ build generated.
-
-The current Rust-only checkout assembles its ROMs at startup using the included assemblers. Historical C++ differential comparisons require separately generated reference artifacts.
-
-## When the two trees disagree
-
-`cargo run --example differential` prints a per-frame hash of the machine —
-registers, all of bank-zero RAM and the tube. The counterpart is thirty lines of
-C++ linked against `build/libkestrel_machine.a` printing the same line, and
-`diff` names the first frame that differs. That found the 6502's missing `INC`
-and `DEC` flags: everything agreed until one instruction, where `INC $20` left
-the zero flag alone, `BNE` fell through, and a line of BASIC printed nothing.
-
-## Reading it
-
-The port was made file by file against the original, and the shape is still
-visible: `profile.rs` is the model table, `devices.rs` the four devices, `bus.rs`
-the address decode and the I/O page, `machine.rs` the processor joined to it.
-Each module's header says what it is and, where it matters, why it is that way.
-
-The numbers the machine's behaviour rests on are asserted in tests -- the profiles
-against the documented figures, the opcode maps against the assemblers, the
-machines against the sample programs' `.expected` files -- so a drift shows up as
-a failing test rather than as a machine that behaves differently.
+See [development history](../docs/development-history.md) for the earlier C++ implementation and migration.

@@ -33,6 +33,8 @@ PRINT 2+2
 4
 ```
 
+**New here?** Start with the [Quickstart](QUICKSTART.md), then explore the [BASIC dialect comparison](docs/basic-comparison.md) and [manuals](docs/README.md).
+
 ## One machine, two models
 
 `Machine` is built for a `Model`, and a profile table says what that

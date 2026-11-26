@@ -25,3 +25,5 @@ jobs:
         run: |
           rust/target/debug/kestrel --model kestrel --type "PRINT 2+2"
           rust/target/debug/kestrel --model kestrel16 --type "PRINT 2+2"
+      - name: Check documentation
+        run: python3 scripts/check_docs.py rust/target/debug/kestrel

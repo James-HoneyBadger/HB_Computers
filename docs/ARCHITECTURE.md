@@ -49,7 +49,7 @@ arrays and the I/O page.
 
 The two processors are not interchangeable: they are separate types, and the
 `Cpu` enum the machine holds is decided once at power-on, so only the one the
-model has is ever stepped. A fault in one cannot show up as a fault in the other.
+model has is ever stepped. The cores are separate, but shared bus, device and frontend changes may affect both models.
 
 ### The two models
 
@@ -70,8 +70,7 @@ repeat them for the ROMs. The three are changed together, in the same commit.
 The languages are not Rust: they are `roms/kestrel/*.s` and `roms/kestrel16/*.s`,
 assembled when a machine starts by `kestrel_asm` and `kestrel16_asm` — once per
 process, in memory — and handed to the bus as bytes. There is no ROM build step,
-so a change to a `.s` file is in the next run and a test can never be run against
-yesterday's ROM. A change to a ROM is a change to the machine, and the machine
+so a source change is picked up on the next run when using source-assembled ROMs. The frontends can also explicitly load preassembled images with `--roms DIR`. A change to a ROM is a change to the machine, and the machine
 tests prove it by typing at the machine and reading the screen back.
 
 A `.s` file is a ROM and an `.inc` is a piece of one, so `roms.rs` builds the

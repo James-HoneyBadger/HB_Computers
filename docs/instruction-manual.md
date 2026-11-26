@@ -343,7 +343,7 @@ machine again, which is what a cartridge always needed.
 
 | What you see | What it means |
 | --- | --- |
-| A key does nothing | The keyboard controller holds sixteen keys and is emptied fifty times a second. Typing faster than the emulated machine reads loses keys, exactly as it would have in 1982. The command line paces itself; a window pasting text may not |
+| A key does nothing | The keyboard controller holds sixteen keys on Kestrel or thirty-two on Kestrel 16; ROM interrupt handlers drain it. Typing faster than the emulated machine reads loses keys, exactly as it would have in 1982. The command line paces itself; a window pasting text may not |
 | Two lines joined together | The same thing: the Return went missing with the last key. Press Return |
 | `?SYNTAX ERROR` | The line is not a statement the language has, or something followed a statement that was not a `:` |
 | `?OUT OF MEMORY` | The program, its variables and its strings no longer fit between `$0801` and the top of the free memory |
@@ -358,8 +358,7 @@ machine again, which is what a cartridge always needed.
 - **Changing the ROM socket** cold-boots the Kestrel, which clears memory.
 - **Saving a disk** writes the whole volume, including its free map, so an image
   file is a photograph of a disk rather than a list of files.
-- **Leaving the window open** costs nothing but a frame interrupt fifty times a
-  second; the machines have no idle state to enter.
+- **Leaving the window open** continues emulation and display updates. Pause or quit to reduce host CPU usage.
 
 ---
 

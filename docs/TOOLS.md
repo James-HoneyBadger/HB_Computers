@@ -132,7 +132,7 @@ READY.
 | `--model kestrel\|kestrel16` | Which machine to power on; `kestrel` by default |
 | `--frames N` | Frames to run before typing and again after it (default 40) |
 | `--type "LINE"` | Type a line at the prompt and let the machine answer; may be repeated |
-| `--file FILE` | Type every line of a file, in order, before any `--type` line |
+| `--file FILE` | Type every line of a file at that position in the argument sequence |
 | `--rom NAME` | Which language to put in the machine: one of the names `--languages` lists (see below) |
 | `--languages` | List the language ROMs `roms/` holds for the model and exit |
 | `--roms DIR` | Load the assembled images from `DIR` instead of assembling them |
@@ -148,8 +148,7 @@ means something.
 
 The machine types at the speed it could be typed at: a key goes in only when the
 keyboard controller has room for it, and each line waits for the buffer to empty
-before the next. Pasting a whole line in at once overruns the sixteen-key buffer
-and loses characters, Return included — which welds two program lines into one.
+before the next. Pasting a whole line in at once can overrun the 16-key (Kestrel) or 32-key (Kestrel 16) buffer and lose characters, Return included — which welds two program lines into one.
 
 ```bash
 $ ./start.sh cli --rom monitor --type "S 0900 0902" --type "L"
@@ -263,8 +262,8 @@ The same machines with a tube you can watch and a keyboard you can use.
 ```
 
 The window is the machine on a bench: the tube, a menu bar, and a status line
-with a lamp for each piece of hardware. `Settings` -- `F12` -- opens a second
-window shaped after WinUAE's: a tree of properties down the left, the chosen
+with a lamp for each piece of hardware. `Settings` -- `F12` -- opens a settings
+sheet over the emulator, shaped after WinUAE's: a tree of properties down the left, the chosen
 page in groups on the right, and `OK`, `Cancel` and `Reset` along the foot. It
 sets the machine, the clock, the ROM and the cartridge, the disk and the tape,
 the zoom and the sound; `Ctrl+Q` closes the window.
@@ -297,6 +296,4 @@ cargo test --workspace --locked # every suite
 | `kestrel-cli` | `kestrel` and `kestrel_emu` |
 | `kestrel-app` | `kestrel_computers`, the window |
 
-There is no ROM build step: the programs assemble `roms/*.s` when they start, with
-the same two assemblers, once per process. A change to a `.s` file is therefore in
-the next run, and a test can never be run against yesterday's ROM.
+By default the programs assemble ROM sources once per process. A source change is picked up on the next run. The explicit `--roms DIR` option instead loads preassembled images.

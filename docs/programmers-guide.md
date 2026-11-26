@@ -128,7 +128,7 @@ which is why the sources are assembled to the full size with the rest left as
 | --- | --- |
 | `$00` | RAM, the screen, the I/O page, the KERNAL at `$E000` |
 | `$01` | The language ROM, 64 KiB. This is where BASIC lives |
-| `$04`–`$07` | A cartridge, when one is fitted: 64 KiB a bank, read-only. The same image also shows through an 8 KiB window at `$00:C000`–`$DFFF`. Writes still reach the RAM underneath |
+| `$04`–`$07` | Cartridge read window: image in banks $04–$05, $FF in $06–$07 when fitted; zero when absent. The first 8 KiB also appears at `$00:C000`–`$DFFF`. Bank $04–$07 writes reach backing RAM |
 
 The KERNAL's services are a table of `JSR`/`RTL` entries at `$00:E000`, and the
 same list again at `$00:FF00` in four-byte entries — `JSL` and `RTL` — because a
@@ -307,8 +307,7 @@ and compares the screen with the `.expected` file beside it.
 | `kestrel-app` | `kestrel_computers`, the window |
 
 Nothing is generated ahead of time. The machine assembles `roms/*.s` with the two
-ported assemblers when it starts, once per process, so a change to a `.s` file is
-in the next run and the tests can never be run against yesterday's ROM.
+ported assemblers when it starts, once per process, so a source change is picked up on the next run by default. Explicit preassembled images can be loaded with `--roms DIR`.
 
 `./start.sh` builds what is out of date and starts a machine; `Vagrantfile` does
 the same in a clean Ubuntu 22.04 guest if you want a build machine without
@@ -324,5 +323,4 @@ touching yours.
   of them is a defect; the code is what the machine does, so the book follows it
   in the same commit.
 - **The samples are tests.** A sample with no `.expected` file fails the suite.
-- **Nothing on the screen is drawn by the host.** It is the one rule that makes
-  these machines machines.
+- **Guest screen content comes from emulated machine state.** The host renders that state and its own interface; it does not implement BASIC.

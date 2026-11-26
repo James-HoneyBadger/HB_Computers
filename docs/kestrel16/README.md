@@ -1,6 +1,6 @@
 # The Kestrel 16 Owner's Manual
 
-HoneyBadger Systems' 1992 computer, and the Kestrel's successor. Same idea, ten
+HoneyBadger Systems' fictional 1992 computer, and the Kestrel's successor. Same idea, ten
 years on: a processor, a ROM socket, a tube, a keyboard and a disk, with the
 language in ROM rather than in the host. What the decade bought is width — a
 65816, a megabyte of banked memory, and sixteen-bit arithmetic in a language that
@@ -33,8 +33,7 @@ READY.
 
 ### The map
 
-The 65816 sees twenty-four address lines, so the machine is a row of 64 KiB banks
-rather than one page. Bank zero keeps the shape the Kestrel had.
+The 65816 addresses 256 banks of 64 KiB (16 MiB). The machine has 1 MiB of backing RAM in the first sixteen banks, subject to the overlays below. Bank zero keeps the shape the Kestrel had.
 
 | Bank | Address | What is there |
 | --- | --- | --- |
@@ -51,14 +50,14 @@ rather than one page. Bank zero keeps the shape the Kestrel had.
 | `$01` | `$0000`–`$FFFF` | The language ROM, whole |
 | `$02` | | RAM: the filesystem's header, directory and one sector's buffer |
 | `$03` | | RAM: the language's strings, its array table and heap, and its `DEF FN` texts |
-| `$04`–`$07` | | The cartridge image, when one is fitted; RAM when none is |
+| `$04`–`$07` | | Cartridge read window; zero when no cartridge is fitted |
 | `$08`–`$0F` | | RAM |
 
 A megabyte is all sixteen banks; what the table lists as ROM, cartridge and I/O
 stands in front of it. The cartridge itself is one 128 KiB image, and it appears
 in two places at once: the eight kilobytes at `$00:C000`–`$DFFF`, and the whole
 of it across banks `$04` and `$05`, with `$06` and `$07` reading `$FF` beyond
-the end of the image. Writes to either place are lost.
+the end of the image. Writes to the bank-zero window are ignored. Writes in banks $04–$07 reach backing RAM but reads remain mapped to the cartridge (or zero when absent).
 
 The map is written three times — `rust/crates/kestrel-machine/src/bus.rs` for the
 decode, `rust/crates/kestrel-machine/src/profile.rs` for the sizes and addresses,
@@ -222,13 +221,9 @@ A colon separates statements, so a line may hold several:
 Expressions are `+ - * /` with parentheses and unary minus; `*` and `/` bind
 tighter than `+` and `-`. Comparisons (`=` `<>` `<` `>` `<=` `>=`) give `-1` or
 `0`, and `AND`, `OR` and `NOT` combine them. Values are sixteen-bit signed integers, so
-`PRINT 30000+1` is `30001` and `PRINT 1000*20` is `20000` — neither of which the
-Kestrel's BASIC could hold.
+`PRINT 30000+1` is `30001` and `PRINT 1000*20` is `20000` ; the original Kestrel can also represent these values using floating point.
 
-A `PRINT` item has to be something the machine can read. It is evaluated first and
-printed only if it is whole, so `PRINT A$` — which is `A` followed by a character
-that means nothing here — says `?WHAT?` and prints no value at all, and
-`PRINT 1+2` still prints `3`.
+String variables can be printed directly: after `A$="HELLO"`, `PRINT A$` prints `HELLO`. Numeric expressions such as `PRINT 1+2` print `3`.
 
 Anything else is a mistake, and the machine says so:
 

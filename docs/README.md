@@ -36,6 +36,12 @@ A book and a machine that disagree are a defect in one of them, so a change to
 the machine, its maps or its dialect carries its documentation with it, in the
 same commit.
 
+## Additional guides
+
+- [Quickstart](../QUICKSTART.md) — get both machines running.
+- [BASIC dialect comparison](basic-comparison.md) — choose the right language.
+- [Development history](development-history.md) — the C++/Qt to Rust/egui migration.
+
 ## Reading order
 
 1. **Just want to see it run:** [Instruction Manual](instruction-manual.md), then
