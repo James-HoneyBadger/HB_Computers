@@ -278,3 +278,11 @@ fn pei_takes_a_direct_page_operand() {
     let bytes = std::fs::read(&binary).expect("an image");
     assert_eq!(&bytes[..5], &[0xD4, 0x12, 0xF4, 0x34, 0x12], "PEI $12 ; PEA $1234");
 }
+
+#[test]
+fn the_tool_reports_its_version() {
+    let output = Command::new(TOOL).arg("--version").output().expect("the tool to run");
+    assert!(output.status.success());
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(text.contains(env!("CARGO_PKG_VERSION")), "{text}");
+}

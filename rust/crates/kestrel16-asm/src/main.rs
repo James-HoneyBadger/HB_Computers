@@ -23,15 +23,17 @@ use kestrel16_asm::{expand_includes, Assembler, SourceParser};
 /// the same reason its diagnostics do: the two tools were written as one and
 /// this output has been that way since.
 const USAGE: &str = "\
-usage: kestrel_asm <source.s> [--name basic] [--origin $A000]
+usage: kestrel16_asm <source.s> [--name basic] [--origin $A000]
               [--size 16384] [--fill $FF]
               [--header out.hpp] [--bin out.bin]
               [--symbols out.sym] [--listing out.lst]
+              [--version]
 ";
 
 enum Outcome {
     Assembled,
     Help,
+    Version,
 }
 
 enum Failure {
@@ -54,6 +56,10 @@ fn main() -> ExitCode {
     match run(&arguments) {
         Ok(Outcome::Help) => {
             print!("{USAGE}");
+            ExitCode::SUCCESS
+        }
+        Ok(Outcome::Version) => {
+            println!("kestrel16_asm {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
         Ok(Outcome::Assembled) => ExitCode::SUCCESS,
@@ -93,6 +99,7 @@ fn run(arguments: &[String]) -> Result<Outcome, Failure> {
             "--listing" => command.listing = Some(value_of(arguments, &mut index)?),
             "--name" => command.name = Some(value_of(arguments, &mut index)?),
             "--help" | "-h" => return Ok(Outcome::Help),
+            "--version" | "-V" => return Ok(Outcome::Version),
             _ if argument.starts_with('-') => {
                 return Err(Failure::Message(format!("unknown option {argument}")));
             }

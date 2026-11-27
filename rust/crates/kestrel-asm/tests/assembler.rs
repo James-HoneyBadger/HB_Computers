@@ -198,3 +198,11 @@ fn an_operand_too_wide_for_its_form_is_refused() {
         );
     }
 }
+
+#[test]
+fn the_tool_reports_its_version() {
+    let output = Command::new(TOOL).arg("--version").output().expect("the tool to run");
+    assert!(output.status.success());
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(text.contains(env!("CARGO_PKG_VERSION")), "{text}");
+}

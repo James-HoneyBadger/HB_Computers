@@ -22,6 +22,19 @@ fn catalogues_succeed_and_use_the_final_model() {
 }
 
 #[test]
+fn version_reports_the_workspace_version() {
+    for binary in [env!("CARGO_BIN_EXE_kestrel"), env!("CARGO_BIN_EXE_kestrel_emu")] {
+        let output = Command::new(binary).arg("--version").output().unwrap();
+        assert!(output.status.success());
+        let text = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            text.contains(env!("CARGO_PKG_VERSION")),
+            "{binary} should name its version"
+        );
+    }
+}
+
+#[test]
 fn invalid_arguments_fail() {
     for args in [&["--frames", "-1"][..], &["--frames", "0"], &["--model", "unknown"], &["--unknown"]] {
         assert_eq!(run(args).status.code(), Some(2));

@@ -405,6 +405,7 @@ fn usage() {
          \x20 --languages  list the language ROMs the repository ships for the model\n\
          \x20 --roms    images to load from disk instead of assembling the ROMs\n\
          \x20 --cart    a cartridge to fit, by name from cartridges/ or as an image\n\
+         \x20 --version print the version and exit\n\
          \n\
          Inside a session, a line beginning with / is a command: /help lists them."
     );
@@ -428,6 +429,10 @@ fn main() -> ExitCode {
             arguments.get(*index).cloned()
         };
         match argument {
+            "--version" | "-V" => {
+                println!("kestrel_emu {}", env!("CARGO_PKG_VERSION"));
+                return ExitCode::SUCCESS;
+            }
             "--model" => {
                 model = match value(&mut index).as_deref() {
                     Some("kestrel") => Some(Model::Kestrel),

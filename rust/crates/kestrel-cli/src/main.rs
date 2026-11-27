@@ -52,7 +52,8 @@ fn usage() {
          \x20 --cartridges  list the cartridges the repository ships for the model\n\
          \x20 --disk     a disk image to put in the drive; it is written back at exit\n\
          \x20 --tape     a tape image to put in the deck\n\
-         \x20 --no-screen  run without printing the tube"
+         \x20 --no-screen  run without printing the tube\n\
+         \x20 --version  print the version and exit"
     );
 }
 
@@ -81,6 +82,10 @@ fn parse(arguments: &[String]) -> Result<Options, String> {
                 .ok_or_else(|| format!("{argument} needs a value"))
         };
         match argument {
+            "--version" | "-V" => {
+                println!("kestrel {}", env!("CARGO_PKG_VERSION"));
+                return Err(String::new());
+            }
             "--model" => {
                 let name = value()?;
                 options.model = match name.as_str() {
