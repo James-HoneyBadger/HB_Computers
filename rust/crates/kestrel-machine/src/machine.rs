@@ -237,9 +237,11 @@ impl Machine {
     }
 
     /// Write the volume back out, which is what a disk in a drive means: what the
-    /// machine wrote is there the next time it is mounted.
+    /// machine wrote is there the next time it is mounted. The write is atomic:
+    /// the bytes go to a sibling temporary file first, so a failed or
+    /// interrupted save leaves the original image intact.
     pub fn save_disk_image(&self, path: &Path) -> std::io::Result<()> {
-        std::fs::write(path, self.bus.disk.image())
+        write_atomically(path, self.bus.disk.image())
     }
 
     /// A tape in the deck. A tape is a byte stream, so any length is a tape.
@@ -251,7 +253,7 @@ impl Machine {
     }
 
     pub fn save_tape_image(&self, path: &Path) -> std::io::Result<()> {
-        std::fs::write(path, self.bus.tape.image())
+        write_atomically(path, self.bus.tape.image())
     }
 
     /// Power-on: RAM and the tube cleared, the devices idle, the clock at zero.
@@ -401,6 +403,26 @@ fn read_image(path: &Path) -> Result<Vec<u8>, RomError> {
     std::fs::read(path).map_err(|error| RomError::Unreadable(format!("{}: {error}", path.display())))
 }
 
+/// Write bytes to `path` without risking the file that is already there. The
+/// bytes go to a sibling temporary file first, which is then renamed over the
+/// target; a failed or interrupted write therefore leaves the original intact.
+fn write_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("image");
+    let temporary = parent.join(format!(".{name}.{}.tmp", std::process::id()));
+    if let Err(error) = std::fs::write(&temporary, bytes) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(error);
+    }
+    std::fs::rename(&temporary, path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -533,6 +555,37 @@ mod tests {
             machine.mount_disk_image(&path),
             Err(RomError::WrongSize { wanted, got }) if wanted == size && got == 100
         ));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// A failed save must not corrupt the image it was asked to overwrite: the
+    /// bytes go to a temporary sibling file and are only renamed over the
+    /// original once the whole volume is written.
+    #[test]
+    fn a_failed_disk_save_leaves_the_original_intact() {
+        let mut machine = boot(Model::Kestrel);
+        let size = machine.bus.disk.image_size();
+        let path = std::env::temp_dir().join("kestrel-atomic-save-test.dsk");
+        let original = vec![0x42u8; size];
+        std::fs::write(&path, &original).expect("a disk image to write");
+
+        machine.mount_disk_image(&path).expect("a disk that fits the drive");
+        let mut sector = vec![0u8; 256];
+        sector[0] = 0x99;
+        assert!(machine.bus.disk.write_sector(0, &sector));
+
+        // The temporary write fails because the parent directory is missing.
+        let bad = std::env::temp_dir()
+            .join("no-such-directory")
+            .join("disk.dsk");
+        assert!(machine.save_disk_image(&bad).is_err());
+
+        // The original is untouched.
+        assert_eq!(
+            std::fs::read(&path).expect("the original to be read"),
+            original,
+            "the original image survived the failed save"
+        );
         let _ = std::fs::remove_file(&path);
     }
 
