@@ -24,12 +24,21 @@ substantive pass. Do not read this file as aspirational.
    Commit `7e8cc48`; regression tests added.
 6. **Verified assembler and CLI exit codes** (malformed source → 1, no source →
    2, unknown option → 2, bad model/frames → 2, runtime error → 1).
+7. **Made disk and tape image saves atomic.** `save_disk_image` and
+   `save_tape_image` now write to a sibling temporary file and rename it over
+   the target, so a failed or interrupted save leaves the user's original image
+   intact. Commit `e7e2be3`; regression test added.
+8. **Reviewed the execution loop** (`run_cycles`/`run_frames`) and the paced
+   keyboard input; both are sound and deterministic (frame-tick IRQ, bounded
+   keyboard queue).
 
 ### Files changed (this pass)
 
 - `rust/crates/kestrel-machine/src/cpu6502.rs` — RMW cycle fix + test.
 - `rust/crates/kestrel-machine/src/bus.rs`, `src/lib.rs` — Kestrel 16 write-gap
   fix + test.
+- `rust/crates/kestrel-machine/src/machine.rs` — atomic disk/tape image saves
+  + test.
 - `rust/crates/kestrel-cli/src/main.rs`, `src/bin/kestrel-emu.rs`,
   `rust/crates/kestrel-asm/src/main.rs`, `rust/crates/kestrel16-asm/src/main.rs`
   and their test files — `--version`.
@@ -41,7 +50,7 @@ substantive pass. Do not read this file as aspirational.
 cd rust && cargo test --workspace --locked
 ```
 
-Result: **all green — 146 tests passed, 0 failed** (85 machine, 44 CLI,
+Result: **all green — 147 tests passed, 0 failed** (86 machine, 44 CLI,
 7 + 7 assembler, 3 app) after all changes.
 
 ```
@@ -55,6 +64,8 @@ Result: local Markdown links OK; both machines' documented BASIC examples OK.
 - 6502 RMW `abs,X`/`abs,Y` page-crossing penalty (8 cycles → 7).
 - Kestrel 16 bank-zero write decode for `$9F40–$9FFF` (writes dropped → RAM).
 - `kestrel16_asm` usage text naming the wrong tool.
+- Disk/tape image saves could truncate the original on a failed write (now
+  atomic).
 
 ### Known limitations
 

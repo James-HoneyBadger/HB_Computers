@@ -26,10 +26,10 @@ look and what evidence completes it.
    malformed and incomplete statements, boundary values, exhaustion. Evidence:
    controlled errors, no panics, in `kestrel-asm`, `kestrel16-asm`, and
    `kestrel-machine`.
-6. **Safe file operations audit.** Walk every filesystem write in the CLI and
-   app (disk save, tape save, screenshot, settings). Ensure atomic replacement
-   and that a failed save preserves the original. Evidence: tests plus code
-   inspection notes.
+6. **Safe file operations audit (partial).** Made disk/tape image saves atomic;
+   failed saves now preserve the original. Remaining: audit the screenshot write
+   in `kestrel-app` and the settings save path for the same pattern. Evidence:
+   tests plus code inspection notes.
 
 ## Next (Stage C — architecture and usability)
 
