@@ -90,6 +90,23 @@ mod tests {
     }
 
     #[test]
+    fn the_1992_gap_between_the_attributes_and_the_io_page_is_ram() {
+        use bus::Bus;
+        let mut kestrel16 = Bus::new(&KESTREL16);
+
+        // $9F40 is one past the attributes. The read decode answers RAM there,
+        // so a write must land in RAM too, not be dropped.
+        kestrel16.write(0x9F40, 0x5A);
+        assert_eq!(kestrel16.read(0x9F40), 0x5A, "the gap below the I/O page is RAM");
+
+        // Above the I/O page is the unmapped page: reads are zero and writes
+        // stay dropped.
+        assert_eq!(kestrel16.read(0xA100), 0);
+        kestrel16.write(0xA100, 0x7E);
+        assert_eq!(kestrel16.read(0xA100), 0, "the unmapped page drops writes");
+    }
+
+    #[test]
     fn the_1982_disk_moves_a_sector_through_its_pointer() {
         use bus::Bus;
         let mut kestrel = Bus::new(&KESTREL);

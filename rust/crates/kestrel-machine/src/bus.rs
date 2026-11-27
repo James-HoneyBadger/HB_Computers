@@ -603,6 +603,15 @@ impl Bus {
                 );
                 return;
             }
+            // The read decode answers RAM for the gap between the attributes and
+            // the I/O page, so a write there must land in RAM too; above the I/O
+            // page the regions are the cartridge, the KERNAL and the unmapped
+            // page above it, all of which drop writes.
+            if u32::from(offset) < self.profile.io_base {
+                if (address as usize) < self.ram.len() {
+                    self.ram[address as usize] = value;
+                }
+            }
             return;
         }
         if (address as usize) < self.ram.len() {
