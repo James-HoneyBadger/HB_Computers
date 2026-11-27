@@ -3,29 +3,37 @@
 Accurate status of the HB Computers engineering overhaul. Updated after every
 substantive pass. Do not read this file as aspirational.
 
-## Current pass — Stage B: correctness (CPU audit)
+## Current pass — Stage B: correctness (CPU, bus, CLI)
 
 ### Work completed
 
 1. **Read both processor cores in full** (`cpu6502.rs`, `cpu65816.rs`, and the
    65816 tests) and audited them against the directive's CPU checklist.
-2. **Fixed a 6502 cycle-accounting defect.** Read-modify-write instructions
-   (`ASL`, `LSR`, `ROL`, `ROR`, `INC`, `DEC`) with an `absolute,X` or
-   `absolute,Y` operand were charged an extra cycle when the index crossed a
-   page. The NMOS 6502 does not add that penalty (an RMW `abs,X` is seven cycles
-   regardless of page), and the 65816 core already handled it correctly. Commit
-   `e8849a1` removes the penalty and adds a regression assertion.
+2. **Fixed a 6502 cycle-accounting defect.** RMW instructions with an
+   `absolute,X`/`absolute,Y` operand were charged an extra cycle on a page cross;
+   the NMOS 6502 fixes them at seven cycles. Commit `e8849a1`.
 3. **Wrote `docs/cpu-conformance.md`** — an explicit conformance matrix for both
-   cores, distinguishing functional correctness, instruction-level cycle
-   accounting and bus-level accuracy, and documenting the undocumented-opcode
-   policy and reset conventions. Linked it from `docs/README.md`.
+   cores, linked from `docs/README.md`.
+4. **Fixed a Kestrel 16 bus write-decode defect.** Addresses `$9F40–$9FFF`
+   (between attribute memory and the I/O page) read as RAM but silently dropped
+   writes. The write decode now lands them in backing RAM, matching the read
+   decode and the documented map. Commit `3f0286e`; regression test added.
+5. **Added `--version`/`-V` to all four binaries** (`kestrel`, `kestrel_emu`,
+   `kestrel_asm`, `kestrel16_asm`), each exiting zero and reporting the workspace
+   version. Also fixed `kestrel16_asm`'s usage text, which named the wrong tool.
+   Commit `7e8cc48`; regression tests added.
+6. **Verified assembler and CLI exit codes** (malformed source → 1, no source →
+   2, unknown option → 2, bad model/frames → 2, runtime error → 1).
 
 ### Files changed (this pass)
 
-- `rust/crates/kestrel-machine/src/cpu6502.rs` — RMW page-cross cycle fix and
-  regression test; corrected the `paid()` doc comment.
-- `docs/cpu-conformance.md` (new) — conformance matrix.
-- `docs/README.md` — link to the conformance matrix.
+- `rust/crates/kestrel-machine/src/cpu6502.rs` — RMW cycle fix + test.
+- `rust/crates/kestrel-machine/src/bus.rs`, `src/lib.rs` — Kestrel 16 write-gap
+  fix + test.
+- `rust/crates/kestrel-cli/src/main.rs`, `src/bin/kestrel-emu.rs`,
+  `rust/crates/kestrel-asm/src/main.rs`, `rust/crates/kestrel16-asm/src/main.rs`
+  and their test files — `--version`.
+- `docs/cpu-conformance.md` (new), `docs/README.md`.
 
 ### Actual test commands and results
 
@@ -33,7 +41,8 @@ substantive pass. Do not read this file as aspirational.
 cd rust && cargo test --workspace --locked
 ```
 
-Result: **all green — 142 tests passed, 0 failed** after the fix.
+Result: **all green — 146 tests passed, 0 failed** (85 machine, 44 CLI,
+7 + 7 assembler, 3 app) after all changes.
 
 ```
 python3 scripts/check_docs.py rust/target/debug/kestrel
@@ -41,21 +50,16 @@ python3 scripts/check_docs.py rust/target/debug/kestrel
 
 Result: local Markdown links OK; both machines' documented BASIC examples OK.
 
-### Architectural decisions
-
-See `ARCHITECTURE_DECISIONS.md`. The cycle-accounting correction is recorded
-there and in `docs/cpu-conformance.md`.
-
 ### Defects corrected
 
 - 6502 RMW `abs,X`/`abs,Y` page-crossing penalty (8 cycles → 7).
+- Kestrel 16 bank-zero write decode for `$9F40–$9FFF` (writes dropped → RAM).
+- `kestrel16_asm` usage text naming the wrong tool.
 
 ### Known limitations
 
-- No third-party CPU conformance vectors are wired in yet; coverage comes from
-  the ported C++ suites, the machine integration tests and the samples.
-- Neither core claims bus-level cycle accuracy; cycle accounting is
-  instruction-level only.
+- No third-party CPU conformance vectors wired in yet.
+- Neither core claims bus-level cycle accuracy.
 
 ## Earlier pass — Stage A: baseline
 

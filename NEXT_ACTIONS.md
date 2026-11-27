@@ -9,14 +9,12 @@ look and what evidence completes it.
 1. ~~**CPU conformance matrix.**~~ Done — see `docs/cpu-conformance.md`.
 2. **CPU defect hunt (ongoing).** Both cores read in full; one 6502 defect fixed
    (RMW page-cross cycle). Remaining: wire in a third-party conformance vector
-   suite (e.g. Klaus Dormann 6502 functional tests) and record provenance;
-   re-verify the 6502 decimal-mode flag edge cases with vector evidence.
+   suite (e.g. Klaus Dormann 6502 functional tests) and record provenance.
    Evidence: vector suite runs green; any new defect gets a regression test.
-3. **Memory-map and bus decode tests.** `bus.rs` has inline tests in `lib.rs`;
-   extend them for boundary addresses, ROM overlays, the Kestrel 16 `$A100–$BFFF`
-   region, cartridge windows, bank transitions, read-only regions and writes
-   beneath overlays. First resolve whether the `$A100–$BFFF` zero read is intended
-   (check `roms/kestrel16/*.inc` and the C++ history). Evidence: tests in
+3. **Memory-map and bus decode tests (partial).** Fixed the Kestrel 16
+   `$9F40–$9FFF` write-decode gap and added a test. Remaining: boundary tests for
+   ROM overlays, cartridge windows (banks `$04–$07`), bank transitions, read-only
+   regions, and the 1982 machine's equivalent gaps. Evidence: tests in
    `kestrel-machine`.
 4. **BASIC feature inventory.** Extract a feature inventory from the ROM assembly
    (`roms/kestrel/*.s`, `roms/kestrel16/*.s`) and from executable tests, not from
