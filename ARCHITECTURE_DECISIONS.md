@@ -57,6 +57,12 @@ have no external dependencies, which keeps the headless path dependency-light.
    commit `2212e7b`) by fast-forward. Its technical claims were verified against
    the implementation before merging (see below). This is documented here rather
    than silently.
+2. **Correct the 6502 read-modify-write page-crossing cycle count.** RMW
+   instructions (`ASL`/`LSR`/`ROL`/`ROR`/`INC`/`DEC`) with `absolute,X` or
+   `absolute,Y` operands are fixed at seven cycles on the NMOS 6502; the previous
+   extra page-crossing cycle was a ported C++ deviation, not chip behavior. The
+   65816 core already omitted the penalty, so the cores are now consistent with
+   each other and with the datasheet. Recorded in `docs/cpu-conformance.md`.
 
 ## Findings that remain open (not yet acted on)
 

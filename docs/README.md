@@ -41,6 +41,7 @@ same commit.
 - [Quickstart](../QUICKSTART.md) — get both machines running.
 - [BASIC dialect comparison](basic-comparison.md) — choose the right language.
 - [Development history](development-history.md) — the C++/Qt to Rust/egui migration.
+- [Processor conformance](cpu-conformance.md) — what the two cores are verified to do.
 
 ## Reading order
 

@@ -6,16 +6,12 @@ look and what evidence completes it.
 
 ## Immediate (Stage B — correctness and data integrity)
 
-1. **CPU conformance matrix.** Read `rust/crates/kestrel-machine/src/cpu6502.rs`
-   and `cpu65816.rs` in full; build a matrix of legal opcode coverage, addressing
-   modes, flags, timing, and (for the 65816) mode/width behavior. Record the
-   matrix in `docs/technical-reference.md` or a new `docs/cpu-conformance.md`,
-   distinguishing functional correctness, cycle accounting and bus-level
-   accuracy. Evidence: the matrix exists and cites tests.
-2. **CPU defect hunt.** Cross-check both cores against the ported C++ tables and
-   the existing unit tests (`cpu65816/tests.rs`, the inline tests in
-   `cpu6502.rs`). Add a regression test for every discovered defect. Evidence:
-   new tests fail before the fix, pass after.
+1. ~~**CPU conformance matrix.**~~ Done — see `docs/cpu-conformance.md`.
+2. **CPU defect hunt (ongoing).** Both cores read in full; one 6502 defect fixed
+   (RMW page-cross cycle). Remaining: wire in a third-party conformance vector
+   suite (e.g. Klaus Dormann 6502 functional tests) and record provenance;
+   re-verify the 6502 decimal-mode flag edge cases with vector evidence.
+   Evidence: vector suite runs green; any new defect gets a regression test.
 3. **Memory-map and bus decode tests.** `bus.rs` has inline tests in `lib.rs`;
    extend them for boundary addresses, ROM overlays, the Kestrel 16 `$A100–$BFFF`
    region, cartridge windows, bank transitions, read-only regions and writes
