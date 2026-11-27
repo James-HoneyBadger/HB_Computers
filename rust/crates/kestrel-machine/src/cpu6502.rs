@@ -484,10 +484,7 @@ impl Cpu6502 {
                     };
                     self.a = value;
                 } else {
-                    let (address, crossed) = self.address(bus, mode);
-                    if crossed {
-                        cycles += 1;
-                    }
+                    let (address, _) = self.address(bus, mode);
                     let value = bus.read(address);
                     let value = match op {
                         Op::Asl => self.asl(value),
@@ -540,10 +537,7 @@ impl Cpu6502 {
                 self.compare(self.y, value);
             }
             Op::Dec => {
-                let (address, crossed) = self.address(bus, mode);
-                if crossed {
-                    cycles += 1;
-                }
+                let (address, _) = self.address(bus, mode);
                 let value = bus.read(address).wrapping_sub(1);
                 bus.write(address, value);
                 self.set_zn(value);
@@ -562,10 +556,7 @@ impl Cpu6502 {
                 self.set_zn(self.a);
             }
             Op::Inc => {
-                let (address, crossed) = self.address(bus, mode);
-                if crossed {
-                    cycles += 1;
-                }
+                let (address, _) = self.address(bus, mode);
                 let value = bus.read(address).wrapping_add(1);
                 bus.write(address, value);
                 self.set_zn(value);
@@ -769,9 +760,9 @@ impl Cpu6502 {
     }
 
     /// The operand's value, with the page-crossing penalty added for the
-    /// instructions that pay it. The C++ core charges it to the read-modify-write
-    /// instructions too, which the datasheet does not; the port keeps the machine
-    /// it is a port of, so the pacing is the same.
+    /// instructions that pay it. Read-modify-write instructions do not pay the
+    /// penalty on the chip — `ASL abs,X` is seven cycles whatever page the index
+    /// lands in — so their handlers never add it.
     fn paid(&mut self, bus: &mut dyn Bus, mode: Mode, cycles: &mut i32) -> u8 {
         if mode == Mode::Imm {
             return self.fetch(bus);
@@ -1406,6 +1397,19 @@ mod tests {
         registers.x = 0xF0;
         cpu.set_registers(&registers);
         assert_eq!(cpu.step(&mut ram), 5);
+
+        // Read-modify-write instructions do not earn the penalty either: the
+        // chip's `ASL abs,X` is seven cycles whether or not the index crosses a
+        // page, and charging eight was a cycle-accounting defect.
+        for opcode in [0x1Eu8, 0xFE, 0xDE] {
+            // ASL, INC and DEC absolute,X.
+            ram.load(0x0220, &[opcode, 0x00, 0x30]);
+            let mut registers = cpu.registers();
+            registers.pc = 0x0220;
+            registers.x = 0xF0;
+            cpu.set_registers(&registers);
+            assert_eq!(cpu.step(&mut ram), 7, "opcode {opcode:#04X} crossing a page");
+        }
 
         // A frame's worth of work: 20 000 cycles is the machine's tick.
         let mut ram = Ram::new();
